@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -7,11 +7,13 @@ import * as Clipboard from 'expo-clipboard';
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
+import { AvatarBadge } from '@/components/AvatarBadge';
+import { ChoiceChips } from '@/components/ChoiceChips';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDateTime } from '@/utils/date';
 import { maskSensitive, tripDateRange } from '@/utils/format';
-import { getNextFlight, getTripBundle } from '@/utils/selectors';
+import { getNextEvent, getNextFlight, getTripBundle } from '@/utils/selectors';
 
 function ValueCard({
   label,
@@ -45,10 +47,23 @@ export default function TravelModeScreen() {
   const { data } = useAppStore();
   const bundle = getTripBundle(data, tripId);
   const nextFlight = getNextFlight(data, tripId);
+  const nextEvent = getNextEvent(data, tripId);
   const hotel = bundle.hotelStays[0];
   const insuranceDocument = bundle.documents.find((document) => document.documentType === 'insurance');
   const [revealed, setRevealed] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const { width } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView | null>(null);
+  const pageWidth = width - 32;
+
+  const views = useMemo(
+    () => [
+      { key: 'family', label: 'Family' },
+      ...bundle.travellers.map((traveller) => ({ key: traveller.id, label: traveller.fullName.split(' ')[0] })),
+    ],
+    [bundle.travellers]
+  );
+  const [activeView, setActiveView] = useState(views[0]?.key ?? 'family');
 
   useEffect(() => {
     if (!secondsLeft) return;
@@ -64,14 +79,12 @@ export default function TravelModeScreen() {
     return () => clearInterval(timer);
   }, [secondsLeft]);
 
-  const travellerValues = useMemo(
-    () =>
-      bundle.travellers.flatMap((traveller) => [
-        { label: `${traveller.fullName} passport`, value: traveller.passportNumber, sensitive: true },
-        { label: `${traveller.fullName} GHIC / EHIC`, value: traveller.ghicNumber, sensitive: true },
-      ]),
-    [bundle.travellers]
-  );
+  function scrollToView(key: string) {
+    const index = views.findIndex((view) => view.key === key);
+    if (index < 0) return;
+    setActiveView(key);
+    scrollRef.current?.scrollTo({ x: index * pageWidth, animated: true });
+  }
 
   if (!bundle.trip) {
     return (
@@ -84,59 +97,115 @@ export default function TravelModeScreen() {
   }
 
   return (
-    <AppScreen title="Travel Mode" subtitle="High-contrast, one-hand access for airports, hotels, taxis, and emergencies.">
+    <AppScreen title="Travel Mode" subtitle="Quick access for airports, hotels, taxis, and family emergencies.">
       <AppCard>
         <Text style={styles.tripName}>{bundle.trip.name}</Text>
         <Text style={styles.subline}>{bundle.trip.destination}</Text>
         <Text style={styles.subline}>{tripDateRange(bundle.trip.startDate, bundle.trip.endDate)}</Text>
         <View style={styles.buttonRow}>
-          <AppButton label={revealed ? 'Hide sensitive values' : 'Reveal sensitive values'} onPress={() => { setRevealed((current) => !current); setSecondsLeft(0); }} />
-          <AppButton label={secondsLeft ? `Visible for ${secondsLeft}s` : 'Show for 30 sec'} tone="secondary" onPress={() => { setRevealed(true); setSecondsLeft(30); }} />
+          <AppButton
+            label={revealed ? 'Hide sensitive values' : 'Reveal sensitive values'}
+            onPress={() => {
+              setRevealed((current) => !current);
+              setSecondsLeft(0);
+            }}
+          />
+          <AppButton
+            label={secondsLeft ? `Visible for ${secondsLeft}s` : 'Show for 30 sec'}
+            tone="secondary"
+            onPress={() => {
+              setRevealed(true);
+              setSecondsLeft(30);
+            }}
+          />
         </View>
       </AppCard>
 
-      <AppCard title="Travellers">
+      <ChoiceChips<string>
+        value={activeView}
+        onChange={scrollToView}
+        options={views.map((view) => ({ label: view.label, value: view.key }))}
+      />
+
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={(event) => {
+          const index = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+          setActiveView(views[index]?.key ?? 'family');
+        }}
+      >
+        <View style={[styles.page, { width: pageWidth }]}>
+          <AppCard title="Family overview">
+            <View style={styles.familyList}>
+              {bundle.travellers.map((traveller) => (
+                <View key={traveller.id} style={styles.familyRow}>
+                  <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} size={36} />
+                  <View style={styles.familyCopy}>
+                    <Text style={styles.subline}>{traveller.fullName}</Text>
+                    <Text style={styles.smallText}>
+                      Passport {revealed ? traveller.passportNumber || 'Not set' : maskSensitive(traveller.passportNumber)}
+                    </Text>
+                    <Text style={styles.smallText}>
+                      GHIC / EHIC {revealed ? traveller.ghicNumber || 'Not set' : maskSensitive(traveller.ghicNumber)}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </AppCard>
+          <ValueCard label="Insurance policy" value={insuranceDocument?.documentNumber || ''} sensitive revealed={revealed} />
+          <ValueCard label="Insurer emergency" value={bundle.emergencyInfo?.insurerEmergencyNumber || ''} revealed />
+          <ValueCard label="Emergency contacts" value={bundle.emergencyInfo?.emergencyContacts || ''} revealed />
+          <AppCard title="Shared travel refs">
+            <Text style={styles.subline}>{nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : 'No upcoming flight saved'}</Text>
+            {nextFlight ? (
+              <>
+                <Text style={styles.smallText}>{nextFlight.departureAirport} → {nextFlight.arrivalAirport}</Text>
+                <Text style={styles.smallText}>{formatDateTime(nextFlight.departureTime)}</Text>
+                <ValueCard label="Booking ref" value={nextFlight.bookingRef} revealed />
+              </>
+            ) : null}
+            {hotel ? (
+              <>
+                <Text style={styles.subline}>{hotel.hotelName}</Text>
+                <Text style={styles.smallText}>{hotel.address}</Text>
+                <ValueCard label="Hotel phone" value={hotel.phone} revealed />
+              </>
+            ) : null}
+            {nextEvent ? <Text style={styles.smallText}>Next important event: {nextEvent.title} • {formatDateTime(nextEvent.dateTime)}</Text> : null}
+          </AppCard>
+          <AppCard title="Emergency notes">
+            <Text style={styles.smallText}>{bundle.emergencyInfo?.localEmergencyNote || 'No local emergency note saved.'}</Text>
+            <Text style={styles.smallText}>{bundle.emergencyInfo?.embassyConsulateNote || 'No embassy / consulate note saved.'}</Text>
+          </AppCard>
+        </View>
+
         {bundle.travellers.map((traveller) => (
-          <Text key={traveller.id} style={styles.subline}>{traveller.fullName}</Text>
+          <View key={traveller.id} style={[styles.page, { width: pageWidth }]}>
+            <AppCard>
+              <View style={styles.familyRow}>
+                <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} size={48} />
+                <View style={styles.familyCopy}>
+                  <Text style={styles.tripName}>{traveller.fullName}</Text>
+                  <Text style={styles.smallText}>{traveller.relationshipType}</Text>
+                </View>
+              </View>
+            </AppCard>
+            <ValueCard label="Passport number" value={traveller.passportNumber} sensitive revealed={revealed} />
+            <ValueCard label="GHIC / EHIC number" value={traveller.ghicNumber} sensitive revealed={revealed} />
+            <ValueCard label="Medical note" value={traveller.medicalNote} revealed />
+            <AppCard title="Shared refs">
+              <ValueCard label="Insurance policy" value={insuranceDocument?.documentNumber || ''} sensitive revealed={revealed} />
+              <ValueCard label="Next flight ref" value={nextFlight?.bookingRef || ''} revealed />
+              <ValueCard label="Hotel ref" value={hotel?.bookingRef || ''} revealed />
+              {nextEvent ? <Text style={styles.smallText}>Next event: {nextEvent.title} • {formatDateTime(nextEvent.dateTime)}</Text> : null}
+            </AppCard>
+          </View>
         ))}
-      </AppCard>
-
-      {travellerValues.map((item) => (
-        <ValueCard key={item.label} label={item.label} value={item.value} sensitive={item.sensitive} revealed={revealed} />
-      ))}
-
-      <ValueCard label="Insurance policy" value={insuranceDocument?.documentNumber || ''} sensitive revealed={revealed} />
-      <ValueCard label="Insurer emergency" value={bundle.emergencyInfo?.insurerEmergencyNumber || ''} revealed />
-      <ValueCard label="Emergency contacts" value={bundle.emergencyInfo?.emergencyContacts || ''} revealed />
-
-      <AppCard title="Next flight">
-        <Text style={styles.subline}>{nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : 'No upcoming flight saved'}</Text>
-        {nextFlight ? (
-          <>
-            <Text style={styles.subline}>{nextFlight.departureAirport} → {nextFlight.arrivalAirport}</Text>
-            <Text style={styles.subline}>{formatDateTime(nextFlight.departureTime)}</Text>
-            <ValueCard label="Booking ref" value={nextFlight.bookingRef} sensitive={false} revealed />
-            <ValueCard label="Terminal / gate" value={`${nextFlight.terminal || 'TBC'} / ${nextFlight.gate || 'TBC'}`} revealed />
-          </>
-        ) : null}
-      </AppCard>
-
-      <AppCard title="Hotel">
-        <Text style={styles.subline}>{hotel?.hotelName || 'No hotel saved'}</Text>
-        {hotel ? (
-          <>
-            <ValueCard label="Address" value={hotel.address} revealed />
-            <ValueCard label="Phone" value={hotel.phone} revealed />
-            <ValueCard label="Booking ref" value={hotel.bookingRef} revealed />
-          </>
-        ) : null}
-      </AppCard>
-
-      <AppCard title="Emergency notes">
-        <Text style={styles.subline}>{bundle.emergencyInfo?.localEmergencyNote || 'No local emergency note saved.'}</Text>
-        <Text style={styles.subline}>{bundle.emergencyInfo?.embassyConsulateNote || 'No embassy / consulate note saved.'}</Text>
-        <Text style={styles.subline}>{bundle.emergencyInfo?.travellerMedicalNote || 'No traveller medical note saved.'}</Text>
-      </AppCard>
+      </ScrollView>
     </AppScreen>
   );
 }
@@ -145,7 +214,7 @@ const styles = StyleSheet.create({
   tripName: {
     color: colors.nightNavy,
     fontFamily: 'Poppins_700Bold',
-    fontSize: 30,
+    fontSize: 28,
   },
   subline: {
     color: colors.nightNavy,
@@ -153,8 +222,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
+  smallText: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+  },
   buttonRow: {
     gap: spacing.sm,
+  },
+  page: {
+    gap: spacing.md,
+    paddingRight: spacing.md,
+  },
+  familyList: {
+    gap: spacing.sm,
+  },
+  familyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  familyCopy: {
+    flex: 1,
+    gap: 2,
   },
   valueCard: {
     backgroundColor: colors.nightNavy,

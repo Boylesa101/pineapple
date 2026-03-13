@@ -1,5 +1,7 @@
 import { formatShortDate } from './date';
 
+import type { RelationshipType } from '@/types/models';
+
 export function maskSensitive(value: string, keep = 4) {
   if (!value) {
     return 'Not set';
@@ -26,4 +28,17 @@ export function pluralize(count: number, singular: string, plural = `${singular}
 
 export function tripDateRange(startDate: string, endDate: string) {
   return `${formatShortDate(startDate)} - ${formatShortDate(endDate)}`;
+}
+
+export function relationshipLabel(value: RelationshipType) {
+  switch (value) {
+    case 'adult':
+      return 'Adult';
+    case 'child':
+      return 'Child';
+    case 'infant':
+      return 'Infant';
+    default:
+      return 'Other';
+  }
 }

@@ -9,24 +9,35 @@ import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { EmptyState } from '@/components/EmptyState';
+import { InfoChip } from '@/components/InfoChip';
+import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { ProgressBar } from '@/components/ProgressBar';
 import { SectionHeader } from '@/components/SectionHeader';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, spacing } from '@/constants/theme';
+import { packingTemplates, type PackingTemplateId } from '@/data/packingTemplates';
 import { useAppStore } from '@/store/useAppStore';
-import type { LuggageType, PackingCategory, PackingItemDraft } from '@/types/models';
+import type {
+  LuggageType,
+  PackingAssignmentScope,
+  PackingCategory,
+  PackingItemDraft,
+  PackingPriority,
+} from '@/types/models';
 import { percent } from '@/utils/format';
-import { getPackingProgress, getTripBundle } from '@/utils/selectors';
+import { getPackingProgress, getPackingProgressByTraveller, getTripBundle } from '@/utils/selectors';
 import { validatePackingItem } from '@/utils/validation';
 
 const emptyDraft = (tripId: string): PackingItemDraft => ({
   tripId,
-  travellerId: null,
   title: '',
   category: 'clothes',
   quantity: 1,
   isPacked: false,
   luggageType: 'checked',
+  assignmentScope: 'trip',
+  travellerIds: [],
+  priority: 'useful',
   notes: '',
 });
 
@@ -41,13 +52,28 @@ const categoryLabels: Record<PackingCategory, string> = {
   other: 'Other',
 };
 
+const priorityLabels: Record<PackingPriority, string> = {
+  essential: 'Essential',
+  useful: 'Useful',
+  optional: 'Optional',
+};
+
 export default function PackingScreen() {
-  const { data, activeTripId, setActiveTrip, savePackingItem, deleteRecord } = useAppStore();
+  const {
+    data,
+    activeTripId,
+    setActiveTrip,
+    savePackingItem,
+    deleteRecord,
+    duplicatePackingItem,
+    applyPackingTemplate,
+  } = useAppStore();
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState<PackingItemDraft | null>(null);
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
   const progress = getPackingProgress(data, selectedTripId);
+  const travellerProgress = getPackingProgressByTraveller(bundle.packingItems, bundle.travellers);
   const grouped = useMemo(() => {
     return bundle.packingItems.reduce<Record<string, typeof bundle.packingItems>>((accumulator, item) => {
       accumulator[item.category] = [...(accumulator[item.category] ?? []), item];
@@ -59,7 +85,10 @@ export default function PackingScreen() {
     return (
       <AppScreen title="Packing">
         <AppCard>
-          <EmptyState title="Packing starts with a trip" description="Create a trip first, then build category-based packing lists, assign items to travellers, and track progress." />
+          <EmptyState
+            title="Packing starts with a trip"
+            description="Create a trip first, then build category-based packing lists, apply templates, and assign items to one traveller, several travellers, or the whole trip."
+          />
         </AppCard>
       </AppScreen>
     );
@@ -76,19 +105,57 @@ export default function PackingScreen() {
     setVisible(false);
   }
 
+  async function handleTemplateApply(templateId: PackingTemplateId) {
+    if (!selectedTripId) return;
+    await applyPackingTemplate(selectedTripId, templateId);
+  }
+
   return (
-    <AppScreen title="Packing" subtitle="Grouped by category, assigned by traveller, and ready offline.">
+    <AppScreen title="Packing" subtitle="Family-focused lists, templates, and traveller progress that stay offline.">
       <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
       <AppCard title="Completion">
-        <Text style={styles.meta}>{progress.packed} of {progress.total} items packed</Text>
+        <Text style={styles.meta}>
+          {progress.packed} of {progress.total} items packed
+        </Text>
         <ProgressBar progress={percent(progress.packed, progress.total)} />
+        <View style={styles.chipRow}>
+          {travellerProgress.map(({ traveller, packed, total }) => (
+            <InfoChip
+              key={traveller.id}
+              label={`${traveller.fullName.split(' ')[0]} ${packed}/${total || 0}`}
+              tone={total && packed === total ? 'success' : 'blue'}
+            />
+          ))}
+        </View>
       </AppCard>
+
+      <AppCard title="Templates" subtitle="Apply quick lists when creating a trip or later.">
+        <View style={styles.templateList}>
+          {Object.entries(packingTemplates).map(([templateId, template]) => (
+            <View key={templateId} style={styles.templateRow}>
+              <View style={styles.templateCopy}>
+                <Text style={styles.templateTitle}>{template.label}</Text>
+                <Text style={styles.meta}>{template.description}</Text>
+              </View>
+              <AppButton label="Apply" tone="secondary" onPress={() => handleTemplateApply(templateId as PackingTemplateId)} />
+            </View>
+          ))}
+        </View>
+      </AppCard>
+
       {Object.keys(grouped).length ? (
         Object.entries(grouped).map(([category, items]) => (
           <AppCard key={category}>
             <SectionHeader title={categoryLabels[category as PackingCategory]} subtitle={`${items.length} item(s)`} />
             {items.map((item) => {
-              const traveller = bundle.travellers.find((travellerItem) => travellerItem.id === item.travellerId);
+              const assignedNames =
+                item.assignmentScope === 'trip'
+                  ? 'Entire trip'
+                  : bundle.travellers
+                      .filter((traveller) => item.travellerIds.includes(traveller.id))
+                      .map((traveller) => traveller.fullName)
+                      .join(', ');
+
               return (
                 <View key={item.id} style={styles.row}>
                   <Pressable
@@ -98,12 +165,24 @@ export default function PackingScreen() {
                     {item.isPacked ? <MaterialIcons name="check" size={16} color={colors.white} /> : null}
                   </Pressable>
                   <View style={styles.rowCopy}>
-                    <Text style={styles.rowTitle}>{item.title} x{item.quantity}</Text>
+                    <Text style={styles.rowTitle}>
+                      {item.title} x{item.quantity}
+                    </Text>
                     <Text style={styles.meta}>
-                      {traveller?.fullName || 'Everyone'} • {item.luggageType === 'carry_on' ? 'Carry-on' : 'Checked'}
+                      {assignedNames} • {item.luggageType === 'carry_on' ? 'Carry-on' : 'Checked'} •{' '}
+                      {priorityLabels[item.priority]}
                     </Text>
                   </View>
-                  <Pressable onPress={() => { setDraft(item); setVisible(true); }} style={styles.iconButton}>
+                  <Pressable onPress={() => duplicatePackingItem(item.id)} style={styles.iconButton}>
+                    <MaterialIcons name="content-copy" size={18} color={colors.nightNavy} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setDraft(item);
+                      setVisible(true);
+                    }}
+                    style={styles.iconButton}
+                  >
                     <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
                   </Pressable>
                   <Pressable onPress={() => deleteRecord('packing_items', item.id)} style={styles.iconButton}>
@@ -116,48 +195,119 @@ export default function PackingScreen() {
         ))
       ) : (
         <AppCard>
-          <EmptyState title="Your list is empty" description="Add clothes, toiletries, electronics, medicines, and anything else you need." />
+          <EmptyState
+            title="Your list is empty"
+            description="Add clothes, toiletries, electronics, medicines, family extras, and priority labels to get ready."
+          />
         </AppCard>
       )}
 
-      <AppButton label="Add packing item" onPress={() => { if (selectedTripId) { setDraft(emptyDraft(selectedTripId)); setVisible(true); } }} />
+      <AppButton
+        label="Add packing item"
+        onPress={() => {
+          if (selectedTripId) {
+            setDraft(emptyDraft(selectedTripId));
+            setVisible(true);
+          }
+        }}
+      />
 
-      <AppModal visible={visible} title={draft?.id ? 'Edit packing item' : 'Add packing item'} onClose={() => setVisible(false)}>
+      <AppModal
+        visible={visible}
+        title={draft?.id ? 'Edit packing item' : 'Add packing item'}
+        onClose={() => setVisible(false)}
+      >
         {draft ? (
           <>
-            <AppTextField label="Item" value={draft.title} onChangeText={(value) => setDraft((current) => current ? { ...current, title: value } : current)} placeholder="Swimwear" />
-            <AppTextField label="Quantity" value={String(draft.quantity)} onChangeText={(value) => setDraft((current) => current ? { ...current, quantity: Number(value || '1') } : current)} keyboardType="numeric" />
+            <AppTextField
+              label="Item"
+              value={draft.title}
+              onChangeText={(value) => setDraft((current) => (current ? { ...current, title: value } : current))}
+              placeholder="Swimwear"
+            />
+            <AppTextField
+              label="Quantity"
+              value={String(draft.quantity)}
+              onChangeText={(value) =>
+                setDraft((current) => (current ? { ...current, quantity: Math.max(1, Number(value || '1')) } : current))
+              }
+              keyboardType="numeric"
+            />
             <View style={styles.field}>
               <Text style={styles.label}>Category</Text>
               <ChoiceChips<PackingCategory>
                 value={draft.category}
-                onChange={(value) => setDraft((current) => current ? { ...current, category: value } : current)}
+                onChange={(value) => setDraft((current) => (current ? { ...current, category: value } : current))}
                 options={Object.entries(categoryLabels).map(([value, label]) => ({ value: value as PackingCategory, label }))}
               />
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Assigned traveller</Text>
-              <ChoiceChips<string>
-                value={draft.travellerId ?? 'everyone'}
-                onChange={(value) => setDraft((current) => current ? { ...current, travellerId: value === 'everyone' ? null : value } : current)}
+              <Text style={styles.label}>Assignment</Text>
+              <ChoiceChips<PackingAssignmentScope>
+                value={draft.assignmentScope}
+                onChange={(value) =>
+                  setDraft((current) =>
+                    current
+                      ? {
+                          ...current,
+                          assignmentScope: value,
+                          travellerIds: value === 'trip' ? [] : current.travellerIds,
+                        }
+                      : current
+                  )
+                }
                 options={[
-                  { label: 'Everyone', value: 'everyone' },
-                  ...bundle.travellers.map((traveller) => ({ label: traveller.fullName, value: traveller.id })),
+                  { label: 'Entire trip', value: 'trip' },
+                  { label: 'Specific travellers', value: 'travellers' },
                 ]}
               />
             </View>
+            {draft.assignmentScope === 'travellers' ? (
+              <View style={styles.field}>
+                <Text style={styles.label}>Travellers</Text>
+                <MultiSelectChips
+                  value={draft.travellerIds}
+                  onChange={(travellerIds) =>
+                    setDraft((current) => (current ? { ...current, travellerIds } : current))
+                  }
+                  options={bundle.travellers.map((traveller) => ({
+                    label: traveller.fullName,
+                    value: traveller.id,
+                  }))}
+                />
+              </View>
+            ) : null}
             <View style={styles.field}>
               <Text style={styles.label}>Luggage</Text>
               <ChoiceChips<LuggageType>
                 value={draft.luggageType}
-                onChange={(value) => setDraft((current) => current ? { ...current, luggageType: value } : current)}
+                onChange={(value) =>
+                  setDraft((current) => (current ? { ...current, luggageType: value } : current))
+                }
                 options={[
                   { label: 'Carry-on', value: 'carry_on' },
                   { label: 'Checked', value: 'checked' },
                 ]}
               />
             </View>
-            <AppTextField label="Notes" value={draft.notes} onChangeText={(value) => setDraft((current) => current ? { ...current, notes: value } : current)} multiline />
+            <View style={styles.field}>
+              <Text style={styles.label}>Priority</Text>
+              <ChoiceChips<PackingPriority>
+                value={draft.priority}
+                onChange={(value) => setDraft((current) => (current ? { ...current, priority: value } : current))}
+                options={[
+                  { label: 'Essential', value: 'essential' },
+                  { label: 'Useful', value: 'useful' },
+                  { label: 'Optional', value: 'optional' },
+                ]}
+              />
+            </View>
+            <AppTextField
+              label="Notes"
+              value={draft.notes}
+              onChangeText={(value) => setDraft((current) => (current ? { ...current, notes: value } : current))}
+              multiline
+            />
             <AppButton label="Save item" onPress={handleSave} />
           </>
         ) : null}
@@ -167,6 +317,28 @@ export default function PackingScreen() {
 }
 
 const styles = StyleSheet.create({
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  templateList: {
+    gap: spacing.sm,
+  },
+  templateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  templateCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  templateTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  },
   field: {
     gap: spacing.xs,
   },
@@ -209,6 +381,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
+    lineHeight: 18,
   },
   iconButton: {
     padding: spacing.xs,

@@ -10,18 +10,20 @@ import { AppCard } from '@/components/AppCard';
 import { AppModal } from '@/components/AppModal';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
+import { AvatarBadge } from '@/components/AvatarBadge';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { EmptyState } from '@/components/EmptyState';
+import { InfoChip } from '@/components/InfoChip';
 import { PinPad } from '@/components/PinPad';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import type { DocumentDraft, DocumentType } from '@/types/models';
-import { formatShortDate } from '@/utils/date';
+import { formatShortDate, isDateWithinDays, isPast } from '@/utils/date';
 import { copyIntoAppStorage } from '@/utils/fileStorage';
 import { maskSensitive } from '@/utils/format';
-import { getTripBundle } from '@/utils/selectors';
+import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
 import { validateDocument } from '@/utils/validation';
 
 const documentLabels: Record<DocumentType, string> = {
@@ -35,24 +37,84 @@ const documentLabels: Record<DocumentType, string> = {
   custom: 'Custom',
 };
 
+type PrimaryFilter = 'all' | 'traveller' | 'type';
+type GroupMode = 'flat' | 'traveller' | 'type';
+
 export default function VaultScreen() {
-  const { data, activeTripId, setActiveTrip, saveDocument, deleteRecord, security, confirmPin, unlockWithBiometrics, unlockVault, vaultUnlockedUntil } = useAppStore();
+  const {
+    data,
+    activeTripId,
+    setActiveTrip,
+    saveDocument,
+    deleteRecord,
+    security,
+    confirmPin,
+    unlockWithBiometrics,
+    unlockVault,
+    vaultUnlockedUntil,
+  } = useAppStore();
   const [editorVisible, setEditorVisible] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
   const [pinPromptVisible, setPinPromptVisible] = useState(false);
   const [draft, setDraft] = useState<DocumentDraft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pin, setPin] = useState('');
+  const [primaryFilter, setPrimaryFilter] = useState<PrimaryFilter>('all');
+  const [travellerFilter, setTravellerFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<DocumentType | 'all'>('all');
+  const [groupMode, setGroupMode] = useState<GroupMode>('flat');
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
   const selectedDocument = bundle.documents.find((item) => item.id === selectedId) ?? null;
   const isVaultUnlocked = !!vaultUnlockedUntil && vaultUnlockedUntil > Date.now();
+  const expiryWarnings = getDocumentExpiryWarnings(bundle.documents);
+
+  const filteredDocuments = useMemo(() => {
+    return bundle.documents.filter((document) => {
+      if (primaryFilter === 'traveller' && travellerFilter !== 'all') {
+        return travellerFilter === 'trip' ? document.travellerId === null : document.travellerId === travellerFilter;
+      }
+      if (primaryFilter === 'type' && typeFilter !== 'all') {
+        return document.documentType === typeFilter;
+      }
+      return true;
+    });
+  }, [bundle.documents, primaryFilter, travellerFilter, typeFilter]);
+
+  const groupedDocuments = useMemo(() => {
+    if (groupMode === 'flat') {
+      return [{ title: 'All documents', documents: filteredDocuments }];
+    }
+
+    if (groupMode === 'traveller') {
+      return [
+        {
+          title: 'Trip-wide',
+          documents: filteredDocuments.filter((document) => !document.travellerId),
+        },
+        ...bundle.travellers.map((traveller) => ({
+          title: traveller.fullName,
+          documents: filteredDocuments.filter((document) => document.travellerId === traveller.id),
+        })),
+      ].filter((group) => group.documents.length);
+    }
+
+    return Object.entries(documentLabels)
+      .map(([type, label]) => ({
+        title: label,
+        documents: filteredDocuments.filter((document) => document.documentType === type),
+      }))
+      .filter((group) => group.documents.length);
+  }, [bundle.travellers, filteredDocuments, groupMode]);
 
   if (!data.trips.length) {
     return (
       <AppScreen title="Vault">
         <AppCard>
-          <EmptyState title="Vault is ready when you are" description="Create a trip first, then add passports, GHIC cards, boarding passes, insurance docs, and PDFs." />
+          <EmptyState
+            title="Vault is ready when you are"
+            description="Create a trip first, then add passports, GHIC cards, boarding passes, insurance docs, and PDFs."
+          />
         </AppCard>
       </AppScreen>
     );
@@ -133,26 +195,102 @@ export default function VaultScreen() {
     setPin('');
   }
 
-  const sortedDocuments = useMemo(() => [...bundle.documents], [bundle.documents]);
+  function expiryTone(expiryDate: string | null) {
+    if (isPast(expiryDate)) return 'danger';
+    if (isDateWithinDays(expiryDate, 30)) return 'coral';
+    if (isDateWithinDays(expiryDate, 60)) return 'gold';
+    return 'default';
+  }
 
   return (
-    <AppScreen title="Vault" subtitle="Sensitive trip documents, stored locally and hidden until you unlock them.">
+    <AppScreen title="Vault" subtitle="Traveller-specific documents, grouped views, and clear expiry warnings.">
       <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
+
+      {!!expiryWarnings.length ? (
+        <AppCard title="Expiry warnings" subtitle="Check these before you travel.">
+          <View style={styles.warningList}>
+            {expiryWarnings.map((document) => (
+              <InfoChip
+                key={document.id}
+                label={`${document.holderName || documentLabels[document.documentType]} • ${formatShortDate(document.expiryDate)}`}
+                tone={expiryTone(document.expiryDate)}
+              />
+            ))}
+          </View>
+        </AppCard>
+      ) : null}
+
       <AppCard title="Vault controls">
         <View style={styles.buttonRow}>
           <AppButton label="Add from files" tone="secondary" onPress={() => handleSourcePick('files')} />
           <AppButton label="Add from photos" tone="secondary" onPress={() => handleSourcePick('photos')} />
         </View>
-        <AppButton label={isVaultUnlocked ? 'Vault unlocked' : 'Unlock previews'} onPress={() => setPinPromptVisible(true)} tone={isVaultUnlocked ? 'ghost' : 'primary'} />
+        <AppButton
+          label={isVaultUnlocked ? 'Vault unlocked' : 'Unlock previews'}
+          onPress={() => setPinPromptVisible(true)}
+          tone={isVaultUnlocked ? 'ghost' : 'primary'}
+        />
       </AppCard>
-      {sortedDocuments.length ? (
-        sortedDocuments.map((document) => {
-          const traveller = bundle.travellers.find((item) => item.id === document.travellerId);
-          const previewUnlocked = isVaultUnlocked || !document.sensitive;
-          return (
-            <AppCard key={document.id}>
-              <Pressable onPress={() => { setSelectedId(document.id); setDetailVisible(true); }}>
-                <View style={styles.documentRow}>
+
+      <AppCard title="Filters">
+        <ChoiceChips<PrimaryFilter>
+          value={primaryFilter}
+          onChange={setPrimaryFilter}
+          options={[
+            { label: 'All', value: 'all' },
+            { label: 'Traveller', value: 'traveller' },
+            { label: 'Document type', value: 'type' },
+          ]}
+        />
+        {primaryFilter === 'traveller' ? (
+          <ChoiceChips<string>
+            value={travellerFilter}
+            onChange={setTravellerFilter}
+            options={[
+              { label: 'All travellers', value: 'all' },
+              { label: 'Trip-wide', value: 'trip' },
+              ...bundle.travellers.map((traveller) => ({ label: traveller.fullName, value: traveller.id })),
+            ]}
+          />
+        ) : null}
+        {primaryFilter === 'type' ? (
+          <ChoiceChips<string>
+            value={typeFilter}
+            onChange={(value) => setTypeFilter(value as DocumentType | 'all')}
+            options={[
+              { label: 'All types', value: 'all' },
+              ...Object.entries(documentLabels).map(([value, label]) => ({ value, label })),
+            ]}
+          />
+        ) : null}
+        <Text style={styles.label}>Grouped view</Text>
+        <ChoiceChips<GroupMode>
+          value={groupMode}
+          onChange={setGroupMode}
+          options={[
+            { label: 'Flat', value: 'flat' },
+            { label: 'By traveller', value: 'traveller' },
+            { label: 'By type', value: 'type' },
+          ]}
+        />
+      </AppCard>
+
+      {groupedDocuments.length ? (
+        groupedDocuments.map((group) => (
+          <AppCard key={group.title} title={group.title}>
+            {group.documents.map((document) => {
+              const traveller = bundle.travellers.find((item) => item.id === document.travellerId);
+              const previewUnlocked = isVaultUnlocked || !document.sensitive;
+              const numberLabel = previewUnlocked ? document.documentNumber || 'No number saved' : maskSensitive(document.documentNumber);
+              return (
+                <Pressable
+                  key={document.id}
+                  onPress={() => {
+                    setSelectedId(document.id);
+                    setDetailVisible(true);
+                  }}
+                  style={styles.documentRow}
+                >
                   {previewUnlocked && document.previewUri ? (
                     <Image source={document.previewUri} style={styles.thumbnail} contentFit="cover" />
                   ) : (
@@ -161,63 +299,111 @@ export default function VaultScreen() {
                     </View>
                   )}
                   <View style={styles.copy}>
-                    <Text style={styles.title}>{documentLabels[document.documentType]}</Text>
-                    <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Holder not set'}</Text>
-                    <Text style={styles.meta}>{previewUnlocked ? document.documentNumber || 'No number saved' : maskSensitive(document.documentNumber)}</Text>
+                    <View style={styles.titleRow}>
+                      <Text style={styles.title}>{documentLabels[document.documentType]}</Text>
+                      {document.expiryDate ? <InfoChip label={formatShortDate(document.expiryDate)} tone={expiryTone(document.expiryDate)} /> : null}
+                    </View>
+                    <View style={styles.inlineRow}>
+                      {traveller ? <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} size={26} /> : null}
+                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+                    </View>
+                    <Text style={styles.meta}>{numberLabel}</Text>
                   </View>
-                </View>
-              </Pressable>
-              <View style={styles.buttonRow}>
-                <AppButton label="Edit" tone="secondary" onPress={() => { setDraft(document); setEditorVisible(true); }} />
-                <AppButton label="Delete" tone="danger" onPress={() => deleteRecord('documents', document.id)} />
-              </View>
-            </AppCard>
-          );
-        })
+                  <View style={styles.iconColumn}>
+                    <Pressable
+                      onPress={() => {
+                        setDraft(document);
+                        setEditorVisible(true);
+                      }}
+                      style={styles.iconButton}
+                    >
+                      <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+                    </Pressable>
+                    <Pressable onPress={() => deleteRecord('documents', document.id)} style={styles.iconButton}>
+                      <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                    </Pressable>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </AppCard>
+        ))
       ) : (
         <AppCard>
-          <EmptyState title="Vault is empty" description="Add passports, boarding passes, insurance policies, visas, hotel bookings, or any custom PDF." />
+          <EmptyState
+            title="Vault is empty"
+            description="Add passports, boarding passes, insurance policies, visas, hotel bookings, or any custom PDF."
+          />
         </AppCard>
       )}
 
-      <AppModal visible={editorVisible} title={draft?.id ? 'Edit document' : 'Add document'} onClose={() => setEditorVisible(false)}>
+      <AppModal
+        visible={editorVisible}
+        title={draft?.id ? 'Edit document' : 'Add document'}
+        onClose={() => setEditorVisible(false)}
+      >
         {draft ? (
           <>
-            <AppTextField label="Holder name" value={draft.holderName} onChangeText={(value) => setDraft((current) => current ? { ...current, holderName: value } : current)} />
+            <AppTextField
+              label="Holder name"
+              value={draft.holderName}
+              onChangeText={(value) => setDraft((current) => (current ? { ...current, holderName: value } : current))}
+            />
             <View style={styles.field}>
               <Text style={styles.label}>Document type</Text>
               <ChoiceChips<DocumentType>
                 value={draft.documentType}
-                onChange={(value) => setDraft((current) => current ? { ...current, documentType: value } : current)}
+                onChange={(value) => setDraft((current) => (current ? { ...current, documentType: value } : current))}
                 options={Object.entries(documentLabels).map(([value, label]) => ({ value: value as DocumentType, label }))}
               />
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>Assigned traveller</Text>
               <ChoiceChips<string>
-                value={draft.travellerId ?? 'none'}
-                onChange={(value) => setDraft((current) => current ? { ...current, travellerId: value === 'none' ? null : value } : current)}
+                value={draft.travellerId ?? 'trip'}
+                onChange={(value) =>
+                  setDraft((current) => (current ? { ...current, travellerId: value === 'trip' ? null : value } : current))
+                }
                 options={[
-                  { label: 'None', value: 'none' },
+                  { label: 'Whole trip', value: 'trip' },
                   ...bundle.travellers.map((traveller) => ({ label: traveller.fullName, value: traveller.id })),
                 ]}
               />
             </View>
-            <AppTextField label="Document number" value={draft.documentNumber} onChangeText={(value) => setDraft((current) => current ? { ...current, documentNumber: value } : current)} />
-            <DateTimeField label="Issue date" mode="date" value={draft.issueDate} onChange={(value) => setDraft((current) => current ? { ...current, issueDate: value } : current)} />
-            <DateTimeField label="Expiry date" mode="date" value={draft.expiryDate} onChange={(value) => setDraft((current) => current ? { ...current, expiryDate: value } : current)} />
+            <AppTextField
+              label="Document number"
+              value={draft.documentNumber}
+              onChangeText={(value) => setDraft((current) => (current ? { ...current, documentNumber: value } : current))}
+            />
+            <DateTimeField
+              label="Issue date"
+              mode="date"
+              value={draft.issueDate}
+              onChange={(value) => setDraft((current) => (current ? { ...current, issueDate: value } : current))}
+            />
+            <DateTimeField
+              label="Expiry date"
+              mode="date"
+              value={draft.expiryDate}
+              onChange={(value) => setDraft((current) => (current ? { ...current, expiryDate: value } : current))}
+            />
             <View style={styles.field}>
               <Text style={styles.label}>Sensitivity</Text>
               <ChoiceChips<'yes' | 'no'>
                 value={draft.sensitive ? 'yes' : 'no'}
-                onChange={(value) => setDraft((current) => current ? { ...current, sensitive: value === 'yes' } : current)}
+                onChange={(value) => setDraft((current) => (current ? { ...current, sensitive: value === 'yes' } : current))}
                 options={[
                   { label: 'Sensitive', value: 'yes' },
                   { label: 'Standard', value: 'no' },
                 ]}
               />
             </View>
-            <AppTextField label="Notes" value={draft.notes} onChangeText={(value) => setDraft((current) => current ? { ...current, notes: value } : current)} multiline />
+            <AppTextField
+              label="Notes"
+              value={draft.notes}
+              onChangeText={(value) => setDraft((current) => (current ? { ...current, notes: value } : current))}
+              multiline
+            />
             <AppButton label="Save document" onPress={handleSave} />
           </>
         ) : null}
@@ -227,7 +413,9 @@ export default function VaultScreen() {
         <Text style={styles.meta}>Enter your PIN to reveal sensitive previews for this session.</Text>
         <PinPad value={pin} pinLength={security.pinLength} onChange={setPin} />
         <AppButton label="Unlock with PIN" onPress={handleVaultUnlock} />
-        {security.biometricEnabled ? <AppButton label="Use biometrics" tone="secondary" onPress={() => unlockWithBiometrics('vault')} /> : null}
+        {security.biometricEnabled ? (
+          <AppButton label="Use biometrics" tone="secondary" onPress={() => unlockWithBiometrics('vault')} />
+        ) : null}
       </AppModal>
 
       <AppModal visible={detailVisible} title="Document detail" onClose={() => setDetailVisible(false)}>
@@ -241,12 +429,20 @@ export default function VaultScreen() {
             ) : (
               <>
                 <Text style={styles.title}>{documentLabels[selectedDocument.documentType]}</Text>
-                <Text style={styles.meta}>Holder: {selectedDocument.holderName}</Text>
+                <Text style={styles.meta}>Holder: {selectedDocument.holderName || 'Trip-wide'}</Text>
                 <Text style={styles.meta}>Number: {selectedDocument.documentNumber || 'Not set'}</Text>
                 <Text style={styles.meta}>Issue date: {formatShortDate(selectedDocument.issueDate)}</Text>
                 <Text style={styles.meta}>Expiry date: {formatShortDate(selectedDocument.expiryDate)}</Text>
-                {selectedDocument.previewUri ? <Image source={selectedDocument.previewUri} style={styles.preview} contentFit="contain" /> : null}
-                {selectedDocument.mimeType === 'application/pdf' ? <AppButton label="Open PDF locally" tone="secondary" onPress={() => Linking.openURL(selectedDocument.localFileUri)} /> : null}
+                {selectedDocument.previewUri ? (
+                  <Image source={selectedDocument.previewUri} style={styles.preview} contentFit="contain" />
+                ) : null}
+                {selectedDocument.mimeType === 'application/pdf' ? (
+                  <AppButton
+                    label="Open PDF locally"
+                    tone="secondary"
+                    onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                  />
+                ) : null}
                 {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
               </>
             )}
@@ -258,15 +454,29 @@ export default function VaultScreen() {
 }
 
 const styles = StyleSheet.create({
+  warningList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
   buttonRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
+  field: {
+    gap: spacing.xs,
+  },
+  label: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
   documentRow: {
     flexDirection: 'row',
     gap: spacing.md,
     alignItems: 'center',
+    paddingVertical: spacing.xs,
   },
   thumbnail: {
     width: 72,
@@ -284,6 +494,17 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  inlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   title: {
     color: colors.nightNavy,
     fontFamily: 'Inter_600SemiBold',
@@ -295,13 +516,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  field: {
+  iconColumn: {
     gap: spacing.xs,
   },
-  label: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
+  iconButton: {
+    padding: spacing.xs,
   },
   preview: {
     width: '100%',

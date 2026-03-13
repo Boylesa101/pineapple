@@ -14,6 +14,7 @@ import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { EmptyState } from '@/components/EmptyState';
 import { colors, radii, spacing } from '@/constants/theme';
+import { packingTemplates, type PackingTemplateId } from '@/data/packingTemplates';
 import { useAppStore } from '@/store/useAppStore';
 import type { TripDraft, TripStatus } from '@/types/models';
 import { tripDateRange } from '@/utils/format';
@@ -32,20 +33,23 @@ const emptyTripDraft: TripDraft = {
 
 export default function TripsScreen() {
   const router = useRouter();
-  const { data, saveTrip, deleteRecord, setActiveTrip } = useAppStore();
+  const { data, saveTrip, deleteRecord, setActiveTrip, applyPackingTemplate } = useAppStore();
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState<TripDraft>(emptyTripDraft);
+  const [templateId, setTemplateId] = useState<PackingTemplateId | 'none'>('none');
   const [saving, setSaving] = useState(false);
 
   const sortedTrips = useMemo(() => [...data.trips], [data.trips]);
 
   function openNewTrip() {
     setDraft(emptyTripDraft);
+    setTemplateId('none');
     setVisible(true);
   }
 
   function openEditTrip(current: TripDraft) {
     setDraft(current);
+    setTemplateId('none');
     setVisible(true);
   }
 
@@ -69,9 +73,14 @@ export default function TripsScreen() {
 
     setSaving(true);
     try {
-      await saveTrip(draft);
+      const wasNew = !draft.id;
+      const tripId = await saveTrip(draft);
+      if (wasNew && templateId !== 'none') {
+        await applyPackingTemplate(tripId, templateId);
+      }
       setVisible(false);
       setDraft(emptyTripDraft);
+      setTemplateId('none');
     } finally {
       setSaving(false);
     }
@@ -140,6 +149,22 @@ export default function TripsScreen() {
             ]}
           />
         </View>
+        {!draft.id ? (
+          <View style={styles.statusField}>
+            <Text style={styles.label}>Optional starter template</Text>
+            <ChoiceChips<string>
+              value={templateId}
+              onChange={(value) => setTemplateId(value as PackingTemplateId | 'none')}
+              options={[
+                { label: 'None', value: 'none' },
+                ...Object.entries(packingTemplates).map(([value, template]) => ({
+                  label: template.label,
+                  value,
+                })),
+              ]}
+            />
+          </View>
+        ) : null}
         <AppTextField label="Notes" value={draft.notes} onChangeText={(value) => setDraft((current) => ({ ...current, notes: value }))} multiline placeholder="Check airport parking, request late checkout..." />
         {draft.coverImageUri ? <Image source={draft.coverImageUri} style={styles.cover} contentFit="cover" /> : null}
         <AppButton label={draft.coverImageUri ? 'Change cover image' : 'Add cover image'} tone="secondary" onPress={pickCover} />

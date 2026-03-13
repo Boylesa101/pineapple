@@ -1,4 +1,13 @@
-import type { DocumentDraft, EmergencyInfoDraft, HotelStayDraft, ItineraryEventDraft, PackingItemDraft, TravelSegmentDraft, TravellerDraft, TripDraft } from '@/types/models';
+import type {
+  DocumentDraft,
+  EmergencyInfoDraft,
+  HotelStayDraft,
+  ItineraryEventDraft,
+  PackingItemDraft,
+  TravelSegmentDraft,
+  TravellerDraft,
+  TripDraft,
+} from '@/types/models';
 
 export function validateTrip(input: TripDraft) {
   const errors: string[] = [];
@@ -15,6 +24,7 @@ export function validateTrip(input: TripDraft) {
 export function validateTraveller(input: TravellerDraft) {
   const errors: string[] = [];
   if (!input.fullName.trim()) errors.push('Traveller name is required.');
+  if (!input.avatarColor.trim()) errors.push('Choose an avatar colour.');
   return errors;
 }
 
@@ -29,6 +39,9 @@ export function validatePackingItem(input: PackingItemDraft) {
   const errors: string[] = [];
   if (!input.title.trim()) errors.push('Item name is required.');
   if (input.quantity < 1) errors.push('Quantity must be at least 1.');
+  if (input.assignmentScope === 'travellers' && !input.travellerIds.length) {
+    errors.push('Choose at least one traveller, or mark the item as trip-wide.');
+  }
   return errors;
 }
 

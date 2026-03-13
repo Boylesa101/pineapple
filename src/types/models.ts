@@ -18,7 +18,11 @@ export type PackingCategory =
   | 'kids_baby'
   | 'other';
 export type LuggageType = 'carry_on' | 'checked';
+export type PackingAssignmentScope = 'trip' | 'travellers';
+export type PackingPriority = 'essential' | 'useful' | 'optional';
 export type ItineraryType = 'excursion' | 'meal' | 'ticket' | 'reminder' | 'custom';
+export type RelationshipType = 'adult' | 'child' | 'infant' | 'other';
+export type ReminderKind = 'passport_expiry' | 'packing_incomplete' | 'trip_starts_tomorrow';
 export type PinLength = 4 | 6;
 
 export interface Trip {
@@ -38,9 +42,14 @@ export interface Traveller {
   id: string;
   tripId: string;
   fullName: string;
+  dateOfBirth: string | null;
+  passportNationality: string;
   passportNumber: string;
   ghicNumber: string;
   medicalNote: string;
+  notes: string;
+  avatarColor: string;
+  relationshipType: RelationshipType;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,12 +75,14 @@ export interface Document {
 export interface PackingItem {
   id: string;
   tripId: string;
-  travellerId: string | null;
   title: string;
   category: PackingCategory;
   quantity: number;
   isPacked: boolean;
   luggageType: LuggageType;
+  assignmentScope: PackingAssignmentScope;
+  travellerIds: string[];
+  priority: PackingPriority;
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -135,6 +146,16 @@ export interface EmergencyInfo {
   updatedAt: string;
 }
 
+export interface ReminderSetting {
+  id: string;
+  tripId: string | null;
+  kind: ReminderKind;
+  enabled: boolean;
+  leadTimeDays: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppSecuritySettings {
   pinConfigured: boolean;
   pinLength: PinLength;
@@ -156,6 +177,40 @@ export interface AppDataSnapshot {
   hotelStays: HotelStay[];
   itineraryEvents: ItineraryEvent[];
   emergencyInfos: EmergencyInfo[];
+  reminderSettings: ReminderSetting[];
+}
+
+export interface BackupAttachment {
+  originalUri: string;
+  folder: 'trips' | 'vault';
+  mimeType: string | null;
+  fileName: string;
+  base64: string;
+}
+
+export interface BackupPayload {
+  version: 2;
+  exportedAt: string;
+  settings: {
+    autoLockSeconds: number;
+  };
+  data: AppDataSnapshot;
+  attachments: BackupAttachment[];
+}
+
+export interface BackupEnvelope {
+  format: 'pineapple-backup';
+  version: 2;
+  encryption: 'aes';
+  ciphertext: string;
+}
+
+export interface PdfExportOptions {
+  includeEmergencyNumbers: boolean;
+  includeDocumentNumbers: boolean;
+  includePackingList: boolean;
+  includeDocumentReferences: boolean;
+  hideSensitiveValues: boolean;
 }
 
 export type TripDraft = Omit<Trip, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
@@ -166,3 +221,4 @@ export type TravelSegmentDraft = Omit<TravelSegment, 'id' | 'createdAt' | 'updat
 export type HotelStayDraft = Omit<HotelStay, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type ItineraryEventDraft = Omit<ItineraryEvent, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type EmergencyInfoDraft = Omit<EmergencyInfo, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
+export type ReminderSettingDraft = Omit<ReminderSetting, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };

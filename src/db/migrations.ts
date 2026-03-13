@@ -1,4 +1,8 @@
-export const schema = `
+import type { SQLiteDatabase } from 'expo-sqlite';
+
+const DATABASE_VERSION = 2;
+
+const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS trips (
@@ -18,9 +22,14 @@ CREATE TABLE IF NOT EXISTS travellers (
   id TEXT PRIMARY KEY NOT NULL,
   tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   fullName TEXT NOT NULL,
+  dateOfBirth TEXT,
+  passportNationality TEXT NOT NULL DEFAULT '',
   passportNumber TEXT NOT NULL DEFAULT '',
   ghicNumber TEXT NOT NULL DEFAULT '',
   medicalNote TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  avatarColor TEXT NOT NULL DEFAULT '#F4B400',
+  relationshipType TEXT NOT NULL DEFAULT 'adult',
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
 );
@@ -52,9 +61,17 @@ CREATE TABLE IF NOT EXISTS packing_items (
   quantity INTEGER NOT NULL DEFAULT 1,
   isPacked INTEGER NOT NULL DEFAULT 0,
   luggageType TEXT NOT NULL,
+  assignmentScope TEXT NOT NULL DEFAULT 'trip',
+  priority TEXT NOT NULL DEFAULT 'useful',
   notes TEXT NOT NULL DEFAULT '',
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS packing_item_travellers (
+  packingItemId TEXT NOT NULL REFERENCES packing_items(id) ON DELETE CASCADE,
+  travellerId TEXT NOT NULL REFERENCES travellers(id) ON DELETE CASCADE,
+  PRIMARY KEY (packingItemId, travellerId)
 );
 
 CREATE TABLE IF NOT EXISTS travel_segments (
@@ -114,4 +131,83 @@ CREATE TABLE IF NOT EXISTS emergency_infos (
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS reminder_settings (
+  id TEXT PRIMARY KEY NOT NULL,
+  tripId TEXT REFERENCES trips(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  leadTimeDays INTEGER NOT NULL DEFAULT 1,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_documents_trip ON documents (tripId);
+CREATE INDEX IF NOT EXISTS idx_documents_expiry ON documents (expiryDate);
+CREATE INDEX IF NOT EXISTS idx_packing_trip ON packing_items (tripId);
+CREATE INDEX IF NOT EXISTS idx_itinerary_trip_datetime ON itinerary_events (tripId, dateTime);
+CREATE INDEX IF NOT EXISTS idx_reminders_trip_kind ON reminder_settings (tripId, kind);
 `;
+
+async function getUserVersion(db: SQLiteDatabase) {
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  return row?.user_version ?? 0;
+}
+
+async function getColumnNames(db: SQLiteDatabase, table: string) {
+  const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  return rows.map((row) => row.name);
+}
+
+async function ensureColumn(db: SQLiteDatabase, table: string, column: string, definition: string) {
+  const columns = await getColumnNames(db, table);
+  if (!columns.includes(column)) {
+    await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+async function runPhaseTwoMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'travellers', 'dateOfBirth', 'TEXT');
+  await ensureColumn(db, 'travellers', 'passportNationality', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'travellers', 'notes', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'travellers', 'avatarColor', "TEXT NOT NULL DEFAULT '#F4B400'");
+  await ensureColumn(db, 'travellers', 'relationshipType', "TEXT NOT NULL DEFAULT 'adult'");
+  await ensureColumn(db, 'packing_items', 'assignmentScope', "TEXT NOT NULL DEFAULT 'trip'");
+  await ensureColumn(db, 'packing_items', 'priority', "TEXT NOT NULL DEFAULT 'useful'");
+
+  await db.execAsync(`
+    INSERT OR IGNORE INTO packing_item_travellers (packingItemId, travellerId)
+    SELECT id, travellerId
+    FROM packing_items
+    WHERE travellerId IS NOT NULL AND travellerId != '';
+
+    UPDATE packing_items
+    SET assignmentScope = CASE
+      WHEN travellerId IS NULL OR travellerId = '' THEN 'trip'
+      ELSE 'travellers'
+    END
+    WHERE assignmentScope IS NULL OR assignmentScope = '';
+
+    UPDATE travellers
+    SET avatarColor = '#F4B400'
+    WHERE avatarColor IS NULL OR avatarColor = '';
+
+    UPDATE travellers
+    SET relationshipType = 'adult'
+    WHERE relationshipType IS NULL OR relationshipType = '';
+
+    UPDATE packing_items
+    SET priority = 'useful'
+    WHERE priority IS NULL OR priority = '';
+  `);
+}
+
+export async function runMigrations(db: SQLiteDatabase) {
+  await db.execAsync(createLatestTablesSql);
+
+  const version = await getUserVersion(db);
+  if (version < 2) {
+    await runPhaseTwoMigration(db);
+    await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+  }
+}

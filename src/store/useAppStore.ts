@@ -2,10 +2,35 @@ import { AppStateStatus } from 'react-native';
 
 import { create } from 'zustand';
 
-import { clearAllData, deleteById, loadSnapshot, upsertDocument, upsertEmergencyInfo, upsertHotelStay, upsertItineraryEvent, upsertPackingItem, upsertTravelSegment, upsertTraveller, upsertTrip } from '@/db/repositories';
+import { buildPackingTemplateItems, type PackingTemplateId } from '@/data/packingTemplates';
 import { createDemoSnapshot } from '@/data/demo';
+import {
+  clearAllData,
+  deleteById,
+  loadSnapshot,
+  persistSnapshot,
+  upsertDocument,
+  upsertEmergencyInfo,
+  upsertHotelStay,
+  upsertItineraryEvent,
+  upsertPackingItem,
+  upsertReminderSetting,
+  upsertTravelSegment,
+  upsertTraveller,
+  upsertTrip,
+} from '@/db/repositories';
+import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup';
+import { exportTripPdf } from '@/services/pdfExport';
 import { ensureAppDirectories } from '@/utils/fileStorage';
-import { createPinConfig, defaultSecurityConfig, authenticateBiometrics, canUseBiometrics, loadSecurityConfig, persistSecurityConfig, verifyPin } from '@/utils/security';
+import {
+  authenticateBiometrics,
+  canUseBiometrics,
+  createPinConfig,
+  defaultSecurityConfig,
+  loadSecurityConfig,
+  persistSecurityConfig,
+  verifyPin,
+} from '@/utils/security';
 import type {
   AppDataSnapshot,
   DocumentDraft,
@@ -13,6 +38,8 @@ import type {
   HotelStayDraft,
   ItineraryEventDraft,
   PackingItemDraft,
+  PdfExportOptions,
+  ReminderSettingDraft,
   StoredSecurityConfig,
   TravelSegmentDraft,
   TravellerDraft,
@@ -28,6 +55,7 @@ const emptySnapshot: AppDataSnapshot = {
   hotelStays: [],
   itineraryEvents: [],
   emergencyInfos: [],
+  reminderSettings: [],
 };
 
 type StoreState = {
@@ -58,24 +86,19 @@ type StoreState = {
   saveTraveller: (draft: TravellerDraft) => Promise<string>;
   saveDocument: (draft: DocumentDraft) => Promise<string>;
   savePackingItem: (draft: PackingItemDraft) => Promise<string>;
+  duplicatePackingItem: (itemId: string) => Promise<void>;
+  applyPackingTemplate: (tripId: string, templateId: PackingTemplateId) => Promise<void>;
   saveTravelSegment: (draft: TravelSegmentDraft) => Promise<string>;
   saveHotelStay: (draft: HotelStayDraft) => Promise<string>;
   saveItineraryEvent: (draft: ItineraryEventDraft) => Promise<string>;
   saveEmergencyInfo: (draft: EmergencyInfoDraft) => Promise<string>;
+  saveReminderSetting: (draft: ReminderSettingDraft) => Promise<string>;
+  exportTripPdfFile: (tripId: string, options: PdfExportOptions) => Promise<string>;
+  exportBackupFile: (password: string) => Promise<string>;
+  importBackupFile: (encryptedContents: string, password: string) => Promise<void>;
   deleteRecord: (table: string, id: string) => Promise<void>;
   resetWithDemoData: () => Promise<void>;
 };
-
-async function persistSnapshot(snapshot: AppDataSnapshot) {
-  for (const trip of snapshot.trips) await upsertTrip(trip);
-  for (const traveller of snapshot.travellers) await upsertTraveller(traveller);
-  for (const document of snapshot.documents) await upsertDocument(document);
-  for (const item of snapshot.packingItems) await upsertPackingItem(item);
-  for (const segment of snapshot.travelSegments) await upsertTravelSegment(segment);
-  for (const hotel of snapshot.hotelStays) await upsertHotelStay(hotel);
-  for (const event of snapshot.itineraryEvents) await upsertItineraryEvent(event);
-  for (const emergency of snapshot.emergencyInfos) await upsertEmergencyInfo(emergency);
-}
 
 function nextActiveTripId(state: StoreState, snapshot: AppDataSnapshot) {
   if (state.activeTripId && snapshot.trips.some((trip) => trip.id === state.activeTripId)) {
@@ -177,9 +200,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
     }
     return valid;
   },
-  confirmPin: async (pin) => {
-    return verifyPin(pin, get().security);
-  },
+  confirmPin: async (pin) => verifyPin(pin, get().security),
   unlockWithBiometrics: async (scope = 'app') => {
     const enabled = await canUseBiometrics();
     if (!enabled) {
@@ -227,6 +248,23 @@ export const useAppStore = create<StoreState>((set, get) => ({
     await get().refreshData();
     return id;
   },
+  duplicatePackingItem: async (itemId) => {
+    const item = get().data.packingItems.find((current) => current.id === itemId);
+    if (!item) return;
+    await upsertPackingItem({
+      ...item,
+      id: undefined,
+      title: `${item.title} copy`,
+    });
+    await get().refreshData();
+  },
+  applyPackingTemplate: async (tripId, templateId) => {
+    const items = buildPackingTemplateItems(tripId, templateId);
+    for (const item of items) {
+      await upsertPackingItem(item);
+    }
+    await get().refreshData();
+  },
   saveTravelSegment: async (draft) => {
     const id = await upsertTravelSegment(draft);
     await get().refreshData();
@@ -246,6 +284,24 @@ export const useAppStore = create<StoreState>((set, get) => ({
     const id = await upsertEmergencyInfo(draft);
     await get().refreshData();
     return id;
+  },
+  saveReminderSetting: async (draft) => {
+    const id = await upsertReminderSetting(draft);
+    await get().refreshData();
+    return id;
+  },
+  exportTripPdfFile: async (tripId, options) => {
+    return exportTripPdf(get().data, tripId, options);
+  },
+  exportBackupFile: async (password) => {
+    return exportEncryptedBackup({ data: get().data, security: get().security, password });
+  },
+  importBackupFile: async (encryptedContents, password) => {
+    const restoredSettings = await restoreEncryptedBackup({ encryptedContents, password });
+    const nextSecurity = { ...get().security, autoLockSeconds: restoredSettings.autoLockSeconds };
+    await persistSecurityConfig(nextSecurity);
+    await get().refreshData();
+    set({ security: nextSecurity });
   },
   deleteRecord: async (table, id) => {
     await deleteById(table, id);

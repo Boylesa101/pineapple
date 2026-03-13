@@ -1,4 +1,13 @@
-import { compareAsc, format, formatDistanceStrict, isAfter, parseISO, startOfDay } from 'date-fns';
+import {
+  compareAsc,
+  differenceInCalendarDays,
+  format,
+  formatDistanceStrict,
+  isAfter,
+  isBefore,
+  parseISO,
+  startOfDay,
+} from 'date-fns';
 
 export function formatShortDate(value: string | null | undefined) {
   if (!value) {
@@ -37,6 +46,31 @@ export function countdownLabel(dateIso: string) {
   }
 
   return formatDistanceStrict(target, today, { unit: 'day' });
+}
+
+export function daysUntil(dateIso: string) {
+  return differenceInCalendarDays(startOfDay(parseISO(dateIso)), startOfDay(new Date()));
+}
+
+export function daysLeft(endDateIso: string) {
+  return differenceInCalendarDays(startOfDay(parseISO(endDateIso)), startOfDay(new Date()));
+}
+
+export function isDateWithinDays(value: string | null | undefined, days: number) {
+  if (!value) {
+    return false;
+  }
+
+  const target = startOfDay(parseISO(value));
+  const today = startOfDay(new Date());
+  return !isBefore(target, today) && differenceInCalendarDays(target, today) <= days;
+}
+
+export function isPast(value: string | null | undefined) {
+  if (!value) {
+    return false;
+  }
+  return isBefore(parseISO(value), new Date());
 }
 
 export function sortByDateTime<T extends { dateTime: string }>(items: T[]) {

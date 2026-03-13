@@ -1,6 +1,6 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
-import { schema } from './migrations';
+import { runMigrations } from './migrations';
 
 let databasePromise: Promise<SQLiteDatabase> | null = null;
 
@@ -8,7 +8,7 @@ export async function getDatabase() {
   if (!databasePromise) {
     databasePromise = (async () => {
       const db = await openDatabaseAsync('pineapple.db');
-      await db.execAsync(schema);
+      await runMigrations(db);
       return db;
     })();
   }

@@ -8,6 +8,7 @@ import type {
   HotelStayDraft,
   ItineraryEventDraft,
   PackingItemDraft,
+  ReminderSettingDraft,
   TravelSegmentDraft,
   TravellerDraft,
   TripDraft,
@@ -17,33 +18,73 @@ function now() {
   return new Date().toISOString();
 }
 
-function toBool(value: number) {
-  return value === 1;
+function toBool(value: number | boolean) {
+  return value === 1 || value === true;
+}
+
+async function replacePackingAssignments(id: string, travellerIds: string[]) {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM packing_item_travellers WHERE packingItemId = ?', id);
+
+  for (const travellerId of travellerIds) {
+    await db.runAsync(
+      'INSERT OR IGNORE INTO packing_item_travellers (packingItemId, travellerId) VALUES (?, ?)',
+      id,
+      travellerId
+    );
+  }
 }
 
 export async function loadSnapshot(): Promise<AppDataSnapshot> {
   const db = await getDatabase();
-  const [trips, travellers, documents, packingItems, travelSegments, hotelStays, itineraryEvents, emergencyInfos] =
-    await Promise.all([
-      db.getAllAsync<any>('SELECT * FROM trips ORDER BY startDate ASC'),
-      db.getAllAsync<any>('SELECT * FROM travellers ORDER BY fullName ASC'),
-      db.getAllAsync<any>('SELECT * FROM documents ORDER BY createdAt DESC'),
-      db.getAllAsync<any>('SELECT * FROM packing_items ORDER BY category ASC, title ASC'),
-      db.getAllAsync<any>('SELECT * FROM travel_segments ORDER BY departureTime ASC'),
-      db.getAllAsync<any>('SELECT * FROM hotel_stays ORDER BY checkIn ASC'),
-      db.getAllAsync<any>('SELECT * FROM itinerary_events ORDER BY dateTime ASC'),
-      db.getAllAsync<any>('SELECT * FROM emergency_infos ORDER BY createdAt DESC'),
-    ]);
+  const [
+    trips,
+    travellers,
+    documents,
+    packingItemsRaw,
+    packingAssignments,
+    travelSegments,
+    hotelStays,
+    itineraryEvents,
+    emergencyInfos,
+    reminderSettings,
+  ] = await Promise.all([
+    db.getAllAsync<any>('SELECT * FROM trips ORDER BY startDate ASC'),
+    db.getAllAsync<any>('SELECT * FROM travellers ORDER BY fullName ASC'),
+    db.getAllAsync<any>('SELECT * FROM documents ORDER BY createdAt DESC'),
+    db.getAllAsync<any>('SELECT * FROM packing_items ORDER BY category ASC, title ASC'),
+    db.getAllAsync<{ packingItemId: string; travellerId: string }>(
+      'SELECT packingItemId, travellerId FROM packing_item_travellers'
+    ),
+    db.getAllAsync<any>('SELECT * FROM travel_segments ORDER BY departureTime ASC'),
+    db.getAllAsync<any>('SELECT * FROM hotel_stays ORDER BY checkIn ASC'),
+    db.getAllAsync<any>('SELECT * FROM itinerary_events ORDER BY dateTime ASC'),
+    db.getAllAsync<any>('SELECT * FROM emergency_infos ORDER BY createdAt DESC'),
+    db.getAllAsync<any>('SELECT * FROM reminder_settings ORDER BY tripId ASC, kind ASC'),
+  ]);
+
+  const assignmentMap = packingAssignments.reduce<Record<string, string[]>>((accumulator, row) => {
+    accumulator[row.packingItemId] = [...(accumulator[row.packingItemId] ?? []), row.travellerId];
+    return accumulator;
+  }, {});
 
   return {
     trips,
     travellers,
     documents: documents.map((document) => ({ ...document, sensitive: toBool(document.sensitive) })),
-    packingItems: packingItems.map((item) => ({ ...item, isPacked: toBool(item.isPacked) })),
+    packingItems: packingItemsRaw.map((item) => ({
+      ...item,
+      isPacked: toBool(item.isPacked),
+      travellerIds: assignmentMap[item.id] ?? (item.travellerId ? [item.travellerId] : []),
+    })),
     travelSegments,
     hotelStays,
     itineraryEvents,
     emergencyInfos,
+    reminderSettings: reminderSettings.map((setting) => ({
+      ...setting,
+      enabled: toBool(setting.enabled),
+    })),
   };
 }
 
@@ -85,21 +126,31 @@ export async function upsertTraveller(input: TravellerDraft) {
   const id = input.id ?? createId('traveller');
 
   await db.runAsync(
-    `INSERT INTO travellers (id, tripId, fullName, passportNumber, ghicNumber, medicalNote, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO travellers (id, tripId, fullName, dateOfBirth, passportNationality, passportNumber, ghicNumber, medicalNote, notes, avatarColor, relationshipType, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        fullName = excluded.fullName,
+       dateOfBirth = excluded.dateOfBirth,
+       passportNationality = excluded.passportNationality,
        passportNumber = excluded.passportNumber,
        ghicNumber = excluded.ghicNumber,
        medicalNote = excluded.medicalNote,
+       notes = excluded.notes,
+       avatarColor = excluded.avatarColor,
+       relationshipType = excluded.relationshipType,
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
     input.fullName,
+    input.dateOfBirth,
+    input.passportNationality,
     input.passportNumber,
     input.ghicNumber,
     input.medicalNote,
+    input.notes,
+    input.avatarColor,
+    input.relationshipType,
     timestamp,
     timestamp
   );
@@ -153,10 +204,11 @@ export async function upsertPackingItem(input: PackingItemDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('packing');
+  const primaryTravellerId = input.travellerIds[0] ?? null;
 
   await db.runAsync(
-    `INSERT INTO packing_items (id, tripId, travellerId, title, category, quantity, isPacked, luggageType, notes, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO packing_items (id, tripId, travellerId, title, category, quantity, isPacked, luggageType, assignmentScope, priority, notes, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        travellerId = excluded.travellerId,
@@ -165,21 +217,26 @@ export async function upsertPackingItem(input: PackingItemDraft) {
        quantity = excluded.quantity,
        isPacked = excluded.isPacked,
        luggageType = excluded.luggageType,
+       assignmentScope = excluded.assignmentScope,
+       priority = excluded.priority,
        notes = excluded.notes,
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
-    input.travellerId,
+    primaryTravellerId,
     input.title,
     input.category,
     input.quantity,
     input.isPacked ? 1 : 0,
     input.luggageType,
+    input.assignmentScope,
+    input.priority,
     input.notes,
     timestamp,
     timestamp
   );
 
+  await replacePackingAssignments(id, input.assignmentScope === 'travellers' ? input.travellerIds : []);
   return id;
 }
 
@@ -322,6 +379,32 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
   return id;
 }
 
+export async function upsertReminderSetting(input: ReminderSettingDraft) {
+  const db = await getDatabase();
+  const timestamp = now();
+  const id = input.id ?? createId('reminder');
+
+  await db.runAsync(
+    `INSERT INTO reminder_settings (id, tripId, kind, enabled, leadTimeDays, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       tripId = excluded.tripId,
+       kind = excluded.kind,
+       enabled = excluded.enabled,
+       leadTimeDays = excluded.leadTimeDays,
+       updatedAt = excluded.updatedAt`,
+    id,
+    input.tripId,
+    input.kind,
+    input.enabled ? 1 : 0,
+    input.leadTimeDays,
+    timestamp,
+    timestamp
+  );
+
+  return id;
+}
+
 export async function deleteById(table: string, id: string) {
   const db = await getDatabase();
   await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, id);
@@ -330,6 +413,8 @@ export async function deleteById(table: string, id: string) {
 export async function clearAllData() {
   const db = await getDatabase();
   await db.execAsync(`
+    DELETE FROM reminder_settings;
+    DELETE FROM packing_item_travellers;
     DELETE FROM emergency_infos;
     DELETE FROM itinerary_events;
     DELETE FROM hotel_stays;
@@ -339,4 +424,21 @@ export async function clearAllData() {
     DELETE FROM travellers;
     DELETE FROM trips;
   `);
+}
+
+export async function persistSnapshot(snapshot: AppDataSnapshot) {
+  for (const trip of snapshot.trips) await upsertTrip(trip);
+  for (const traveller of snapshot.travellers) await upsertTraveller(traveller);
+  for (const document of snapshot.documents) await upsertDocument(document);
+  for (const item of snapshot.packingItems) await upsertPackingItem(item);
+  for (const segment of snapshot.travelSegments) await upsertTravelSegment(segment);
+  for (const hotel of snapshot.hotelStays) await upsertHotelStay(hotel);
+  for (const event of snapshot.itineraryEvents) await upsertItineraryEvent(event);
+  for (const emergency of snapshot.emergencyInfos) await upsertEmergencyInfo(emergency);
+  for (const reminder of snapshot.reminderSettings) await upsertReminderSetting(reminder);
+}
+
+export async function replaceAllData(snapshot: AppDataSnapshot) {
+  await clearAllData();
+  await persistSnapshot(snapshot);
 }
