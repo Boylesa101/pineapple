@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1 - 2026-03-13
+
+- Added a five-screen first-launch onboarding flow covering welcome, document storage, Travel Mode, import/share readiness, and expiry warnings
+- Added biometric preference selection to PIN setup and routed first-launch users into a dedicated create-first-trip screen
+- Added a post-creation setup checklist for passports, boarding passes, hotel details, packing, and Travel Mode readiness
+- Persisted onboarding completion locally so the flow only appears once and does not block normal startup after completion
+
 ## 1.3.0 - 2026-03-13
 
 - Added phase 3 SQLite migrations and snapshot support for app preferences, trip participants, invites, shared-trip state, and sync conflicts

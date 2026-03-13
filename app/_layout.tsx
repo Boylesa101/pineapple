@@ -36,7 +36,7 @@ function LoadingView() {
 function RouteGuard() {
   const router = useRouter();
   const segments = useSegments();
-  const { isBootstrapped, security, isUnlocked } = useAppStore();
+  const { isBootstrapped, security, isUnlocked, hasCompletedOnboarding, data } = useAppStore();
 
   useEffect(() => {
     if (!isBootstrapped) {
@@ -45,7 +45,14 @@ function RouteGuard() {
 
     const inAuth = segments[0] === '(auth)';
     const secondSegment = segments.at(1);
-    if (!security.pinConfigured && !inAuth) {
+    const isChecklist = segments[0] === 'getting-started';
+
+    if (!hasCompletedOnboarding && !(inAuth && secondSegment === 'onboarding')) {
+      router.replace('/onboarding');
+      return;
+    }
+
+    if (hasCompletedOnboarding && !security.pinConfigured && !(inAuth && secondSegment === 'setup-pin')) {
       router.replace('/setup-pin');
       return;
     }
@@ -55,10 +62,15 @@ function RouteGuard() {
       return;
     }
 
-    if (security.pinConfigured && isUnlocked && inAuth) {
+    if (security.pinConfigured && isUnlocked && data.trips.length === 0 && !(inAuth && secondSegment === 'create-first-trip')) {
+      router.replace('/create-first-trip');
+      return;
+    }
+
+    if (security.pinConfigured && isUnlocked && inAuth && !isChecklist) {
       router.replace('/home');
     }
-  }, [isBootstrapped, isUnlocked, router, security.pinConfigured, segments]);
+  }, [data.trips.length, hasCompletedOnboarding, isBootstrapped, isUnlocked, router, security.pinConfigured, segments]);
 
   return null;
 }
@@ -121,6 +133,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="getting-started" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="trip/[tripId]" />
           <Stack.Screen name="trip/[tripId]/travel-mode" />

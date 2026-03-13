@@ -38,6 +38,7 @@ import {
   persistSecurityConfig,
   verifyPin,
 } from '@/utils/security';
+import { loadOnboardingComplete, persistOnboardingComplete } from '@/utils/onboarding';
 import type {
   AppDataSnapshot,
   ConflictStatus,
@@ -87,6 +88,7 @@ type StoreState = {
   isBootstrapped: boolean;
   isBusy: boolean;
   isUnlocked: boolean;
+  hasCompletedOnboarding: boolean;
   privacyOverlayVisible: boolean;
   activeTripId: string | null;
   lastInteractionAt: number;
@@ -96,6 +98,7 @@ type StoreState = {
   data: AppDataSnapshot;
   bootstrap: () => Promise<void>;
   refreshData: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
   setActiveTrip: (tripId: string | null) => void;
   noteInteraction: () => void;
   enforceInactivityLock: () => void;
@@ -147,6 +150,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
   isBootstrapped: false,
   isBusy: false,
   isUnlocked: false,
+  hasCompletedOnboarding: false,
   privacyOverlayVisible: false,
   activeTripId: null,
   lastInteractionAt: Date.now(),
@@ -161,11 +165,20 @@ export const useAppStore = create<StoreState>((set, get) => ({
 
     set({ isBusy: true });
     await ensureAppDirectories();
-    const [security, data] = await Promise.all([loadSecurityConfig(), loadSnapshot()]);
+    const [security, data, onboardingStatus] = await Promise.all([
+      loadSecurityConfig(),
+      loadSnapshot(),
+      loadOnboardingComplete(),
+    ]);
+    const hasCompletedOnboarding = onboardingStatus ?? (security.pinConfigured || data.trips.length > 0);
+    if (onboardingStatus === null && hasCompletedOnboarding) {
+      await persistOnboardingComplete(true);
+    }
     await syncNotificationState(data);
     set({
       security,
       data,
+      hasCompletedOnboarding,
       activeTripId: data.trips[0]?.id ?? null,
       isUnlocked: false,
       isBootstrapped: true,
@@ -180,6 +193,10 @@ export const useAppStore = create<StoreState>((set, get) => ({
       data: snapshot,
       activeTripId: nextActiveTripId(state, snapshot),
     }));
+  },
+  completeOnboarding: async () => {
+    await persistOnboardingComplete(true);
+    set({ hasCompletedOnboarding: true });
   },
   setActiveTrip: (tripId) => set({ activeTripId: tripId }),
   noteInteraction: () => set({ lastInteractionAt: Date.now() }),

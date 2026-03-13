@@ -26,6 +26,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Optional manual-share trip sync with participant roles, invite records, conflict review, and trip-share export/import
 - Expanded settings surface for security, reminders, sync, backup/recovery, and privacy masking
 - Expo web/PWA companion mode for trip overview, packing, itinerary, emergency info, and printable summaries
+- Five-screen first-launch onboarding with PIN setup, first-trip creation, and a setup checklist
 - Development-only demo data reset for QA
 
 ### Stack
