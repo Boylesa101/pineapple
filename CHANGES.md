@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 - 2026-03-13
+
+- Added phase 3 SQLite migrations and snapshot support for app preferences, trip participants, invites, shared-trip state, and sync conflicts
+- Added local notification scheduling via `expo-notifications` for trip start, passport/GHIC expiry, insurance gaps, packing completeness, flight check-in, and excursion reminders
+- Added a dedicated Settings screen covering security, reminders, manual-share sync, privacy masking, backup/recovery, and conflict review
+- Added optional shared-trip export/import with participant role records, invite codes, sync status metadata, and manual conflict resolution
+- Improved Trip Detail with participant avatars, share controls, invite handling, and trip-scoped conflict surfacing
+- Improved Travel Mode with next-action and today timeline cards while preserving the phase 1/2 visual language
+- Added web/PWA companion scaffolding and documentation clarifying Android as the primary secure vault experience
+- Updated docs and version metadata for phase 3
+
 ## 1.2.0 - 2026-03-13
 
 - Added phase 2 multi-traveller support with DOB, nationality, relationship type, notes, and avatar badge colours

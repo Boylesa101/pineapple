@@ -17,7 +17,7 @@ type ImportBackupArgs = {
 };
 
 function validateBackupPayload(payload: BackupPayload) {
-  if (payload.version !== 2) {
+  if (payload.version !== 3) {
     throw new Error('Unsupported backup version.');
   }
 
@@ -32,6 +32,11 @@ function validateBackupPayload(payload: BackupPayload) {
     !Array.isArray(data.itineraryEvents) ||
     !Array.isArray(data.emergencyInfos) ||
     !Array.isArray(data.reminderSettings) ||
+    !data.appPreferences ||
+    !Array.isArray(data.tripParticipants) ||
+    !Array.isArray(data.tripInvites) ||
+    !Array.isArray(data.sharedTripStates) ||
+    !Array.isArray(data.syncConflicts) ||
     !Array.isArray(payload.attachments)
   ) {
     throw new Error('Backup file is missing required data sections.');
@@ -72,7 +77,7 @@ export async function collectBackupAttachments(snapshot: AppDataSnapshot): Promi
 export async function exportEncryptedBackup({ data, security, password }: ExportBackupArgs) {
   const attachments = await collectBackupAttachments(data);
   const payload: BackupPayload = {
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     settings: {
       autoLockSeconds: security.autoLockSeconds,
@@ -84,7 +89,7 @@ export async function exportEncryptedBackup({ data, security, password }: Export
   const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(payload), password).toString();
   const envelope: BackupEnvelope = {
     format: 'pineapple-backup',
-    version: 2,
+    version: 3,
     encryption: 'aes',
     ciphertext,
   };

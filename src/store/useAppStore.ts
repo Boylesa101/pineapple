@@ -9,18 +9,25 @@ import {
   deleteById,
   loadSnapshot,
   persistSnapshot,
+  replaceAllData,
+  upsertAppPreferences,
   upsertDocument,
   upsertEmergencyInfo,
   upsertHotelStay,
   upsertItineraryEvent,
   upsertPackingItem,
   upsertReminderSetting,
+  upsertSharedTripState,
   upsertTravelSegment,
   upsertTraveller,
   upsertTrip,
+  upsertTripInvite,
+  upsertTripParticipant,
 } from '@/db/repositories';
 import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup';
+import { rescheduleLocalNotifications } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
+import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, resolveConflict } from '@/services/sync';
 import { ensureAppDirectories } from '@/utils/fileStorage';
 import {
   authenticateBiometrics,
@@ -33,6 +40,7 @@ import {
 } from '@/utils/security';
 import type {
   AppDataSnapshot,
+  ConflictStatus,
   DocumentDraft,
   EmergencyInfoDraft,
   HotelStayDraft,
@@ -44,6 +52,8 @@ import type {
   TravelSegmentDraft,
   TravellerDraft,
   TripDraft,
+  TripInviteDraft,
+  TripParticipantDraft,
 } from '@/types/models';
 
 const emptySnapshot: AppDataSnapshot = {
@@ -56,6 +66,21 @@ const emptySnapshot: AppDataSnapshot = {
   itineraryEvents: [],
   emergencyInfos: [],
   reminderSettings: [],
+  appPreferences: {
+    id: 'app',
+    notificationsEnabled: false,
+    syncEnabled: false,
+    syncMode: 'manual_share',
+    syncStatus: 'local_only',
+    lastSyncAt: null,
+    privacyMaskingMode: 'always',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  tripParticipants: [],
+  tripInvites: [],
+  sharedTripStates: [],
+  syncConflicts: [],
 };
 
 type StoreState = {
@@ -82,8 +107,11 @@ type StoreState = {
   lockApp: () => void;
   unlockVault: (seconds?: number) => void;
   updateSecurityPreferences: (updates: Partial<Pick<StoredSecurityConfig, 'biometricEnabled' | 'autoLockSeconds'>>) => Promise<void>;
+  saveAppPreferences: (updates: Partial<AppDataSnapshot['appPreferences']>) => Promise<void>;
   saveTrip: (draft: TripDraft) => Promise<string>;
   saveTraveller: (draft: TravellerDraft) => Promise<string>;
+  saveTripParticipant: (draft: TripParticipantDraft) => Promise<string>;
+  saveTripInvite: (draft: TripInviteDraft) => Promise<string>;
   saveDocument: (draft: DocumentDraft) => Promise<string>;
   savePackingItem: (draft: PackingItemDraft) => Promise<string>;
   duplicatePackingItem: (itemId: string) => Promise<void>;
@@ -96,6 +124,9 @@ type StoreState = {
   exportTripPdfFile: (tripId: string, options: PdfExportOptions) => Promise<string>;
   exportBackupFile: (password: string) => Promise<string>;
   importBackupFile: (encryptedContents: string, password: string) => Promise<void>;
+  exportSharedTripFile: (tripId: string) => Promise<string>;
+  importSharedTripFile: (contents: string) => Promise<{ mode: 'created' | 'updated' | 'conflict'; tripId?: string }>;
+  resolveSyncConflictChoice: (conflictId: string, resolution: ConflictStatus) => Promise<void>;
   deleteRecord: (table: string, id: string) => Promise<void>;
   resetWithDemoData: () => Promise<void>;
 };
@@ -106,6 +137,10 @@ function nextActiveTripId(state: StoreState, snapshot: AppDataSnapshot) {
   }
 
   return snapshot.trips[0]?.id ?? null;
+}
+
+async function syncNotificationState(snapshot: AppDataSnapshot) {
+  await rescheduleLocalNotifications(snapshot);
 }
 
 export const useAppStore = create<StoreState>((set, get) => ({
@@ -127,6 +162,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
     set({ isBusy: true });
     await ensureAppDirectories();
     const [security, data] = await Promise.all([loadSecurityConfig(), loadSnapshot()]);
+    await syncNotificationState(data);
     set({
       security,
       data,
@@ -139,6 +175,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
   },
   refreshData: async () => {
     const snapshot = await loadSnapshot();
+    await syncNotificationState(snapshot);
     set((state) => ({
       data: snapshot,
       activeTripId: nextActiveTripId(state, snapshot),
@@ -227,6 +264,15 @@ export const useAppStore = create<StoreState>((set, get) => ({
     await persistSecurityConfig(next);
     set({ security: next });
   },
+  saveAppPreferences: async (updates) => {
+    const current = get().data.appPreferences;
+    await upsertAppPreferences({
+      ...current,
+      ...updates,
+      id: 'app',
+    });
+    await get().refreshData();
+  },
   saveTrip: async (draft) => {
     const id = await upsertTrip(draft);
     await get().refreshData();
@@ -235,6 +281,16 @@ export const useAppStore = create<StoreState>((set, get) => ({
   },
   saveTraveller: async (draft) => {
     const id = await upsertTraveller(draft);
+    await get().refreshData();
+    return id;
+  },
+  saveTripParticipant: async (draft) => {
+    const id = await upsertTripParticipant(draft);
+    await get().refreshData();
+    return id;
+  },
+  saveTripInvite: async (draft) => {
+    const id = await upsertTripInvite(draft);
     await get().refreshData();
     return id;
   },
@@ -302,6 +358,37 @@ export const useAppStore = create<StoreState>((set, get) => ({
     await persistSecurityConfig(nextSecurity);
     await get().refreshData();
     set({ security: nextSecurity });
+  },
+  exportSharedTripFile: async (tripId) => {
+    const { uri, packet } = await exportSharedTripPacket(get().data, tripId);
+    const currentState = get().data.sharedTripStates.find((item) => item.tripId === tripId);
+    await upsertSharedTripState({
+      tripId,
+      shareCode: currentState?.shareCode ?? packet.shareCode,
+      syncEnabled: get().data.appPreferences.syncEnabled,
+      syncStatus: get().data.appPreferences.syncEnabled ? 'pending_import' : 'local_only',
+      lastSyncAt: get().data.appPreferences.syncEnabled ? new Date().toISOString() : currentState?.lastSyncAt ?? null,
+      lastExportedAt: new Date().toISOString(),
+      lastImportedAt: currentState?.lastImportedAt ?? null,
+      lastKnownRemoteUpdatedAt: currentState?.lastKnownRemoteUpdatedAt ?? null,
+    });
+    await get().refreshData();
+    return uri;
+  },
+  importSharedTripFile: async (contents) => {
+    const packet = parseSharedTripPacket(contents);
+    const result = importSharedTripPacket(get().data, packet);
+    await replaceAllData(result.snapshot);
+    await get().refreshData();
+    return {
+      mode: result.mode,
+      tripId: 'tripId' in result ? result.tripId : undefined,
+    };
+  },
+  resolveSyncConflictChoice: async (conflictId, resolution) => {
+    const nextSnapshot = resolveConflict(get().data, conflictId, resolution);
+    await replaceAllData(nextSnapshot);
+    await get().refreshData();
   },
   deleteRecord: async (table, id) => {
     await deleteById(table, id);

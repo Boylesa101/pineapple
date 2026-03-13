@@ -13,7 +13,7 @@ import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDateTime } from '@/utils/date';
 import { maskSensitive, tripDateRange } from '@/utils/format';
-import { getNextEvent, getNextFlight, getTripBundle } from '@/utils/selectors';
+import { getNextEvent, getNextFlight, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
 
 function ValueCard({
   label,
@@ -48,6 +48,7 @@ export default function TravelModeScreen() {
   const bundle = getTripBundle(data, tripId);
   const nextFlight = getNextFlight(data, tripId);
   const nextEvent = getNextEvent(data, tripId);
+  const timeline = getUpcomingTimeline(data, tripId);
   const hotel = bundle.hotelStays[0];
   const insuranceDocument = bundle.documents.find((document) => document.documentType === 'insurance');
   const [revealed, setRevealed] = useState(false);
@@ -64,6 +65,34 @@ export default function TravelModeScreen() {
     [bundle.travellers]
   );
   const [activeView, setActiveView] = useState(views[0]?.key ?? 'family');
+  const todaysTimeline = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return timeline.filter((item) => item.dateTime.slice(0, 10) === today);
+  }, [timeline]);
+  const nextAction = useMemo(() => {
+    if (nextFlight) {
+      return {
+        title: `${nextFlight.airline} ${nextFlight.flightNumber || ''}`.trim(),
+        subtitle: `${nextFlight.departureAirport} to ${nextFlight.arrivalAirport}`,
+        detail: formatDateTime(nextFlight.departureTime),
+      };
+    }
+    if (hotel) {
+      return {
+        title: hotel.hotelName,
+        subtitle: 'Hotel check-in / stay',
+        detail: `${hotel.address} • ${formatDateTime(hotel.checkIn)}`,
+      };
+    }
+    if (nextEvent) {
+      return {
+        title: nextEvent.title,
+        subtitle: nextEvent.location || nextEvent.type,
+        detail: formatDateTime(nextEvent.dateTime),
+      };
+    }
+    return null;
+  }, [hotel, nextEvent, nextFlight]);
 
   useEffect(() => {
     if (!secondsLeft) return;
@@ -119,6 +148,30 @@ export default function TravelModeScreen() {
             }}
           />
         </View>
+      </AppCard>
+
+      {nextAction ? (
+        <AppCard title="Next action" subtitle="Fastest thing to do next while you move.">
+          <Text style={styles.tripNameSmall}>{nextAction.title}</Text>
+          <Text style={styles.subline}>{nextAction.subtitle}</Text>
+          <Text style={styles.smallText}>{nextAction.detail}</Text>
+        </AppCard>
+      ) : null}
+
+      <AppCard title="Today's timeline" subtitle="Important moments for today only.">
+        {todaysTimeline.length ? (
+          todaysTimeline.map((item) => (
+            <View key={item.id} style={styles.timelineRow}>
+              <View style={styles.timelineDot} />
+              <View style={styles.familyCopy}>
+                <Text style={styles.subline}>{item.title}</Text>
+                <Text style={styles.smallText}>{formatDateTime(item.dateTime)} • {item.subtitle}</Text>
+              </View>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.smallText}>No same-day timeline items yet. Upcoming events appear here automatically.</Text>
+        )}
       </AppCard>
 
       <ChoiceChips<string>
@@ -216,6 +269,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_700Bold',
     fontSize: 28,
   },
+  tripNameSmall: {
+    color: colors.nightNavy,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 22,
+  },
   subline: {
     color: colors.nightNavy,
     fontFamily: 'Inter_500Medium',
@@ -242,6 +300,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  timelineDot: {
+    marginTop: 8,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.pineappleGold,
   },
   familyCopy: {
     flex: 1,

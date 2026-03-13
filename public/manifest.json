@@ -1,0 +1,23 @@
+{
+  "name": "Pineapple",
+  "short_name": "Pineapple",
+  "description": "Local-first holiday planner and secure travel organiser.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7E7CE",
+  "theme_color": "#1E2A38",
+  "icons": [
+    {
+      "src": "/assets/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/favicon.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

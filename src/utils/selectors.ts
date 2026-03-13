@@ -18,6 +18,10 @@ export function getTripBundle(snapshot: AppDataSnapshot, tripId: string | null |
     itineraryEvents: snapshot.itineraryEvents.filter((item) => item.tripId === tripId),
     emergencyInfo: snapshot.emergencyInfos.find((item) => item.tripId === tripId) ?? null,
     reminderSettings: snapshot.reminderSettings.filter((item) => item.tripId === tripId || item.tripId === null),
+    participants: snapshot.tripParticipants.filter((item) => item.tripId === tripId),
+    invites: snapshot.tripInvites.filter((item) => item.tripId === tripId),
+    sharedTripState: snapshot.sharedTripStates.find((item) => item.tripId === tripId) ?? null,
+    conflicts: snapshot.syncConflicts.filter((item) => item.tripId === tripId),
   };
 }
 

@@ -1,22 +1,22 @@
-# Pineapple Phase 3 Roadmap
+# Pineapple Phase 4 Roadmap
 
 ## Product
 
-- Shared family trips across devices without breaking the local-first core
-- Optional encrypted sync and backup destination choices
+- Richer participant acceptance flows and stronger manual-share onboarding
+- Optional encrypted sync and backup destination choices beyond manual-share packets
 - Richer document expiry surfacing and smart prompt automation
 - Multi-trip search, filters, archive tools, and history views
-- Actual local reminders and travel-day shortcuts on top of reminder groundwork
+- More advanced travel-day shortcuts, widgets, and lock-screen surfaces
 
 ## Security
 
 - Stronger vault session controls
 - Per-document biometric gating
-- More robust backup key handling and export warnings
+- More robust backup key handling, export warnings, and attachment integrity checks
 
 ## UX
 
 - In-app PDF rendering
-- Native date range pickers for trip creation
+- Richer PWA install guidance and companion onboarding
 - Rich cover image editing
 - Smarter reusable packing lists and saved family templates

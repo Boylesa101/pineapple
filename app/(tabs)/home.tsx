@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
@@ -187,6 +187,7 @@ export default function HomeScreen() {
           </View>
           <PineappleMark size={72} />
         </View>
+        <AppButton label="Open settings" tone="secondary" onPress={() => router.push('/settings')} />
       </AppCard>
 
       {!upcomingTrip ? (
@@ -310,6 +311,14 @@ export default function HomeScreen() {
           <AppButton label="Import backup" tone="secondary" onPress={openBackupImport} />
         </View>
       </AppCard>
+
+      {Platform.OS === 'web' ? (
+        <AppCard title="Web companion">
+          <Text style={styles.meta}>
+            Pineapple on web focuses on trip overview, packing, itinerary, emergency details, and printable summaries. The Android app remains the best place for sensitive document images.
+          </Text>
+        </AppCard>
+      ) : null}
 
       {__DEV__ ? (
         <AppCard title="Development">

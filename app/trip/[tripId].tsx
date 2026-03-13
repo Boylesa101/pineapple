@@ -3,6 +3,8 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -21,10 +23,13 @@ import { useAppStore } from '@/store/useAppStore';
 import type {
   EmergencyInfoDraft,
   HotelStayDraft,
+  ParticipantRole,
   PdfExportOptions,
   ReminderKind,
+  ReminderLeadTime,
   ReminderSettingDraft,
   TravelSegmentDraft,
+  TripInviteDraft,
   TravellerDraft,
 } from '@/types/models';
 import { daysLeft, daysUntil, formatDateTime, formatShortDate } from '@/utils/date';
@@ -32,12 +37,16 @@ import { relationshipLabel, tripDateRange } from '@/utils/format';
 import { getMissingInfoPrompts, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
 import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, validateTraveller } from '@/utils/validation';
 
-type ModalKind = 'traveller' | 'segment' | 'hotel' | 'emergency' | 'export' | null;
+type ModalKind = 'traveller' | 'segment' | 'hotel' | 'emergency' | 'export' | 'invite' | null;
 
-const reminderMeta: Record<ReminderKind, { label: string; leadTimeDays: number }> = {
+const reminderMeta: Record<ReminderKind, { label: string; leadTimeDays: ReminderLeadTime }> = {
   passport_expiry: { label: 'Passport expiry warning', leadTimeDays: 30 },
+  ghic_expiry: { label: 'GHIC / EHIC expiry warning', leadTimeDays: 30 },
   packing_incomplete: { label: 'Packing incomplete warning', leadTimeDays: 1 },
   trip_starts_tomorrow: { label: 'Trip starts tomorrow warning', leadTimeDays: 1 },
+  insurance_missing: { label: 'Missing insurance warning', leadTimeDays: 7 },
+  flight_check_in: { label: 'Flight check-in reminder', leadTimeDays: 1 },
+  excursion_reminder: { label: 'Excursion reminder', leadTimeDays: 1 },
 };
 
 const defaultExportOptions: PdfExportOptions = {
@@ -47,6 +56,12 @@ const defaultExportOptions: PdfExportOptions = {
   includeDocumentReferences: true,
   hideSensitiveValues: true,
 };
+
+const participantRoleOptions: Array<{ label: string; value: ParticipantRole }> = [
+  { label: 'Owner', value: 'owner' },
+  { label: 'Editor', value: 'editor' },
+  { label: 'Viewer', value: 'viewer' },
+];
 
 export default function TripDetailScreen() {
   const router = useRouter();
@@ -60,6 +75,10 @@ export default function TripDetailScreen() {
     saveEmergencyInfo,
     saveReminderSetting,
     exportTripPdfFile,
+    saveTripInvite,
+    exportSharedTripFile,
+    importSharedTripFile,
+    resolveSyncConflictChoice,
     deleteRecord,
   } = useAppStore();
   const bundle = getTripBundle(data, tripId);
@@ -71,6 +90,7 @@ export default function TripDetailScreen() {
   const [hotelDraft, setHotelDraft] = useState<HotelStayDraft | null>(null);
   const [emergencyDraft, setEmergencyDraft] = useState<EmergencyInfoDraft | null>(null);
   const [exportOptions, setExportOptions] = useState<PdfExportOptions>(defaultExportOptions);
+  const [inviteDraft, setInviteDraft] = useState<TripInviteDraft | null>(null);
 
   const summary = useMemo(
     () => ({
@@ -169,6 +189,17 @@ export default function TripDetailScreen() {
     setModalKind('emergency');
   }
 
+  function openInviteEditor() {
+    setInviteDraft({
+      tripId,
+      email: '',
+      inviteCode: bundle.sharedTripState?.shareCode ?? `PINE-${tripId.slice(-6).toUpperCase()}`,
+      role: 'editor',
+      status: 'pending',
+    });
+    setModalKind('invite');
+  }
+
   async function saveCurrentModal() {
     if (modalKind === 'traveller' && travellerDraft) {
       const errors = validateTraveller(travellerDraft);
@@ -211,6 +242,16 @@ export default function TripDetailScreen() {
       }
       await saveEmergencyInfo(emergencyDraft);
       setModalKind(null);
+      return;
+    }
+
+    if (modalKind === 'invite' && inviteDraft) {
+      if (!inviteDraft.email.trim()) {
+        Alert.alert('Invite needs attention', 'Add an email or label for this participant invite.');
+        return;
+      }
+      await saveTripInvite(inviteDraft);
+      setModalKind(null);
     }
   }
 
@@ -238,6 +279,37 @@ export default function TripDetailScreen() {
     }
   }
 
+  async function handleExportShare() {
+    try {
+      await exportSharedTripFile(tripId);
+      Alert.alert('Shared trip exported', 'A local share file was created for manual import on another device.');
+    } catch (error) {
+      Alert.alert('Share export failed', error instanceof Error ? error.message : 'Unable to export shared trip.');
+    }
+  }
+
+  async function handleImportShare() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets[0]) {
+        return;
+      }
+
+      const contents = await FileSystem.readAsStringAsync(result.assets[0].uri);
+      const outcome = await importSharedTripFile(contents);
+      if (outcome.mode === 'conflict') {
+        Alert.alert('Conflict detected', 'The incoming shared trip was stored for manual conflict review.');
+      } else {
+        Alert.alert('Shared trip imported', 'Trip data was updated from the incoming share file.');
+      }
+    } catch (error) {
+      Alert.alert('Share import failed', error instanceof Error ? error.message : 'Unable to import shared trip.');
+    }
+  }
+
   return (
     <AppScreen title={trip.name} subtitle={tripDateRange(trip.startDate, trip.endDate)}>
       {trip.coverImageUri ? <Image source={trip.coverImageUri} style={styles.cover} contentFit="cover" /> : null}
@@ -259,6 +331,14 @@ export default function TripDetailScreen() {
             label={remainingDays >= 0 ? `${remainingDays} day(s) left` : 'Trip ended'}
             tone={remainingDays > 0 ? 'gold' : 'default'}
           />
+        </View>
+        <View style={styles.participantRow}>
+          {bundle.participants.slice(0, 5).map((participant) => (
+            <AvatarBadge key={participant.id} label={participant.displayName} color={participant.avatarColor} size={34} />
+          ))}
+          {bundle.participants.length ? (
+            <Text style={styles.notes}>{bundle.participants.length} participant(s) in this shared trip space</Text>
+          ) : null}
         </View>
         <Text style={styles.notes}>
           {trip.notes || (trip.status === 'completed' ? 'This trip is complete and kept locally for reference.' : 'Add notes, reminders, and local context for the trip.')}
@@ -343,6 +423,71 @@ export default function TripDetailScreen() {
             description="Add adults, children, infants, and other traveller profiles with badges, passport nationality, DOB, and notes."
           />
         )}
+      </AppCard>
+
+      <AppCard title="Sharing and participants" subtitle="Optional manual-share sync with participant roles and conflict review.">
+        <View style={styles.chipRow}>
+          <InfoChip label={`Share code ${bundle.sharedTripState?.shareCode ?? 'Pending'}`} tone="blue" />
+          <InfoChip label={`Sync ${bundle.sharedTripState?.syncStatus.replaceAll('_', ' ') ?? 'local only'}`} tone={bundle.sharedTripState?.syncStatus === 'conflict' ? 'coral' : 'gold'} />
+        </View>
+        <View style={styles.participantList}>
+          {bundle.participants.map((participant) => (
+            <View key={participant.id} style={styles.participantItem}>
+              <View style={styles.travellerIdentity}>
+                <AvatarBadge label={participant.displayName} color={participant.avatarColor} size={38} />
+                <View style={styles.travellerCopy}>
+                  <Text style={styles.travellerName}>{participant.displayName}</Text>
+                  <Text style={styles.notes}>{participant.role}{participant.email ? ` • ${participant.email}` : ''}</Text>
+                </View>
+              </View>
+              {!participant.isLocalProfile ? (
+                <Pressable onPress={() => deleteRecord('trip_participants', participant.id)}>
+                  <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                </Pressable>
+              ) : null}
+            </View>
+          ))}
+          {bundle.invites.map((invite) => (
+            <View key={invite.id} style={styles.participantItem}>
+              <View style={styles.travellerCopy}>
+                <Text style={styles.travellerName}>{invite.email || 'Pending invite'}</Text>
+                <Text style={styles.notes}>{invite.role} • {invite.status} • code {invite.inviteCode}</Text>
+              </View>
+              <Pressable onPress={() => deleteRecord('trip_invites', invite.id)}>
+                <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+        <View style={styles.buttonWrap}>
+          <AppButton label="Invite by email / code" tone="secondary" onPress={openInviteEditor} />
+          <AppButton label="Export shared trip" onPress={handleExportShare} />
+          <AppButton label="Import update" tone="secondary" onPress={handleImportShare} />
+        </View>
+        {bundle.conflicts.length ? (
+          <View style={styles.conflictList}>
+            {bundle.conflicts
+              .filter((conflict) => conflict.status === 'open')
+              .map((conflict) => (
+                <View key={conflict.id} style={styles.conflictCard}>
+                  <Text style={styles.travellerName}>{conflict.summary}</Text>
+                  <Text style={styles.notes}>Local: {formatDateTime(conflict.localUpdatedAt)}</Text>
+                  <Text style={styles.notes}>Incoming: {formatDateTime(conflict.incomingUpdatedAt)}</Text>
+                  <View style={styles.buttonWrap}>
+                    <AppButton
+                      label="Keep local"
+                      tone="secondary"
+                      onPress={() => resolveSyncConflictChoice(conflict.id, 'resolved_keep_local')}
+                    />
+                    <AppButton
+                      label="Use incoming"
+                      onPress={() => resolveSyncConflictChoice(conflict.id, 'resolved_use_incoming')}
+                    />
+                  </View>
+                </View>
+              ))}
+          </View>
+        ) : null}
       </AppCard>
 
       <AppCard title="Documents" subtitle="Secure vault for passports, GHIC, insurance, tickets, and PDFs">
@@ -535,6 +680,31 @@ export default function TripDetailScreen() {
               ))}
             </View>
             <AppButton label="Save traveller" onPress={saveCurrentModal} />
+          </>
+        ) : null}
+      </AppModal>
+
+      <AppModal visible={modalKind === 'invite'} title="Invite participant" onClose={() => setModalKind(null)}>
+        {inviteDraft ? (
+          <>
+            <AppTextField
+              label="Email or label"
+              value={inviteDraft.email}
+              onChangeText={(value) => setInviteDraft((current) => (current ? { ...current, email: value } : current))}
+              placeholder="traveller@example.com"
+            />
+            <Text style={styles.label}>Role</Text>
+            <ChoiceChips
+              value={inviteDraft.role}
+              onChange={(value) => setInviteDraft((current) => (current ? { ...current, role: value as ParticipantRole } : current))}
+              options={participantRoleOptions}
+            />
+            <AppTextField
+              label="Invite code"
+              value={inviteDraft.inviteCode}
+              onChangeText={(value) => setInviteDraft((current) => (current ? { ...current, inviteCode: value } : current))}
+            />
+            <AppButton label="Save invite" onPress={saveCurrentModal} />
           </>
         ) : null}
       </AppModal>
@@ -787,6 +957,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.xs,
   },
+  participantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
   metrics: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -834,6 +1010,34 @@ const styles = StyleSheet.create({
   iconRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  participantList: {
+    gap: spacing.sm,
+  },
+  participantItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingBottom: spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  buttonWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  conflictList: {
+    gap: spacing.sm,
+  },
+  conflictCard: {
+    gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: '#FFF8EF',
   },
   field: {
     gap: spacing.xs,

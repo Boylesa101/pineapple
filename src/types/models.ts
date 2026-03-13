@@ -22,7 +22,21 @@ export type PackingAssignmentScope = 'trip' | 'travellers';
 export type PackingPriority = 'essential' | 'useful' | 'optional';
 export type ItineraryType = 'excursion' | 'meal' | 'ticket' | 'reminder' | 'custom';
 export type RelationshipType = 'adult' | 'child' | 'infant' | 'other';
-export type ReminderKind = 'passport_expiry' | 'packing_incomplete' | 'trip_starts_tomorrow';
+export type ReminderKind =
+  | 'passport_expiry'
+  | 'ghic_expiry'
+  | 'packing_incomplete'
+  | 'trip_starts_tomorrow'
+  | 'insurance_missing'
+  | 'flight_check_in'
+  | 'excursion_reminder';
+export type ReminderLeadTime = 30 | 7 | 1;
+export type ParticipantRole = 'owner' | 'editor' | 'viewer';
+export type InviteStatus = 'pending' | 'accepted' | 'revoked';
+export type SyncMode = 'manual_share';
+export type SyncStatus = 'local_only' | 'ready' | 'pending_export' | 'pending_import' | 'conflict';
+export type ConflictStatus = 'open' | 'resolved_keep_local' | 'resolved_use_incoming';
+export type PrivacyMaskingMode = 'always' | 'travel_mode';
 export type PinLength = 4 | 6;
 
 export interface Trip {
@@ -151,7 +165,69 @@ export interface ReminderSetting {
   tripId: string | null;
   kind: ReminderKind;
   enabled: boolean;
-  leadTimeDays: number;
+  leadTimeDays: ReminderLeadTime;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppPreferences {
+  id: 'app';
+  notificationsEnabled: boolean;
+  syncEnabled: boolean;
+  syncMode: SyncMode;
+  syncStatus: SyncStatus;
+  lastSyncAt: string | null;
+  privacyMaskingMode: PrivacyMaskingMode;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TripParticipant {
+  id: string;
+  tripId: string;
+  displayName: string;
+  email: string;
+  role: ParticipantRole;
+  avatarColor: string;
+  inviteCode: string;
+  isLocalProfile: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TripInvite {
+  id: string;
+  tripId: string;
+  email: string;
+  inviteCode: string;
+  role: ParticipantRole;
+  status: InviteStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SharedTripState {
+  tripId: string;
+  shareCode: string;
+  syncEnabled: boolean;
+  syncStatus: SyncStatus;
+  lastSyncAt: string | null;
+  lastExportedAt: string | null;
+  lastImportedAt: string | null;
+  lastKnownRemoteUpdatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SyncConflict {
+  id: string;
+  tripId: string;
+  shareCode: string;
+  summary: string;
+  localUpdatedAt: string;
+  incomingUpdatedAt: string;
+  incomingPayload: string;
+  status: ConflictStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -178,6 +254,11 @@ export interface AppDataSnapshot {
   itineraryEvents: ItineraryEvent[];
   emergencyInfos: EmergencyInfo[];
   reminderSettings: ReminderSetting[];
+  appPreferences: AppPreferences;
+  tripParticipants: TripParticipant[];
+  tripInvites: TripInvite[];
+  sharedTripStates: SharedTripState[];
+  syncConflicts: SyncConflict[];
 }
 
 export interface BackupAttachment {
@@ -189,7 +270,7 @@ export interface BackupAttachment {
 }
 
 export interface BackupPayload {
-  version: 2;
+  version: 3;
   exportedAt: string;
   settings: {
     autoLockSeconds: number;
@@ -200,7 +281,7 @@ export interface BackupPayload {
 
 export interface BackupEnvelope {
   format: 'pineapple-backup';
-  version: 2;
+  version: 3;
   encryption: 'aes';
   ciphertext: string;
 }
@@ -213,6 +294,28 @@ export interface PdfExportOptions {
   hideSensitiveValues: boolean;
 }
 
+export interface SharedTripPacketData {
+  trip: Trip;
+  travellers: Traveller[];
+  packingItems: PackingItem[];
+  travelSegments: TravelSegment[];
+  hotelStays: HotelStay[];
+  itineraryEvents: ItineraryEvent[];
+  emergencyInfo: EmergencyInfo | null;
+  reminderSettings: ReminderSetting[];
+  participants: TripParticipant[];
+  invites: TripInvite[];
+}
+
+export interface SharedTripPacket {
+  format: 'pineapple-shared-trip';
+  version: 1;
+  shareCode: string;
+  generatedAt: string;
+  senderLabel: string;
+  data: SharedTripPacketData;
+}
+
 export type TripDraft = Omit<Trip, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type TravellerDraft = Omit<Traveller, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type DocumentDraft = Omit<Document, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
@@ -222,3 +325,8 @@ export type HotelStayDraft = Omit<HotelStay, 'id' | 'createdAt' | 'updatedAt'> &
 export type ItineraryEventDraft = Omit<ItineraryEvent, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type EmergencyInfoDraft = Omit<EmergencyInfo, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type ReminderSettingDraft = Omit<ReminderSetting, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
+export type AppPreferencesDraft = Omit<AppPreferences, 'createdAt' | 'updatedAt'>;
+export type TripParticipantDraft = Omit<TripParticipant, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
+export type TripInviteDraft = Omit<TripInvite, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
+export type SharedTripStateDraft = Omit<SharedTripState, 'createdAt' | 'updatedAt'>;
+export type SyncConflictDraft = Omit<SyncConflict, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };

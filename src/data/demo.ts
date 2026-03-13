@@ -13,6 +13,7 @@ export function createDemoSnapshot(): AppDataSnapshot {
   const travellerA = createId('traveller');
   const travellerB = createId('traveller');
   const travellerC = createId('traveller');
+  const shareCode = `PINE-${tripId.slice(-6).toUpperCase()}`;
   const now = new Date().toISOString();
 
   return {
@@ -218,6 +219,15 @@ export function createDemoSnapshot(): AppDataSnapshot {
     reminderSettings: [
       {
         id: createId('reminder'),
+        tripId: null,
+        kind: 'passport_expiry',
+        enabled: true,
+        leadTimeDays: 30,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: createId('reminder'),
         tripId,
         kind: 'trip_starts_tomorrow',
         enabled: true,
@@ -243,6 +253,106 @@ export function createDemoSnapshot(): AppDataSnapshot {
         createdAt: now,
         updatedAt: now,
       },
+      {
+        id: createId('reminder'),
+        tripId,
+        kind: 'ghic_expiry',
+        enabled: true,
+        leadTimeDays: 30,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: createId('reminder'),
+        tripId,
+        kind: 'insurance_missing',
+        enabled: true,
+        leadTimeDays: 7,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: createId('reminder'),
+        tripId,
+        kind: 'flight_check_in',
+        enabled: true,
+        leadTimeDays: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: createId('reminder'),
+        tripId,
+        kind: 'excursion_reminder',
+        enabled: true,
+        leadTimeDays: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
     ],
+    appPreferences: {
+      id: 'app',
+      notificationsEnabled: false,
+      syncEnabled: false,
+      syncMode: 'manual_share',
+      syncStatus: 'local_only',
+      lastSyncAt: null,
+      privacyMaskingMode: 'always',
+      createdAt: now,
+      updatedAt: now,
+    },
+    tripParticipants: [
+      {
+        id: createId('participant'),
+        tripId,
+        displayName: 'You',
+        email: '',
+        role: 'owner',
+        avatarColor: '#F4B400',
+        inviteCode: shareCode,
+        isLocalProfile: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: createId('participant'),
+        tripId,
+        displayName: 'Jess',
+        email: 'jess@example.com',
+        role: 'editor',
+        avatarColor: '#2BA6CB',
+        inviteCode: shareCode,
+        isLocalProfile: false,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    tripInvites: [
+      {
+        id: createId('invite'),
+        tripId,
+        email: 'grandma@example.com',
+        inviteCode: shareCode,
+        role: 'viewer',
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    sharedTripStates: [
+      {
+        tripId,
+        shareCode,
+        syncEnabled: false,
+        syncStatus: 'local_only',
+        lastSyncAt: null,
+        lastExportedAt: null,
+        lastImportedAt: null,
+        lastKnownRemoteUpdatedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    syncConflicts: [],
   };
 }

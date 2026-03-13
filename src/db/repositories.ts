@@ -3,23 +3,43 @@ import { getDatabase } from './client';
 import { createId } from '@/utils/ids';
 import type {
   AppDataSnapshot,
+  AppPreferences,
+  AppPreferencesDraft,
   DocumentDraft,
   EmergencyInfoDraft,
   HotelStayDraft,
   ItineraryEventDraft,
   PackingItemDraft,
   ReminderSettingDraft,
+  SharedTripStateDraft,
+  SyncConflictDraft,
   TravelSegmentDraft,
   TravellerDraft,
   TripDraft,
+  TripInviteDraft,
+  TripParticipantDraft,
 } from '@/types/models';
 
 function now() {
   return new Date().toISOString();
 }
 
-function toBool(value: number | boolean) {
+function toBool(value: number | boolean | null | undefined) {
   return value === 1 || value === true;
+}
+
+function defaultAppPreferences(timestamp = now()): AppPreferences {
+  return {
+    id: 'app',
+    notificationsEnabled: false,
+    syncEnabled: false,
+    syncMode: 'manual_share',
+    syncStatus: 'local_only',
+    lastSyncAt: null,
+    privacyMaskingMode: 'always',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
 }
 
 async function replacePackingAssignments(id: string, travellerIds: string[]) {
@@ -48,6 +68,11 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     itineraryEvents,
     emergencyInfos,
     reminderSettings,
+    appPreferencesRaw,
+    tripParticipants,
+    tripInvites,
+    sharedTripStates,
+    syncConflicts,
   ] = await Promise.all([
     db.getAllAsync<any>('SELECT * FROM trips ORDER BY startDate ASC'),
     db.getAllAsync<any>('SELECT * FROM travellers ORDER BY fullName ASC'),
@@ -61,12 +86,25 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     db.getAllAsync<any>('SELECT * FROM itinerary_events ORDER BY dateTime ASC'),
     db.getAllAsync<any>('SELECT * FROM emergency_infos ORDER BY createdAt DESC'),
     db.getAllAsync<any>('SELECT * FROM reminder_settings ORDER BY tripId ASC, kind ASC'),
+    db.getFirstAsync<any>('SELECT * FROM app_preferences WHERE id = ?', 'app'),
+    db.getAllAsync<any>('SELECT * FROM trip_participants ORDER BY tripId ASC, createdAt ASC'),
+    db.getAllAsync<any>('SELECT * FROM trip_invites ORDER BY tripId ASC, createdAt ASC'),
+    db.getAllAsync<any>('SELECT * FROM shared_trip_states ORDER BY updatedAt DESC'),
+    db.getAllAsync<any>('SELECT * FROM sync_conflicts ORDER BY createdAt DESC'),
   ]);
 
   const assignmentMap = packingAssignments.reduce<Record<string, string[]>>((accumulator, row) => {
     accumulator[row.packingItemId] = [...(accumulator[row.packingItemId] ?? []), row.travellerId];
     return accumulator;
   }, {});
+
+  const appPreferences = appPreferencesRaw
+    ? {
+        ...appPreferencesRaw,
+        notificationsEnabled: toBool(appPreferencesRaw.notificationsEnabled),
+        syncEnabled: toBool(appPreferencesRaw.syncEnabled),
+      }
+    : defaultAppPreferences();
 
   return {
     trips,
@@ -85,6 +123,17 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
       ...setting,
       enabled: toBool(setting.enabled),
     })),
+    appPreferences,
+    tripParticipants: tripParticipants.map((participant) => ({
+      ...participant,
+      isLocalProfile: toBool(participant.isLocalProfile),
+    })),
+    tripInvites,
+    sharedTripStates: sharedTripStates.map((state) => ({
+      ...state,
+      syncEnabled: toBool(state.syncEnabled),
+    })),
+    syncConflicts,
   };
 }
 
@@ -113,6 +162,27 @@ export async function upsertTrip(input: TripDraft) {
     input.coverImageUri,
     input.notes,
     input.status,
+    timestamp,
+    timestamp
+  );
+
+  await db.runAsync(
+    `INSERT OR IGNORE INTO shared_trip_states (
+      tripId, shareCode, syncEnabled, syncStatus, lastSyncAt, lastExportedAt, lastImportedAt, lastKnownRemoteUpdatedAt, createdAt, updatedAt
+    ) VALUES (?, ?, 0, 'local_only', NULL, NULL, NULL, NULL, ?, ?)`,
+    id,
+    `PINE-${id.slice(-6).toUpperCase()}`,
+    timestamp,
+    timestamp
+  );
+
+  await db.runAsync(
+    `INSERT OR IGNORE INTO trip_participants (
+      id, tripId, displayName, email, role, avatarColor, inviteCode, isLocalProfile, createdAt, updatedAt
+    ) VALUES (?, ?, 'You', '', 'owner', '#F4B400', ?, 1, ?, ?)`,
+    `participant_${id}`,
+    id,
+    `PINE-${id.slice(-6).toUpperCase()}`,
     timestamp,
     timestamp
   );
@@ -405,6 +475,160 @@ export async function upsertReminderSetting(input: ReminderSettingDraft) {
   return id;
 }
 
+export async function upsertAppPreferences(input: AppPreferencesDraft) {
+  const db = await getDatabase();
+  const timestamp = now();
+
+  await db.runAsync(
+    `INSERT INTO app_preferences (id, notificationsEnabled, syncEnabled, syncMode, syncStatus, lastSyncAt, privacyMaskingMode, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       notificationsEnabled = excluded.notificationsEnabled,
+       syncEnabled = excluded.syncEnabled,
+       syncMode = excluded.syncMode,
+       syncStatus = excluded.syncStatus,
+       lastSyncAt = excluded.lastSyncAt,
+       privacyMaskingMode = excluded.privacyMaskingMode,
+       updatedAt = excluded.updatedAt`,
+    input.id,
+    input.notificationsEnabled ? 1 : 0,
+    input.syncEnabled ? 1 : 0,
+    input.syncMode,
+    input.syncStatus,
+    input.lastSyncAt,
+    input.privacyMaskingMode,
+    timestamp,
+    timestamp
+  );
+
+  return input.id;
+}
+
+export async function upsertTripParticipant(input: TripParticipantDraft) {
+  const db = await getDatabase();
+  const timestamp = now();
+  const id = input.id ?? createId('participant');
+
+  await db.runAsync(
+    `INSERT INTO trip_participants (id, tripId, displayName, email, role, avatarColor, inviteCode, isLocalProfile, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       tripId = excluded.tripId,
+       displayName = excluded.displayName,
+       email = excluded.email,
+       role = excluded.role,
+       avatarColor = excluded.avatarColor,
+       inviteCode = excluded.inviteCode,
+       isLocalProfile = excluded.isLocalProfile,
+       updatedAt = excluded.updatedAt`,
+    id,
+    input.tripId,
+    input.displayName,
+    input.email,
+    input.role,
+    input.avatarColor,
+    input.inviteCode,
+    input.isLocalProfile ? 1 : 0,
+    timestamp,
+    timestamp
+  );
+
+  return id;
+}
+
+export async function upsertTripInvite(input: TripInviteDraft) {
+  const db = await getDatabase();
+  const timestamp = now();
+  const id = input.id ?? createId('invite');
+
+  await db.runAsync(
+    `INSERT INTO trip_invites (id, tripId, email, inviteCode, role, status, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       tripId = excluded.tripId,
+       email = excluded.email,
+       inviteCode = excluded.inviteCode,
+       role = excluded.role,
+       status = excluded.status,
+       updatedAt = excluded.updatedAt`,
+    id,
+    input.tripId,
+    input.email,
+    input.inviteCode,
+    input.role,
+    input.status,
+    timestamp,
+    timestamp
+  );
+
+  return id;
+}
+
+export async function upsertSharedTripState(input: SharedTripStateDraft) {
+  const db = await getDatabase();
+  const timestamp = now();
+
+  await db.runAsync(
+    `INSERT INTO shared_trip_states (
+      tripId, shareCode, syncEnabled, syncStatus, lastSyncAt, lastExportedAt, lastImportedAt, lastKnownRemoteUpdatedAt, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(tripId) DO UPDATE SET
+      shareCode = excluded.shareCode,
+      syncEnabled = excluded.syncEnabled,
+      syncStatus = excluded.syncStatus,
+      lastSyncAt = excluded.lastSyncAt,
+      lastExportedAt = excluded.lastExportedAt,
+      lastImportedAt = excluded.lastImportedAt,
+      lastKnownRemoteUpdatedAt = excluded.lastKnownRemoteUpdatedAt,
+      updatedAt = excluded.updatedAt`,
+    input.tripId,
+    input.shareCode,
+    input.syncEnabled ? 1 : 0,
+    input.syncStatus,
+    input.lastSyncAt,
+    input.lastExportedAt,
+    input.lastImportedAt,
+    input.lastKnownRemoteUpdatedAt,
+    timestamp,
+    timestamp
+  );
+
+  return input.tripId;
+}
+
+export async function upsertSyncConflict(input: SyncConflictDraft) {
+  const db = await getDatabase();
+  const timestamp = now();
+  const id = input.id ?? createId('conflict');
+
+  await db.runAsync(
+    `INSERT INTO sync_conflicts (
+      id, tripId, shareCode, summary, localUpdatedAt, incomingUpdatedAt, incomingPayload, status, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      tripId = excluded.tripId,
+      shareCode = excluded.shareCode,
+      summary = excluded.summary,
+      localUpdatedAt = excluded.localUpdatedAt,
+      incomingUpdatedAt = excluded.incomingUpdatedAt,
+      incomingPayload = excluded.incomingPayload,
+      status = excluded.status,
+      updatedAt = excluded.updatedAt`,
+    id,
+    input.tripId,
+    input.shareCode,
+    input.summary,
+    input.localUpdatedAt,
+    input.incomingUpdatedAt,
+    input.incomingPayload,
+    input.status,
+    timestamp,
+    timestamp
+  );
+
+  return id;
+}
+
 export async function deleteById(table: string, id: string) {
   const db = await getDatabase();
   await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, id);
@@ -413,6 +637,10 @@ export async function deleteById(table: string, id: string) {
 export async function clearAllData() {
   const db = await getDatabase();
   await db.execAsync(`
+    DELETE FROM sync_conflicts;
+    DELETE FROM trip_invites;
+    DELETE FROM trip_participants;
+    DELETE FROM shared_trip_states;
     DELETE FROM reminder_settings;
     DELETE FROM packing_item_travellers;
     DELETE FROM emergency_infos;
@@ -423,12 +651,18 @@ export async function clearAllData() {
     DELETE FROM documents;
     DELETE FROM travellers;
     DELETE FROM trips;
+    DELETE FROM app_preferences;
   `);
+  await upsertAppPreferences(defaultAppPreferences());
 }
 
 export async function persistSnapshot(snapshot: AppDataSnapshot) {
+  await upsertAppPreferences(snapshot.appPreferences);
   for (const trip of snapshot.trips) await upsertTrip(trip);
   for (const traveller of snapshot.travellers) await upsertTraveller(traveller);
+  for (const participant of snapshot.tripParticipants) await upsertTripParticipant(participant);
+  for (const invite of snapshot.tripInvites) await upsertTripInvite(invite);
+  for (const sharedTripState of snapshot.sharedTripStates) await upsertSharedTripState(sharedTripState);
   for (const document of snapshot.documents) await upsertDocument(document);
   for (const item of snapshot.packingItems) await upsertPackingItem(item);
   for (const segment of snapshot.travelSegments) await upsertTravelSegment(segment);
@@ -436,6 +670,7 @@ export async function persistSnapshot(snapshot: AppDataSnapshot) {
   for (const event of snapshot.itineraryEvents) await upsertItineraryEvent(event);
   for (const emergency of snapshot.emergencyInfos) await upsertEmergencyInfo(emergency);
   for (const reminder of snapshot.reminderSettings) await upsertReminderSetting(reminder);
+  for (const conflict of snapshot.syncConflicts) await upsertSyncConflict(conflict);
 }
 
 export async function replaceAllData(snapshot: AppDataSnapshot) {

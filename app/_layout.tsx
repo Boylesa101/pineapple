@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AppState, StyleSheet, Text, View } from 'react-native';
+import { AppState, Platform, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -100,6 +100,14 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, isBootstrapped]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+      return;
+    }
+
+    navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+  }, []);
+
   if (!fontsLoaded || !isBootstrapped) {
     return <LoadingView />;
   }
@@ -113,6 +121,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="settings" />
           <Stack.Screen name="trip/[tripId]" />
           <Stack.Screen name="trip/[tripId]/travel-mode" />
         </Stack>

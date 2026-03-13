@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -142,11 +142,76 @@ CREATE TABLE IF NOT EXISTS reminder_settings (
   updatedAt TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS app_preferences (
+  id TEXT PRIMARY KEY NOT NULL,
+  notificationsEnabled INTEGER NOT NULL DEFAULT 0,
+  syncEnabled INTEGER NOT NULL DEFAULT 0,
+  syncMode TEXT NOT NULL DEFAULT 'manual_share',
+  syncStatus TEXT NOT NULL DEFAULT 'local_only',
+  lastSyncAt TEXT,
+  privacyMaskingMode TEXT NOT NULL DEFAULT 'always',
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS trip_participants (
+  id TEXT PRIMARY KEY NOT NULL,
+  tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  displayName TEXT NOT NULL,
+  email TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL,
+  avatarColor TEXT NOT NULL DEFAULT '#F4B400',
+  inviteCode TEXT NOT NULL DEFAULT '',
+  isLocalProfile INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS trip_invites (
+  id TEXT PRIMARY KEY NOT NULL,
+  tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  email TEXT NOT NULL DEFAULT '',
+  inviteCode TEXT NOT NULL,
+  role TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS shared_trip_states (
+  tripId TEXT PRIMARY KEY NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  shareCode TEXT NOT NULL,
+  syncEnabled INTEGER NOT NULL DEFAULT 0,
+  syncStatus TEXT NOT NULL DEFAULT 'local_only',
+  lastSyncAt TEXT,
+  lastExportedAt TEXT,
+  lastImportedAt TEXT,
+  lastKnownRemoteUpdatedAt TEXT,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sync_conflicts (
+  id TEXT PRIMARY KEY NOT NULL,
+  tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  shareCode TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  localUpdatedAt TEXT NOT NULL,
+  incomingUpdatedAt TEXT NOT NULL,
+  incomingPayload TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_documents_trip ON documents (tripId);
 CREATE INDEX IF NOT EXISTS idx_documents_expiry ON documents (expiryDate);
 CREATE INDEX IF NOT EXISTS idx_packing_trip ON packing_items (tripId);
 CREATE INDEX IF NOT EXISTS idx_itinerary_trip_datetime ON itinerary_events (tripId, dateTime);
 CREATE INDEX IF NOT EXISTS idx_reminders_trip_kind ON reminder_settings (tripId, kind);
+CREATE INDEX IF NOT EXISTS idx_participants_trip ON trip_participants (tripId);
+CREATE INDEX IF NOT EXISTS idx_invites_trip ON trip_invites (tripId);
+CREATE INDEX IF NOT EXISTS idx_conflicts_trip_status ON sync_conflicts (tripId, status);
 `;
 
 async function getUserVersion(db: SQLiteDatabase) {
@@ -202,12 +267,50 @@ async function runPhaseTwoMigration(db: SQLiteDatabase) {
   `);
 }
 
+async function runPhaseThreeMigration(db: SQLiteDatabase) {
+  await db.execAsync(`
+    INSERT OR IGNORE INTO app_preferences (
+      id, notificationsEnabled, syncEnabled, syncMode, syncStatus, lastSyncAt, privacyMaskingMode, createdAt, updatedAt
+    ) VALUES (
+      'app', 0, 0, 'manual_share', 'local_only', NULL, 'always', datetime('now'), datetime('now')
+    );
+  `);
+
+  const tripRows = await db.getAllAsync<{ id: string; createdAt: string; updatedAt: string }>('SELECT id, createdAt, updatedAt FROM trips');
+  for (const trip of tripRows) {
+    await db.runAsync(
+      `INSERT OR IGNORE INTO shared_trip_states (
+        tripId, shareCode, syncEnabled, syncStatus, lastSyncAt, lastExportedAt, lastImportedAt, lastKnownRemoteUpdatedAt, createdAt, updatedAt
+      ) VALUES (?, ?, 0, 'local_only', NULL, NULL, NULL, NULL, ?, ?)`,
+      trip.id,
+      `PINE-${trip.id.slice(-6).toUpperCase()}`,
+      trip.createdAt,
+      trip.updatedAt
+    );
+
+    await db.runAsync(
+      `INSERT OR IGNORE INTO trip_participants (
+        id, tripId, displayName, email, role, avatarColor, inviteCode, isLocalProfile, createdAt, updatedAt
+      ) VALUES (?, ?, 'You', '', 'owner', '#F4B400', ?, 1, ?, ?)`,
+      `participant_${trip.id}`,
+      trip.id,
+      `PINE-${trip.id.slice(-6).toUpperCase()}`,
+      trip.createdAt,
+      trip.updatedAt
+    );
+  }
+}
+
 export async function runMigrations(db: SQLiteDatabase) {
   await db.execAsync(createLatestTablesSql);
 
   const version = await getUserVersion(db);
   if (version < 2) {
     await runPhaseTwoMigration(db);
-    await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
   }
+  if (version < 3) {
+    await runPhaseThreeMigration(db);
+  }
+
+  await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }
