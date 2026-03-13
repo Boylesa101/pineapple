@@ -2,7 +2,14 @@ import CryptoJS from 'crypto-js';
 import * as Sharing from 'expo-sharing';
 
 import { replaceAllData } from '@/db/repositories';
-import type { AppDataSnapshot, BackupAttachment, BackupEnvelope, BackupPayload, StoredSecurityConfig } from '@/types/models';
+import type {
+  AppDataSnapshot,
+  BackupAttachment,
+  BackupEnvelope,
+  BackupExportResult,
+  BackupPayload,
+  StoredSecurityConfig,
+} from '@/types/models';
 import { getManagedFolder, readBase64File, writeBase64File, writeUtf8File } from '@/utils/fileStorage';
 
 type ExportBackupArgs = {
@@ -17,6 +24,8 @@ type ImportBackupArgs = {
 };
 
 const BACKUP_PBKDF2_ITERATIONS = 150000;
+export const PINEAPPLE_BACKUP_EXTENSION = '.pineapplebackup';
+export const PINEAPPLE_BACKUP_MIME_TYPE = 'application/json';
 
 function validateBackupPayload(payload: BackupPayload) {
   if (payload.version !== 3) {
@@ -45,12 +54,55 @@ function validateBackupPayload(payload: BackupPayload) {
   }
 }
 
+function validateBackupEnvelope(envelope: BackupEnvelope) {
+  if (envelope.format !== 'pineapple-backup') {
+    throw new Error('This backup file is not recognised.');
+  }
+
+  if (envelope.version !== 3) {
+    throw new Error('This backup file was created with an unsupported Pineapple version.');
+  }
+
+  if (envelope.encryption !== 'aes-256-cbc+hmac-sha256' || envelope.kdf !== 'pbkdf2') {
+    throw new Error('This backup file uses an unsupported protection format.');
+  }
+
+  if (
+    !envelope.ciphertext ||
+    !envelope.iv ||
+    !envelope.salt ||
+    !envelope.mac ||
+    typeof envelope.iterations !== 'number' ||
+    envelope.iterations < 10000
+  ) {
+    throw new Error('Backup file is incomplete or corrupted.');
+  }
+}
+
+export function isBackupFileName(name: string | null | undefined) {
+  return Boolean(name?.toLowerCase().endsWith(PINEAPPLE_BACKUP_EXTENSION));
+}
+
+export function parseBackupEnvelope(encryptedContents: string) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(encryptedContents);
+  } catch {
+    throw new Error('Backup file is not valid JSON.');
+  }
+
+  const envelope = parsed as BackupEnvelope;
+  validateBackupEnvelope(envelope);
+  return envelope;
+}
+
 function attachmentFileName(uri: string) {
   return uri.split('/').pop() || 'attachment.bin';
 }
 
-export async function collectBackupAttachments(snapshot: AppDataSnapshot): Promise<BackupAttachment[]> {
+export async function collectBackupAttachments(snapshot: AppDataSnapshot) {
   const unique = new Map<string, BackupAttachment>();
+  let skippedAttachmentCount = 0;
 
   const tripUris = snapshot.trips
     .map((trip) => trip.coverImageUri)
@@ -62,25 +114,33 @@ export async function collectBackupAttachments(snapshot: AppDataSnapshot): Promi
   for (const uri of [...tripUris, ...documentUris]) {
     if (unique.has(uri)) continue;
 
-    const folder = uri.startsWith(getManagedFolder('trips')) ? 'trips' : 'vault';
-    const base64 = await readBase64File(uri);
-    unique.set(uri, {
-      originalUri: uri,
-      folder,
-      mimeType: uri.endsWith('.pdf') ? 'application/pdf' : null,
-      fileName: attachmentFileName(uri),
-      base64,
-    });
+    try {
+      const folder = uri.startsWith(getManagedFolder('trips')) ? 'trips' : 'vault';
+      const base64 = await readBase64File(uri);
+      unique.set(uri, {
+        originalUri: uri,
+        folder,
+        mimeType: uri.endsWith('.pdf') ? 'application/pdf' : null,
+        fileName: attachmentFileName(uri),
+        base64,
+      });
+    } catch {
+      skippedAttachmentCount += 1;
+    }
   }
 
-  return Array.from(unique.values());
+  return {
+    attachments: Array.from(unique.values()),
+    skippedAttachmentCount,
+  };
 }
 
-export async function exportEncryptedBackup({ data, security, password }: ExportBackupArgs) {
-  const attachments = await collectBackupAttachments(data);
+export async function exportEncryptedBackup({ data, security, password }: ExportBackupArgs): Promise<BackupExportResult> {
+  const exportedAt = new Date().toISOString();
+  const { attachments, skippedAttachmentCount } = await collectBackupAttachments(data);
   const payload: BackupPayload = {
     version: 3,
-    exportedAt: new Date().toISOString(),
+    exportedAt,
     settings: {
       autoLockSeconds: security.autoLockSeconds,
     },
@@ -117,25 +177,27 @@ export async function exportEncryptedBackup({ data, security, password }: Export
 
   const uri = await writeUtf8File(
     'backups',
-    `pineapple-backup-${new Date().toISOString().slice(0, 10)}.pineapplebak`,
+    `pineapple-backup-${exportedAt.slice(0, 10)}${PINEAPPLE_BACKUP_EXTENSION}`,
     JSON.stringify(envelope, null, 2)
   );
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
-      mimeType: 'application/json',
+      mimeType: PINEAPPLE_BACKUP_MIME_TYPE,
       dialogTitle: 'Pineapple encrypted backup',
     });
   }
 
-  return uri;
+  return {
+    uri,
+    exportedAt,
+    attachmentCount: attachments.length,
+    skippedAttachmentCount,
+  };
 }
 
 export function decryptBackupEnvelope({ encryptedContents, password }: ImportBackupArgs) {
-  const envelope = JSON.parse(encryptedContents) as BackupEnvelope;
-  if (envelope.format !== 'pineapple-backup' || envelope.encryption !== 'aes-256-cbc+hmac-sha256') {
-    throw new Error('This backup file is not recognised.');
-  }
+  const envelope = parseBackupEnvelope(encryptedContents);
 
   const salt = CryptoJS.enc.Hex.parse(envelope.salt);
   const iv = CryptoJS.enc.Hex.parse(envelope.iv);

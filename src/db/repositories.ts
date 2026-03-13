@@ -36,6 +36,7 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
     syncMode: 'manual_share',
     syncStatus: 'local_only',
     lastSyncAt: null,
+    lastBackupAt: null,
     privacyMaskingMode: 'always',
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -480,14 +481,15 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const timestamp = now();
 
   await db.runAsync(
-    `INSERT INTO app_preferences (id, notificationsEnabled, syncEnabled, syncMode, syncStatus, lastSyncAt, privacyMaskingMode, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO app_preferences (id, notificationsEnabled, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        notificationsEnabled = excluded.notificationsEnabled,
        syncEnabled = excluded.syncEnabled,
        syncMode = excluded.syncMode,
        syncStatus = excluded.syncStatus,
        lastSyncAt = excluded.lastSyncAt,
+       lastBackupAt = excluded.lastBackupAt,
        privacyMaskingMode = excluded.privacyMaskingMode,
        updatedAt = excluded.updatedAt`,
     input.id,
@@ -496,6 +498,7 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
     input.syncMode,
     input.syncStatus,
     input.lastSyncAt,
+    input.lastBackupAt,
     input.privacyMaskingMode,
     timestamp,
     timestamp

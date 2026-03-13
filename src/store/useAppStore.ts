@@ -74,6 +74,7 @@ const emptySnapshot: AppDataSnapshot = {
     syncMode: 'manual_share',
     syncStatus: 'local_only',
     lastSyncAt: null,
+    lastBackupAt: null,
     privacyMaskingMode: 'always',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -127,7 +128,7 @@ type StoreState = {
   saveEmergencyInfo: (draft: EmergencyInfoDraft) => Promise<string>;
   saveReminderSetting: (draft: ReminderSettingDraft) => Promise<string>;
   exportTripPdfFile: (tripId: string, options: PdfExportOptions) => Promise<string>;
-  exportBackupFile: (password: string) => Promise<string>;
+  exportBackupFile: (password: string) => Promise<{ uri: string; exportedAt: string; attachmentCount: number; skippedAttachmentCount: number }>;
   importBackupFile: (encryptedContents: string, password: string) => Promise<void>;
   exportSharedTripFile: (tripId: string) => Promise<string>;
   importSharedTripFile: (contents: string) => Promise<{ mode: 'created' | 'updated' | 'conflict'; tripId?: string }>;
@@ -399,7 +400,13 @@ export const useAppStore = create<StoreState>((set, get) => ({
     return exportTripPdf(get().data, tripId, options);
   },
   exportBackupFile: async (password) => {
-    return exportEncryptedBackup({ data: get().data, security: get().security, password });
+    const result = await exportEncryptedBackup({ data: get().data, security: get().security, password });
+    await upsertAppPreferences({
+      ...get().data.appPreferences,
+      lastBackupAt: result.exportedAt,
+    });
+    await get().refreshData();
+    return result;
   },
   importBackupFile: async (encryptedContents, password) => {
     const restoredSettings = await restoreEncryptedBackup({ encryptedContents, password });

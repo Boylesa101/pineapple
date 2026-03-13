@@ -297,6 +297,7 @@ export function createDemoSnapshot(): AppDataSnapshot {
       syncMode: 'manual_share',
       syncStatus: 'local_only',
       lastSyncAt: null,
+      lastBackupAt: null,
       privacyMaskingMode: 'always',
       createdAt: now,
       updatedAt: now,

@@ -177,6 +177,7 @@ export interface AppPreferences {
   syncMode: SyncMode;
   syncStatus: SyncStatus;
   lastSyncAt: string | null;
+  lastBackupAt: string | null;
   privacyMaskingMode: PrivacyMaskingMode;
   createdAt: string;
   updatedAt: string;
@@ -290,6 +291,13 @@ export interface BackupEnvelope {
   iv: string;
   mac: string;
   ciphertext: string;
+}
+
+export interface BackupExportResult {
+  uri: string;
+  exportedAt: string;
+  attachmentCount: number;
+  skippedAttachmentCount: number;
 }
 
 export interface PdfExportOptions {

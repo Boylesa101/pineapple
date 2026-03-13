@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.2 - 2026-03-13
+
+- Improved local backup and restore with stricter backup-file validation, explicit replace confirmation, and clearer Settings messaging
+- Switched exported backup files to the `.pineapplebackup` extension and surfaced the last backup timestamp in Settings
+- Added safe tracking of backup creation time in app preferences with additive migration coverage for existing installs
+- Hardened attachment handling so backups still complete when a referenced local file is missing, while keeping metadata in the backup snapshot
+- Documented backup contents, restore behavior, and current attachment handling in the README
+
 ## 1.3.1 - 2026-03-13
 
 - Added a five-screen first-launch onboarding flow covering welcome, document storage, Travel Mode, import/share readiness, and expiry warnings

@@ -34,6 +34,7 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
     syncMode: 'manual_share',
     syncStatus: 'local_only',
     lastSyncAt: null,
+    lastBackupAt: null,
     privacyMaskingMode: 'always',
     createdAt: timestamp,
     updatedAt: timestamp,

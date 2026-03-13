@@ -12,6 +12,7 @@ import { ChoiceChips } from '@/components/ChoiceChips';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
 import { colors, spacing } from '@/constants/theme';
+import { PINEAPPLE_BACKUP_EXTENSION, isBackupFileName } from '@/services/backup';
 import { useAppStore } from '@/store/useAppStore';
 import type { ConflictStatus, PrivacyMaskingMode } from '@/types/models';
 import { canUseBiometrics } from '@/utils/security';
@@ -33,24 +34,61 @@ export default function SettingsScreen() {
   const [backupAction, setBackupAction] = useState<BackupAction>('export');
   const [backupPassword, setBackupPassword] = useState('');
   const [backupSource, setBackupSource] = useState<string | null>(null);
+  const [backupSourceLabel, setBackupSourceLabel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const openConflicts = useMemo(
     () => data.syncConflicts.filter((conflict) => conflict.status === 'open'),
     [data.syncConflicts]
   );
+  const lastBackupLabel = data.appPreferences.lastBackupAt
+    ? new Date(data.appPreferences.lastBackupAt).toLocaleString()
+    : 'Never';
+
+  function closeBackupModal() {
+    setBackupVisible(false);
+    setBackupPassword('');
+    setBackupSource(null);
+    setBackupSourceLabel(null);
+  }
+
+  async function confirmRestore() {
+    return new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Replace current data?',
+        'Restoring a backup replaces your current Pineapple data on this device. This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Replace data', style: 'destructive', onPress: () => resolve(true) },
+        ]
+      );
+    });
+  }
 
   async function openBackupImport() {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ['application/json', '*/*'],
-      copyToCacheDirectory: true,
-    });
-    if (result.canceled || !result.assets[0]) {
-      return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const inferredName = asset.name ?? asset.uri.split('/').pop() ?? 'selected-file';
+      if (!isBackupFileName(inferredName) && !isBackupFileName(asset.uri)) {
+        Alert.alert('Invalid backup file', `Choose a ${PINEAPPLE_BACKUP_EXTENSION} file exported by Pineapple.`);
+        return;
+      }
+
+      setBackupSource(asset.uri);
+      setBackupSourceLabel(inferredName);
+      setBackupAction('import');
+      setBackupVisible(true);
+    } catch (error) {
+      Alert.alert('Restore unavailable', error instanceof Error ? error.message : 'Unable to open the file picker.');
     }
-    setBackupSource(result.assets[0].uri);
-    setBackupAction('import');
-    setBackupVisible(true);
   }
 
   async function handleBackupAction() {
@@ -62,20 +100,32 @@ export default function SettingsScreen() {
     setBusy(true);
     try {
       if (backupAction === 'export') {
-        await exportBackupFile(backupPassword);
-        Alert.alert('Backup exported', 'Your encrypted local backup was generated successfully.');
+        const result = await exportBackupFile(backupPassword);
+        const attachmentSummary = result.skippedAttachmentCount
+          ? `${result.attachmentCount} files included, ${result.skippedAttachmentCount} file references kept as metadata only.`
+          : `${result.attachmentCount} attachment files included.`;
+        Alert.alert(
+          'Backup exported',
+          `Backup created on ${new Date(result.exportedAt).toLocaleString()}.\n\n${attachmentSummary}`
+        );
       } else {
         if (!backupSource) {
           throw new Error('No backup file selected.');
         }
+        const backupInfo = await FileSystem.getInfoAsync(backupSource);
+        if (!backupInfo.exists) {
+          throw new Error('The selected backup file is no longer available.');
+        }
+        const shouldRestore = await confirmRestore();
+        if (!shouldRestore) {
+          return;
+        }
         const contents = await FileSystem.readAsStringAsync(backupSource);
         await importBackupFile(contents, backupPassword);
-        Alert.alert('Backup restored', 'Local data and attachments were restored from the backup file.');
+        Alert.alert('Backup restored', 'Current local data was replaced and refreshed from the selected backup file.');
       }
 
-      setBackupVisible(false);
-      setBackupPassword('');
-      setBackupSource(null);
+      closeBackupModal();
     } catch (error) {
       Alert.alert('Backup failed', error instanceof Error ? error.message : 'Unable to complete the backup action.');
     } finally {
@@ -201,16 +251,18 @@ export default function SettingsScreen() {
         </Text>
       </AppCard>
 
-      <AppCard title="Backup and recovery" subtitle="Password-protected export and restore for local data and attachments.">
+      <AppCard title="Backup & Restore" subtitle="Create encrypted local backup files and restore them later on this device.">
         <Text style={styles.meta}>
-          Backup files contain encrypted structured data plus copied attachment files when available. Keep the password safe.
+          Pineapple exports password-protected {PINEAPPLE_BACKUP_EXTENSION} files with your structured trip data and available local attachments. Store backups securely.
         </Text>
+        <Text style={styles.meta}>Last backup: {lastBackupLabel}</Text>
         <View style={styles.buttonRow}>
           <AppButton
             label="Export backup"
             onPress={() => {
               setBackupAction('export');
               setBackupSource(null);
+              setBackupSourceLabel(null);
               setBackupVisible(true);
             }}
           />
@@ -259,7 +311,7 @@ export default function SettingsScreen() {
       <AppModal
         visible={backupVisible}
         title={backupAction === 'export' ? 'Export encrypted backup' : 'Restore encrypted backup'}
-        onClose={() => setBackupVisible(false)}
+        onClose={closeBackupModal}
       >
         <AppTextField
           label="Backup password"
@@ -273,6 +325,12 @@ export default function SettingsScreen() {
             ? 'This password encrypts the exported backup file.'
             : 'Use the password that was set when the backup file was created.'}
         </Text>
+        {backupAction === 'import' ? (
+          <Text style={styles.meta}>Selected backup: {backupSourceLabel ?? 'No file selected'}</Text>
+        ) : null}
+        {backupAction === 'import' ? (
+          <Text style={styles.meta}>Restoring replaces the current Pineapple data on this device after confirmation.</Text>
+        ) : null}
         <AppButton label={backupAction === 'export' ? 'Create backup' : 'Restore backup'} onPress={handleBackupAction} loading={busy} />
       </AppModal>
     </AppScreen>

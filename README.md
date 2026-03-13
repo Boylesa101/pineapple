@@ -21,18 +21,18 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Emergency reference storage per trip
 - High-contrast Travel Mode with family overview, traveller tabs/swipe, quick copy actions, and temporary sensitive reveal
 - Printable branded trip PDF export with inclusion/hide controls
-- Encrypted local backup export/import with attachment preservation
+- Encrypted local backup export/import with `.pineapplebackup` files, validation, and attachment preservation where the original local files are still available
 - Local reminders and notifications for trip start, passport/GHIC expiry, missing insurance, packing completeness, flights, and excursions
 - Optional manual-share trip sync with participant roles, invite records, conflict review, and trip-share export/import
-- Expanded settings surface for security, reminders, sync, backup/recovery, and privacy masking
+- Expanded settings surface for security, reminders, sync, backup/restore, and privacy masking
 - Expo web/PWA companion mode for trip overview, packing, itinerary, emergency info, and printable summaries
 - Five-screen first-launch onboarding with PIN setup, first-trip creation, and a setup checklist
 - Development-only demo data reset for QA
 
 ### Stack
 
-- Expo SDK 55
-- React Native 0.83
+- Expo SDK 54
+- React Native 0.81
 - Expo Router
 - TypeScript
 - SQLite via `expo-sqlite`
@@ -43,7 +43,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - PDF generation via `expo-print`
 - Local sharing via `expo-sharing`
 - Local notifications via `expo-notifications`
-- Backup encryption via `crypto-js` AES
+- Backup encryption via PBKDF2-derived AES with HMAC integrity using `crypto-js`
 - State management via `zustand`
 
 ### Project structure
@@ -120,6 +120,15 @@ npx expo export --platform web
 - Shared trip sync is optional and manual-share only in phase 3
 - Conflict review is explicit; Pineapple does not silently overwrite local trip changes
 - Web/PWA is supported as a companion surface, but the Android app remains the most secure home for sensitive vault images
+
+### Backup and restore
+
+- Backups are exported as encrypted `.pineapplebackup` files from Settings > Backup & Restore
+- Backup payloads include trips, travellers, document metadata, packing items, itinerary items, hotel stays, travel segments, emergency info, reminder settings, app preferences that are safe to restore, participant/share records, and sync conflict records
+- Pineapple attempts to include locally managed attachment files such as trip cover images and vault files; if a referenced local file is no longer readable, its database metadata remains in the backup and the export still completes
+- Restore validates the backup structure, schema version, and encryption envelope before decrypting
+- Restore currently replaces the existing local database after an explicit confirmation step; Pineapple does not silently merge or overwrite data
+- Security-sensitive unlock material such as the PIN hash itself is not bundled into backups
 
 ### Brand direction
 
