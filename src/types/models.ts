@@ -240,6 +240,7 @@ export interface AppSecuritySettings {
 }
 
 export interface StoredSecurityConfig extends AppSecuritySettings {
+  hashVersion: 1 | 2;
   salt: string;
   hash: string;
 }
@@ -282,7 +283,12 @@ export interface BackupPayload {
 export interface BackupEnvelope {
   format: 'pineapple-backup';
   version: 3;
-  encryption: 'aes';
+  encryption: 'aes-256-cbc+hmac-sha256';
+  kdf: 'pbkdf2';
+  iterations: number;
+  salt: string;
+  iv: string;
+  mac: string;
   ciphertext: string;
 }
 

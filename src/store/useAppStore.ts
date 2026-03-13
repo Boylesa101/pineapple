@@ -94,6 +94,8 @@ type StoreState = {
   lastInteractionAt: number;
   backgroundedAt: number | null;
   vaultUnlockedUntil: number | null;
+  failedUnlockAttempts: number;
+  unlockBlockedUntil: number | null;
   security: StoredSecurityConfig;
   data: AppDataSnapshot;
   bootstrap: () => Promise<void>;
@@ -156,6 +158,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
   lastInteractionAt: Date.now(),
   backgroundedAt: null,
   vaultUnlockedUntil: null,
+  failedUnlockAttempts: 0,
+  unlockBlockedUntil: null,
   security: defaultSecurityConfig,
   data: emptySnapshot,
   bootstrap: async () => {
@@ -174,7 +178,6 @@ export const useAppStore = create<StoreState>((set, get) => ({
     if (onboardingStatus === null && hasCompletedOnboarding) {
       await persistOnboardingComplete(true);
     }
-    await syncNotificationState(data);
     set({
       security,
       data,
@@ -185,14 +188,19 @@ export const useAppStore = create<StoreState>((set, get) => ({
       isBusy: false,
       lastInteractionAt: Date.now(),
     });
+    setTimeout(() => {
+      syncNotificationState(data).catch(() => undefined);
+    }, 0);
   },
   refreshData: async () => {
     const snapshot = await loadSnapshot();
-    await syncNotificationState(snapshot);
     set((state) => ({
       data: snapshot,
       activeTripId: nextActiveTripId(state, snapshot),
     }));
+    setTimeout(() => {
+      syncNotificationState(snapshot).catch(() => undefined);
+    }, 0);
   },
   completeOnboarding: async () => {
     await persistOnboardingComplete(true);
@@ -244,12 +252,25 @@ export const useAppStore = create<StoreState>((set, get) => ({
   },
   unlockWithPin: async (pin) => {
     const state = get();
+    if (state.unlockBlockedUntil && state.unlockBlockedUntil > Date.now()) {
+      return false;
+    }
+
     const valid = await verifyPin(pin, state.security);
     if (valid) {
       set({
         isUnlocked: true,
         privacyOverlayVisible: false,
         lastInteractionAt: Date.now(),
+        failedUnlockAttempts: 0,
+        unlockBlockedUntil: null,
+      });
+    } else {
+      const failedUnlockAttempts = state.failedUnlockAttempts + 1;
+      const shouldBlock = failedUnlockAttempts >= 5;
+      set({
+        failedUnlockAttempts,
+        unlockBlockedUntil: shouldBlock ? Date.now() + 30_000 : null,
       });
     }
     return valid;
@@ -269,12 +290,23 @@ export const useAppStore = create<StoreState>((set, get) => ({
     if (scope === 'vault') {
       get().unlockVault();
     } else {
-      set({ isUnlocked: true, privacyOverlayVisible: false, lastInteractionAt: Date.now() });
+      set({
+        isUnlocked: true,
+        privacyOverlayVisible: false,
+        lastInteractionAt: Date.now(),
+        failedUnlockAttempts: 0,
+        unlockBlockedUntil: null,
+      });
     }
 
     return true;
   },
-  lockApp: () => set({ isUnlocked: false, vaultUnlockedUntil: null, privacyOverlayVisible: true }),
+  lockApp: () =>
+    set({
+      isUnlocked: false,
+      vaultUnlockedUntil: null,
+      privacyOverlayVisible: true,
+    }),
   unlockVault: (seconds = 180) => set({ vaultUnlockedUntil: Date.now() + seconds * 1000 }),
   updateSecurityPreferences: async (updates) => {
     const next = { ...get().security, ...updates };

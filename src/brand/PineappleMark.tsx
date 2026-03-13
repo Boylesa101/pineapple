@@ -1,4 +1,4 @@
-import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 type Props = {
   size?: number;
@@ -39,6 +39,15 @@ export function PineappleMark({ size = 88, simplified = false }: Props) {
       <Path d="M88 52L41 99" stroke="#D99412" strokeWidth="4" strokeLinecap="round" />
       <Path d="M96 69L33 110" stroke="#D99412" strokeWidth="4" strokeLinecap="round" opacity="0.6" />
       <Ellipse cx="43" cy="55" rx="12" ry="18" fill="rgba(255,255,255,0.3)" />
+      <Rect x="25" y="67" width="35" height="18" rx="9" fill="#5D4D52" />
+      <Rect x="68" y="67" width="35" height="18" rx="9" fill="#5D4D52" />
+      <Path d="M58 74C60 72 62 71 64 71C66 71 68 72 70 74" stroke="#A7422A" strokeWidth="4" strokeLinecap="round" />
+      <Rect x="31" y="71" width="23" height="11" rx="5.5" fill="#4A4B57" />
+      <Rect x="74" y="71" width="23" height="11" rx="5.5" fill="#4A4B57" />
+      <Path d="M54 76H74" stroke="#7E5456" strokeWidth="4" strokeLinecap="round" />
+      <Ellipse cx="41" cy="91" rx="8" ry="6" fill="#F7A0B5" />
+      <Ellipse cx="87" cy="91" rx="8" ry="6" fill="#F7A0B5" />
+      <Path d="M57 97C60 101 68 101 71 97" stroke="#9B531D" strokeWidth="3" strokeLinecap="round" />
       <Defs>
         <LinearGradient id="leaf" x1="64" y1="12" x2="64" y2="115" gradientUnits="userSpaceOnUse">
           <Stop stopColor="#75BA63" />

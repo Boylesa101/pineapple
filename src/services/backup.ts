@@ -16,6 +16,8 @@ type ImportBackupArgs = {
   password: string;
 };
 
+const BACKUP_PBKDF2_ITERATIONS = 150000;
+
 function validateBackupPayload(payload: BackupPayload) {
   if (payload.version !== 3) {
     throw new Error('Unsupported backup version.');
@@ -86,11 +88,30 @@ export async function exportEncryptedBackup({ data, security, password }: Export
     attachments,
   };
 
-  const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(payload), password).toString();
+  const salt = CryptoJS.lib.WordArray.random(16);
+  const iv = CryptoJS.lib.WordArray.random(16);
+  const keyMaterial = CryptoJS.PBKDF2(password, salt, {
+    keySize: 512 / 32,
+    iterations: BACKUP_PBKDF2_ITERATIONS,
+    hasher: CryptoJS.algo.SHA256,
+  });
+  const encryptionKey = CryptoJS.lib.WordArray.create(keyMaterial.words.slice(0, 8), 32);
+  const macKey = CryptoJS.lib.WordArray.create(keyMaterial.words.slice(8, 16), 32);
+  const ciphertext = CryptoJS.AES.encrypt(JSON.stringify(payload), encryptionKey, {
+    iv,
+    mode: CryptoJS.mode.CBC,
+    padding: CryptoJS.pad.Pkcs7,
+  }).ciphertext.toString(CryptoJS.enc.Base64);
+  const mac = CryptoJS.HmacSHA256(`${ciphertext}.${iv.toString()}`, macKey).toString();
   const envelope: BackupEnvelope = {
     format: 'pineapple-backup',
     version: 3,
-    encryption: 'aes',
+    encryption: 'aes-256-cbc+hmac-sha256',
+    kdf: 'pbkdf2',
+    iterations: BACKUP_PBKDF2_ITERATIONS,
+    salt: salt.toString(),
+    iv: iv.toString(),
+    mac,
     ciphertext,
   };
 
@@ -112,11 +133,35 @@ export async function exportEncryptedBackup({ data, security, password }: Export
 
 export function decryptBackupEnvelope({ encryptedContents, password }: ImportBackupArgs) {
   const envelope = JSON.parse(encryptedContents) as BackupEnvelope;
-  if (envelope.format !== 'pineapple-backup' || envelope.encryption !== 'aes') {
+  if (envelope.format !== 'pineapple-backup' || envelope.encryption !== 'aes-256-cbc+hmac-sha256') {
     throw new Error('This backup file is not recognised.');
   }
 
-  const decrypted = CryptoJS.AES.decrypt(envelope.ciphertext, password).toString(CryptoJS.enc.Utf8);
+  const salt = CryptoJS.enc.Hex.parse(envelope.salt);
+  const iv = CryptoJS.enc.Hex.parse(envelope.iv);
+  const keyMaterial = CryptoJS.PBKDF2(password, salt, {
+    keySize: 512 / 32,
+    iterations: envelope.iterations,
+    hasher: CryptoJS.algo.SHA256,
+  });
+  const encryptionKey = CryptoJS.lib.WordArray.create(keyMaterial.words.slice(0, 8), 32);
+  const macKey = CryptoJS.lib.WordArray.create(keyMaterial.words.slice(8, 16), 32);
+  const expectedMac = CryptoJS.HmacSHA256(`${envelope.ciphertext}.${envelope.iv}`, macKey).toString();
+  if (expectedMac !== envelope.mac) {
+    throw new Error('Backup integrity check failed. The password or file may be invalid.');
+  }
+
+  const decrypted = CryptoJS.AES.decrypt(
+    {
+      ciphertext: CryptoJS.enc.Base64.parse(envelope.ciphertext),
+    } as CryptoJS.lib.CipherParams,
+    encryptionKey,
+    {
+      iv,
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7,
+    }
+  ).toString(CryptoJS.enc.Utf8);
   if (!decrypted) {
     throw new Error('Unable to decrypt backup. Check the password and try again.');
   }

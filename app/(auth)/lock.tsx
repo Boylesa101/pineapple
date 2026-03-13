@@ -9,9 +9,10 @@ import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 
 export default function LockScreen() {
-  const { security, unlockWithPin, unlockWithBiometrics } = useAppStore();
+  const { security, unlockWithPin, unlockWithBiometrics, unlockBlockedUntil } = useAppStore();
   const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const blockedSeconds = unlockBlockedUntil ? Math.max(0, Math.ceil((unlockBlockedUntil - Date.now()) / 1000)) : 0;
 
   useEffect(() => {
     if (pin.length !== security.pinLength) {
@@ -22,12 +23,15 @@ export default function LockScreen() {
     unlockWithPin(pin)
       .then((valid) => {
         if (!valid) {
-          Alert.alert('Incorrect PIN', 'Try again.');
+          Alert.alert(
+            blockedSeconds > 0 ? 'Too many attempts' : 'Incorrect PIN',
+            blockedSeconds > 0 ? `Wait ${blockedSeconds} seconds before trying again.` : 'Try again.'
+          );
           setPin('');
         }
       })
       .finally(() => setSubmitting(false));
-  }, [pin, security.pinLength, unlockWithPin]);
+  }, [blockedSeconds, pin, security.pinLength, unlockWithPin]);
 
   return (
     <AppScreen scroll={false}>
@@ -38,6 +42,7 @@ export default function LockScreen() {
       </View>
       <View style={styles.pinCard}>
         <Text style={styles.pinTitle}>Enter your PIN</Text>
+        {blockedSeconds > 0 ? <Text style={styles.blockedText}>Locked for {blockedSeconds}s after repeated failed attempts.</Text> : null}
         <PinPad value={pin} pinLength={security.pinLength} onChange={setPin} />
       </View>
       {security.biometricEnabled ? (
@@ -83,6 +88,12 @@ const styles = StyleSheet.create({
     color: colors.nightNavy,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 22,
+    textAlign: 'center',
+  },
+  blockedText: {
+    color: colors.danger,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
     textAlign: 'center',
   },
 });

@@ -9,6 +9,7 @@ const SECURITY_KEY = 'pineapple.security';
 export const defaultSecurityConfig: StoredSecurityConfig = {
   pinConfigured: false,
   pinLength: 4,
+  hashVersion: 2,
   salt: '',
   hash: '',
   biometricEnabled: false,
@@ -21,8 +22,20 @@ function bytesToHex(bytes: Uint8Array) {
     .join('');
 }
 
-async function hashPin(pin: string, salt: string) {
-  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${salt}:${pin}`);
+async function sha256(value: string) {
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, value);
+}
+
+async function hashPinV1(pin: string, salt: string) {
+  return sha256(`${salt}:${pin}`);
+}
+
+async function hashPinV2(pin: string, salt: string) {
+  let digest = `${salt}:${pin}`;
+  for (let round = 0; round < 12000; round += 1) {
+    digest = await sha256(`${salt}:${digest}`);
+  }
+  return digest;
 }
 
 export async function loadSecurityConfig() {
@@ -44,12 +57,13 @@ export async function persistSecurityConfig(config: StoredSecurityConfig) {
 
 export async function createPinConfig(pin: string, pinLength: PinLength) {
   const salt = bytesToHex(Crypto.getRandomBytes(16));
-  const hash = await hashPin(pin, salt);
+  const hash = await hashPinV2(pin, salt);
 
   return {
     ...defaultSecurityConfig,
     pinConfigured: true,
     pinLength,
+    hashVersion: 2,
     salt,
     hash,
   } satisfies StoredSecurityConfig;
@@ -60,7 +74,8 @@ export async function verifyPin(pin: string, config: StoredSecurityConfig) {
     return false;
   }
 
-  const candidate = await hashPin(pin, config.salt);
+  const candidate =
+    config.hashVersion === 1 ? await hashPinV1(pin, config.salt) : await hashPinV2(pin, config.salt);
   return candidate === config.hash;
 }
 
