@@ -25,9 +25,30 @@ export function getTripBundle(snapshot: AppDataSnapshot, tripId: string | null |
   };
 }
 
-export function getUpcomingTrip(snapshot: AppDataSnapshot) {
+export function getDashboardTrip(snapshot: AppDataSnapshot) {
   const now = new Date();
-  return snapshot.trips.find((trip) => parseISO(trip.endDate) >= now) ?? snapshot.trips[0] ?? null;
+  const activeTrips = snapshot.trips
+    .filter((trip) => trip.status === 'active' || (parseISO(trip.startDate) <= now && parseISO(trip.endDate) >= now))
+    .sort((left, right) => left.startDate.localeCompare(right.startDate));
+  if (activeTrips.length) {
+    return activeTrips[0];
+  }
+
+  const upcomingTrips = snapshot.trips
+    .filter((trip) => parseISO(trip.startDate) > now || trip.status === 'upcoming')
+    .sort((left, right) => left.startDate.localeCompare(right.startDate));
+  if (upcomingTrips.length) {
+    return upcomingTrips[0];
+  }
+
+  const completedTrips = snapshot.trips
+    .filter((trip) => trip.status === 'completed' || parseISO(trip.endDate) < now)
+    .sort((left, right) => right.endDate.localeCompare(left.endDate));
+  return completedTrips[0] ?? null;
+}
+
+export function getUpcomingTrip(snapshot: AppDataSnapshot) {
+  return getDashboardTrip(snapshot);
 }
 
 export function getNextFlight(snapshot: AppDataSnapshot, tripId?: string | null) {
@@ -95,6 +116,71 @@ export function getMissingInfoPrompts(snapshot: AppDataSnapshot, tripId: string 
   if (!bundle.hotelStays.length) prompts.push('No hotel details saved yet.');
   if (!bundle.emergencyInfo?.emergencyContacts && !bundle.emergencyInfo?.insurerEmergencyNumber) prompts.push('No emergency contact details saved.');
   return prompts;
+}
+
+export function getDashboardAlerts(snapshot: AppDataSnapshot, tripId: string | null | undefined) {
+  const bundle = getTripBundle(snapshot, tripId);
+  const alerts: Array<{ title: string; subtitle: string; tone: 'gold' | 'coral' | 'danger' }> = [];
+
+  const passportExpiry = bundle.documents.find(
+    (document) => document.documentType === 'passport' && document.expiryDate && isDateWithinDays(document.expiryDate, 60)
+  );
+  if (passportExpiry?.expiryDate) {
+    alerts.push({
+      title: 'Passport expiring soon',
+      subtitle: `${passportExpiry.holderName || 'A passport'} expires on ${passportExpiry.expiryDate.slice(0, 10)}.`,
+      tone: isDateWithinDays(passportExpiry.expiryDate, 30) ? 'danger' : 'gold',
+    });
+  }
+
+  const ghicExpiry = bundle.documents.find(
+    (document) => document.documentType === 'ghic' && document.expiryDate && isDateWithinDays(document.expiryDate, 60)
+  );
+  if (ghicExpiry?.expiryDate) {
+    alerts.push({
+      title: 'GHIC / EHIC expiring soon',
+      subtitle: `${ghicExpiry.holderName || 'A GHIC / EHIC'} expires on ${ghicExpiry.expiryDate.slice(0, 10)}.`,
+      tone: isDateWithinDays(ghicExpiry.expiryDate, 30) ? 'coral' : 'gold',
+    });
+  }
+
+  if (!bundle.documents.some((document) => document.documentType === 'insurance')) {
+    alerts.push({
+      title: 'Insurance missing',
+      subtitle: 'Add insurance details before departure.',
+      tone: 'coral',
+    });
+  }
+
+  if (!bundle.hotelStays.length) {
+    alerts.push({
+      title: 'Hotel not added',
+      subtitle: 'Save your stay details for quick access.',
+      tone: 'gold',
+    });
+  }
+
+  if (!bundle.emergencyInfo?.emergencyContacts && !bundle.emergencyInfo?.insurerEmergencyNumber) {
+    alerts.push({
+      title: 'Emergency contact missing',
+      subtitle: 'Add local emergency contacts or insurer support.',
+      tone: 'gold',
+    });
+  }
+
+  const trip = bundle.trip;
+  if (trip) {
+    const packing = getPackingProgress(snapshot, trip.id);
+    if (daysUntil(trip.startDate) <= 3 && packing.total > 0 && packing.packed < packing.total) {
+      alerts.push({
+        title: 'Packing incomplete',
+        subtitle: `${packing.packed} of ${packing.total} items packed with departure close.`,
+        tone: 'coral',
+      });
+    }
+  }
+
+  return alerts.slice(0, 6);
 }
 
 export function getTripStatusChips(startDate: string, endDate: string) {

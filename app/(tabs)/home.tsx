@@ -1,447 +1,411 @@
-import type { ComponentProps } from 'react';
-import { useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Image } from 'expo-image';
 
-import { PineappleMark } from '@/brand/PineappleMark';
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
-import { AppModal } from '@/components/AppModal';
 import { AppScreen } from '@/components/AppScreen';
-import { AppTextField } from '@/components/AppTextField';
-import { ChoiceChips } from '@/components/ChoiceChips';
+import { AvatarBadge } from '@/components/AvatarBadge';
+import {
+  DashboardActionTile,
+  DashboardAlertCard,
+  DashboardHeader,
+  DashboardSectionHeader,
+  DashboardSummaryTile,
+} from '@/components/DashboardElements';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
-import { ProgressBar } from '@/components/ProgressBar';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
-import { countdownLabel, formatDateTime } from '@/utils/date';
-import { percent, tripDateRange } from '@/utils/format';
+import { countdownLabel, daysUntil, formatDateTime, formatShortDate } from '@/utils/date';
+import { tripDateRange } from '@/utils/format';
 import {
-  getMissingInfoPrompts,
+  getDashboardAlerts,
+  getDashboardTrip,
   getNextEvent,
   getNextFlight,
   getNextHotel,
   getPackingProgress,
-  getTripStatusChips,
-  getUpcomingTimeline,
-  getUpcomingTrip,
+  getTripBundle,
 } from '@/utils/selectors';
-import { canUseBiometrics } from '@/utils/security';
 
-function QuickCard({
-  icon,
-  title,
-  value,
-  onPress,
-}: {
-  icon: ComponentProps<typeof MaterialIcons>['name'];
-  title: string;
-  value: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={styles.quickCard}>
-      <View style={styles.quickIcon}>
-        <MaterialIcons name={icon} size={20} color={colors.nightNavy} />
-      </View>
-      <Text style={styles.quickTitle}>{title}</Text>
-      <Text style={styles.quickValue}>{value}</Text>
-    </Pressable>
-  );
+function formatCountdown(startDate: string, status: string) {
+  const days = daysUntil(startDate);
+  if (status === 'active') return 'In progress';
+  if (days < 0) return 'Completed';
+  if (days === 0) return 'Starts today';
+  if (days === 1) return '1 day to go';
+  return `${days} days to go`;
+}
+
+function formatFlightSummary(value: ReturnType<typeof getNextFlight>) {
+  if (!value) return 'No upcoming travel saved';
+  return `${value.airline} ${value.flightNumber} ${countdownLabel(value.departureTime)} ${formatDateTime(value.departureTime).split(', ')[1]}`;
+}
+
+function formatHotelSummary(value: ReturnType<typeof getNextHotel>) {
+  if (!value) return 'No hotel added';
+  return `${value.hotelName} from ${formatShortDate(value.checkIn)}`;
 }
 
 export default function HomeScreen() {
   const router = useRouter();
-  const {
-    data,
-    security,
-    updateSecurityPreferences,
-    resetWithDemoData,
-    setActiveTrip,
-    exportBackupFile,
-    importBackupFile,
-  } = useAppStore();
-  const [checkingBiometrics, setCheckingBiometrics] = useState(false);
-  const [backupModalVisible, setBackupModalVisible] = useState(false);
-  const [backupAction, setBackupAction] = useState<'export' | 'import'>('export');
-  const [backupPassword, setBackupPassword] = useState('');
-  const [backupSource, setBackupSource] = useState<string | null>(null);
-  const upcomingTrip = useMemo(() => getUpcomingTrip(data), [data]);
+  const { data, setActiveTrip } = useAppStore();
+  const dashboardTrip = useMemo(() => getDashboardTrip(data), [data]);
+  const bundle = useMemo(() => getTripBundle(data, dashboardTrip?.id), [data, dashboardTrip?.id]);
+  const alerts = useMemo(() => getDashboardAlerts(data, dashboardTrip?.id), [data, dashboardTrip?.id]);
+  const nextFlight = getNextFlight(data, dashboardTrip?.id);
+  const nextHotel = getNextHotel(data, dashboardTrip?.id);
+  const nextEvent = getNextEvent(data, dashboardTrip?.id);
+  const packing = getPackingProgress(data, dashboardTrip?.id);
+  const itineraryPreview = useMemo(
+    () => [...bundle.itineraryEvents].sort((left, right) => left.dateTime.localeCompare(right.dateTime)).slice(0, 3),
+    [bundle.itineraryEvents]
+  );
 
-  const nextFlight = getNextFlight(data, upcomingTrip?.id);
-  const nextHotel = getNextHotel(data, upcomingTrip?.id);
-  const nextEvent = getNextEvent(data, upcomingTrip?.id);
-  const packing = getPackingProgress(data, upcomingTrip?.id);
-  const timeline = getUpcomingTimeline(data, upcomingTrip?.id);
-  const prompts = getMissingInfoPrompts(data, upcomingTrip?.id);
-  const tripStatus = upcomingTrip ? getTripStatusChips(upcomingTrip.startDate, upcomingTrip.endDate) : null;
-
-  const quickCards = upcomingTrip
-    ? ([
-        {
-          icon: 'lock',
-          title: 'Documents',
-          value: `${data.documents.filter((item) => item.tripId === upcomingTrip.id).length} saved`,
-          onPress: () => {
-            setActiveTrip(upcomingTrip.id);
-            router.push('/vault');
-          },
-        },
-        {
-          icon: 'checkroom',
-          title: 'Packing',
-          value: `${percent(packing.packed, packing.total)}% ready`,
-          onPress: () => {
-            setActiveTrip(upcomingTrip.id);
-            router.push('/packing');
-          },
-        },
-        {
-          icon: 'flight-takeoff',
-          title: 'Next flight / hotel',
-          value: nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : nextHotel ? nextHotel.hotelName : 'Add travel details',
-          onPress: () => router.push({ pathname: '/trip/[tripId]', params: { tripId: upcomingTrip.id } }),
-        },
-        {
-          icon: 'celebration',
-          title: 'Upcoming excursion',
-          value: nextEvent ? nextEvent.title : 'Plan something memorable',
-          onPress: () => {
-            setActiveTrip(upcomingTrip.id);
-            router.push('/itinerary');
-          },
-        },
-        {
-          icon: 'local-hospital',
-          title: 'Emergency info',
-          value: data.emergencyInfos.find((item) => item.tripId === upcomingTrip.id)?.insurerEmergencyNumber || 'Add trip contacts',
-          onPress: () => router.push({ pathname: '/trip/[tripId]', params: { tripId: upcomingTrip.id } }),
-        },
-        {
-          icon: 'bolt',
-          title: 'Travel Mode',
-          value: 'Fast access screen',
-          onPress: () => router.push({ pathname: '/trip/[tripId]/travel-mode', params: { tripId: upcomingTrip.id } }),
-        },
-      ] satisfies Array<{
-        icon: ComponentProps<typeof MaterialIcons>['name'];
-        title: string;
-        value: string;
-        onPress: () => void;
-      }>)
-    : [];
-
-  async function openBackupImport() {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ['application/json', '*/*'],
-      copyToCacheDirectory: true,
-    });
-    if (result.canceled || !result.assets[0]) {
-      return;
-    }
-    setBackupSource(result.assets[0].uri);
-    setBackupAction('import');
-    setBackupModalVisible(true);
+  function goToTrips() {
+    router.push('/trips');
   }
 
-  async function handleBackupAction() {
-    if (!backupPassword.trim()) {
-      Alert.alert('Password required', 'Enter a password to continue.');
+  function openTripScoped(path: '/vault' | '/packing' | '/itinerary') {
+    if (!dashboardTrip) {
+      goToTrips();
       return;
     }
-
-    try {
-      if (backupAction === 'export') {
-        await exportBackupFile(backupPassword);
-        Alert.alert('Backup exported', 'Your encrypted backup was generated and shared locally if sharing is available.');
-      } else {
-        if (!backupSource) {
-          throw new Error('No backup file selected.');
-        }
-        const contents = await FileSystem.readAsStringAsync(backupSource);
-        await importBackupFile(contents, backupPassword);
-        Alert.alert('Backup imported', 'Local data was restored from the encrypted backup.');
-      }
-
-      setBackupPassword('');
-      setBackupSource(null);
-      setBackupModalVisible(false);
-    } catch (error) {
-      Alert.alert('Backup action failed', error instanceof Error ? error.message : 'Unable to continue.');
-    }
+    setActiveTrip(dashboardTrip.id);
+    router.push(path);
   }
+
+  function openTripDetail() {
+    if (!dashboardTrip) {
+      goToTrips();
+      return;
+    }
+    setActiveTrip(dashboardTrip.id);
+    router.push({ pathname: '/trip/[tripId]', params: { tripId: dashboardTrip.id } });
+  }
+
+  function openTravelMode() {
+    if (!dashboardTrip) {
+      goToTrips();
+      return;
+    }
+    setActiveTrip(dashboardTrip.id);
+    router.push({ pathname: '/trip/[tripId]/travel-mode', params: { tripId: dashboardTrip.id } });
+  }
+
+  const statusTone = dashboardTrip?.status === 'active' ? 'blue' : dashboardTrip?.status === 'completed' ? 'default' : 'gold';
 
   return (
-    <AppScreen title="Home" subtitle="One calm place for your next holiday.">
-      <AppCard>
-        <View style={styles.heroRow}>
-          <View style={styles.heroCopy}>
-            <Text style={styles.brandTitle}>Pineapple</Text>
-            <Text style={styles.brandSubtitle}>
-              Local-first planner, secure vault, family travel mode, printable travel packs, and encrypted backups.
-            </Text>
-          </View>
-          <PineappleMark size={72} />
-        </View>
-        <AppButton label="Open settings" tone="secondary" onPress={() => router.push('/settings')} />
-      </AppCard>
+    <AppScreen scroll title={undefined} subtitle={undefined}>
+      <DashboardHeader title="Your next trip" onSettings={() => router.push('/settings')} />
 
-      {!upcomingTrip ? (
+      {!dashboardTrip ? (
         <AppCard>
           <EmptyState
-            title="Start your first trip"
-            description="Create a holiday, add travellers, and keep everything on-device from day one."
+            title="No trip ready yet"
+            description="Create your first trip and Pineapple will turn it into a calm dashboard for travel details, documents, packing, and alerts."
           />
-          <AppButton label="Create your first trip" onPress={() => router.push('/trips')} />
+          <AppButton label="Create your first trip" onPress={goToTrips} />
         </AppCard>
       ) : (
-        <>
-          <AppCard title={upcomingTrip.name} subtitle={tripDateRange(upcomingTrip.startDate, upcomingTrip.endDate)}>
-            <Text style={styles.destination}>{upcomingTrip.destination}</Text>
-            <View style={styles.chipRow}>
-              <InfoChip label={`${countdownLabel(upcomingTrip.startDate)} until departure`} tone="blue" />
-              {tripStatus ? <InfoChip label={`${tripStatus.daysLeft} day(s) left`} tone="gold" /> : null}
-              <InfoChip label={`${data.travellers.filter((item) => item.tripId === upcomingTrip.id).length} traveller(s)`} tone="default" />
+        <AppCard>
+          {dashboardTrip.coverImageUri ? (
+            <Image source={dashboardTrip.coverImageUri} style={styles.coverImage} contentFit="cover" />
+          ) : null}
+          <View style={styles.primaryHeader}>
+            <View style={styles.primaryCopy}>
+              <Text style={styles.eyebrow}>Primary trip</Text>
+              <Text style={styles.destination}>{dashboardTrip.destination}</Text>
+              <Text style={styles.tripDates}>{tripDateRange(dashboardTrip.startDate, dashboardTrip.endDate)}</Text>
             </View>
-            {upcomingTrip.status === 'completed' ? (
-              <Text style={styles.meta}>This trip is complete and kept locally for reference, travel packs, and family records.</Text>
-            ) : (
-              <Text style={styles.meta}>
-                {nextFlight
-                  ? `Next flight: ${nextFlight.airline} ${nextFlight.flightNumber} on ${formatDateTime(nextFlight.departureTime)}`
-                  : 'Add travel details to see the next movement here.'}
-              </Text>
-            )}
-            <AppButton
-              label="Open trip"
-              onPress={() => router.push({ pathname: '/trip/[tripId]', params: { tripId: upcomingTrip.id } })}
-            />
-          </AppCard>
-
-          {timeline.length ? (
-            <AppCard title="Upcoming timeline">
-              {timeline.map((item) => (
-                <View key={item.id} style={styles.timelineRow}>
-                  <View style={styles.timelineDot} />
-                  <View style={styles.timelineCopy}>
-                    <Text style={styles.quickTitle}>{item.title}</Text>
-                    <Text style={styles.quickValue}>{formatDateTime(item.dateTime)} • {item.subtitle}</Text>
-                  </View>
-                </View>
-              ))}
-            </AppCard>
-          ) : null}
-
-          {prompts.length ? (
-            <AppCard title="Missing info prompts">
-              {prompts.map((prompt) => (
-                <Text key={prompt} style={styles.meta}>• {prompt}</Text>
-              ))}
-            </AppCard>
-          ) : null}
-
-          <View style={styles.quickGrid}>
-            {quickCards.map((card) => (
-              <QuickCard key={card.title} {...card} />
-            ))}
+            <InfoChip label={dashboardTrip.status} tone={statusTone} />
           </View>
-        </>
+          <View style={styles.chipRow}>
+            <InfoChip label={formatCountdown(dashboardTrip.startDate, dashboardTrip.status)} tone="blue" />
+            <InfoChip label={`${bundle.travellers.length} traveller(s)`} tone="default" />
+          </View>
+          <AppButton label="Open trip" onPress={openTripDetail} />
+        </AppCard>
       )}
 
-      <AppCard title="Security">
-        <Text style={styles.securityLabel}>Auto-lock</Text>
-        <ChoiceChips
-          value={String(security.autoLockSeconds) as '30' | '90' | '300'}
-          onChange={(value) => updateSecurityPreferences({ autoLockSeconds: Number(value) })}
-          options={[
-            { label: '30 sec', value: '30' },
-            { label: '90 sec', value: '90' },
-            { label: '5 min', value: '300' },
-          ]}
-        />
-        <AppButton
-          label={security.biometricEnabled ? 'Disable biometrics' : 'Enable biometrics'}
-          tone="secondary"
-          onPress={async () => {
-            if (security.biometricEnabled) {
-              await updateSecurityPreferences({ biometricEnabled: false });
-              return;
-            }
-
-            setCheckingBiometrics(true);
-            const supported = await canUseBiometrics();
-            setCheckingBiometrics(false);
-            if (!supported) {
-              Alert.alert('Biometrics unavailable', 'No enrolled biometric unlock method was detected on this device.');
-              return;
-            }
-
-            await updateSecurityPreferences({ biometricEnabled: true });
-          }}
-          loading={checkingBiometrics}
-        />
-      </AppCard>
-
-      {upcomingTrip ? (
-        <AppCard title="Packing progress">
-          <Text style={styles.meta}>
-            {packing.packed} of {packing.total} items packed
-          </Text>
-          <ProgressBar progress={percent(packing.packed, packing.total)} />
-        </AppCard>
-      ) : null}
-
-      <AppCard title="Encrypted local backup" subtitle="Export and restore your local data without any remote backend.">
-        <Text style={styles.meta}>
-          Backup files are password-protected AES exports of your SQLite-backed app data and referenced local attachments.
-        </Text>
-        <View style={styles.buttonRow}>
-          <AppButton
-            label="Export backup"
-            onPress={() => {
-              setBackupAction('export');
-              setBackupSource(null);
-              setBackupModalVisible(true);
-            }}
-          />
-          <AppButton label="Import backup" tone="secondary" onPress={openBackupImport} />
+      <View style={styles.section}>
+        <DashboardSectionHeader title="Quick actions" />
+        <View style={styles.actionsGrid}>
+          <DashboardActionTile icon="document-scanner" label="Scan Document" onPress={() => openTripScoped('/vault')} />
+          <DashboardActionTile icon="bolt" label="Travel Mode" onPress={openTravelMode} />
+          <DashboardActionTile icon="checkroom" label="Add Packing Item" onPress={() => openTripScoped('/packing')} />
+          <DashboardActionTile icon="event-note" label="Add Itinerary Event" onPress={() => openTripScoped('/itinerary')} />
+          <DashboardActionTile icon="luggage" label="Add Trip" onPress={goToTrips} />
+          <DashboardActionTile icon="lock" label="Open Document Vault" onPress={() => openTripScoped('/vault')} />
         </View>
-      </AppCard>
+      </View>
 
-      {Platform.OS === 'web' ? (
-        <AppCard title="Web companion">
-          <Text style={styles.meta}>
-            Pineapple on web focuses on trip overview, packing, itinerary, emergency details, and printable summaries. The Android app remains the best place for sensitive document images.
-          </Text>
-        </AppCard>
+      {dashboardTrip ? (
+        <>
+          <View style={styles.section}>
+            <DashboardSectionHeader title="Progress summary" />
+            <View style={styles.summaryGrid}>
+              <DashboardSummaryTile
+                title="Packing progress"
+                value={
+                  packing.total
+                    ? `Packing ${packing.packed} of ${packing.total} items complete`
+                    : 'No packing items yet'
+                }
+                icon="checkroom"
+                tone="gold"
+              />
+              <DashboardSummaryTile
+                title="Next flight"
+                value={formatFlightSummary(nextFlight)}
+                icon="flight-takeoff"
+                tone="blue"
+              />
+              <DashboardSummaryTile
+                title="Hotel status"
+                value={formatHotelSummary(nextHotel)}
+                icon="hotel"
+                tone="default"
+              />
+              <DashboardSummaryTile
+                title="Documents"
+                value={`${bundle.documents.length} document(s) saved`}
+                icon="lock"
+                tone="coral"
+              />
+              <DashboardSummaryTile
+                title="Next itinerary"
+                value={nextEvent ? `${nextEvent.title} — ${formatDateTime(nextEvent.dateTime)}` : 'No itinerary items yet'}
+                icon="event"
+                tone="default"
+              />
+            </View>
+          </View>
+
+          {alerts.length ? (
+            <View style={styles.section}>
+              <DashboardSectionHeader title="Alerts and warnings" />
+              <View style={styles.alertList}>
+                {alerts.map((alert) => (
+                  <DashboardAlertCard
+                    key={`${alert.title}-${alert.subtitle}`}
+                    title={alert.title}
+                    subtitle={alert.subtitle}
+                    tone={alert.tone}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          <Pressable onPress={openTravelMode} style={styles.travelModeCard}>
+            <View style={styles.travelModeCopy}>
+              <Text style={styles.travelModeTitle}>Travel Mode</Text>
+              <Text style={styles.travelModeSubtitle}>
+                Travel Mode — quick access to passport numbers, bookings and hotel details.
+              </Text>
+            </View>
+            <View style={styles.travelModeBadge}>
+              <Text style={styles.travelModeBadgeText}>Open</Text>
+            </View>
+          </Pressable>
+
+          <View style={styles.section}>
+            <DashboardSectionHeader
+              title="Itinerary preview"
+              right={<AppButton label="Open" tone="secondary" onPress={() => openTripScoped('/itinerary')} />}
+            />
+            {itineraryPreview.length ? (
+              <AppCard>
+                {itineraryPreview.map((item) => (
+                  <View key={item.id} style={styles.previewRow}>
+                    <View style={styles.previewDot} />
+                    <View style={styles.previewCopy}>
+                      <Text style={styles.previewTitle}>{item.title}</Text>
+                      <Text style={styles.previewMeta}>
+                        {formatDateTime(item.dateTime)}
+                        {item.location ? ` • ${item.location}` : ''}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </AppCard>
+            ) : (
+              <AppCard>
+                <EmptyState
+                  title="No itinerary yet"
+                  description="Add flights, excursions, meals, and reminders so the next few events show up here automatically."
+                />
+                <AppButton label="Add an event" onPress={() => openTripScoped('/itinerary')} />
+              </AppCard>
+            )}
+          </View>
+
+          <View style={styles.section}>
+            <DashboardSectionHeader title="Traveller summary" />
+            <AppCard>
+              {bundle.travellers.length ? (
+                <>
+                  <Text style={styles.summaryLead}>{bundle.travellers.length} traveller(s) on this trip</Text>
+                  <View style={styles.travellerRow}>
+                    {bundle.travellers.map((traveller) => (
+                      <AvatarBadge
+                        key={traveller.id}
+                        label={traveller.fullName}
+                        color={traveller.avatarColor}
+                        size={40}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.summaryLead}>No travellers added yet</Text>
+                  <Text style={styles.summaryMeta}>
+                    Add travellers to organise documents, packing assignments, and Travel Mode summaries.
+                  </Text>
+                  <AppButton label="Add travellers" onPress={openTripDetail} />
+                </>
+              )}
+            </AppCard>
+          </View>
+        </>
       ) : null}
-
-      {__DEV__ ? (
-        <AppCard title="Development">
-          <Text style={styles.meta}>Reset the local database with demo content for QA and layout checks.</Text>
-          <AppButton label="Load demo data" tone="ghost" onPress={resetWithDemoData} />
-        </AppCard>
-      ) : null}
-
-      <AppModal
-        visible={backupModalVisible}
-        title={backupAction === 'export' ? 'Export encrypted backup' : 'Import encrypted backup'}
-        onClose={() => setBackupModalVisible(false)}
-      >
-        <Text style={styles.meta}>
-          {backupAction === 'export'
-            ? 'Choose a password. You will need the same password to restore this backup later.'
-            : 'Enter the password used when the backup was created. Restoring will replace current local data.'}
-        </Text>
-        <AppTextField
-          label="Password"
-          value={backupPassword}
-          onChangeText={setBackupPassword}
-          secureTextEntry
-        />
-        <AppButton label={backupAction === 'export' ? 'Export now' : 'Import now'} onPress={handleBackupAction} />
-      </AppModal>
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  heroRow: {
+  section: {
+    gap: spacing.sm,
+  },
+  coverImage: {
+    width: '100%',
+    height: 170,
+    borderRadius: radii.md,
+  },
+  primaryHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
-  heroCopy: {
+  primaryCopy: {
     flex: 1,
-    gap: spacing.xs,
+    gap: 4,
   },
-  brandTitle: {
-    color: colors.nightNavy,
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 24,
-  },
-  brandSubtitle: {
+  eyebrow: {
     color: colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    lineHeight: 20,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
   },
   destination: {
     color: colors.nightNavy,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 24,
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 28,
+    lineHeight: 34,
+  },
+  tripDates: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
   },
-  meta: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  quickGrid: {
+  actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  quickCard: {
-    width: '48%',
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    padding: spacing.md,
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  alertList: {
     gap: spacing.xs,
   },
-  quickIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFF3D6',
+  travelModeCard: {
+    backgroundColor: colors.nightNavy,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
-  quickTitle: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
+  travelModeCopy: {
+    flex: 1,
+    gap: spacing.xs,
   },
-  quickValue: {
-    color: colors.textMuted,
+  travelModeTitle: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 22,
+  },
+  travelModeSubtitle: {
+    color: '#D2DFEA',
     fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
-  securityLabel: {
+  travelModeBadge: {
+    backgroundColor: '#FFF1C6',
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  travelModeBadgeText: {
     color: colors.nightNavy,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
+    fontSize: 13,
   },
-  timelineRow: {
+  previewRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
     paddingVertical: spacing.xs,
   },
-  timelineDot: {
+  previewDot: {
+    marginTop: 7,
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginTop: 5,
-    backgroundColor: colors.sunsetCoral,
+    backgroundColor: colors.pineappleGold,
   },
-  timelineCopy: {
+  previewCopy: {
     flex: 1,
     gap: 2,
   },
-  buttonRow: {
+  previewTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  },
+  previewMeta: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  summaryLead: {
+    color: colors.nightNavy,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 17,
+  },
+  summaryMeta: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  travellerRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
