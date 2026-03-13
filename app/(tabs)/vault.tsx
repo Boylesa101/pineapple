@@ -20,7 +20,8 @@ import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import type { DocumentDraft, DocumentType } from '@/types/models';
-import { formatShortDate, isDateWithinDays, isPast } from '@/utils/date';
+import { formatShortDate } from '@/utils/date';
+import { getDocumentExpiryInfo } from '@/utils/documentExpiry';
 import { copyIntoAppStorage } from '@/utils/fileStorage';
 import { maskSensitive } from '@/utils/format';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
@@ -67,7 +68,7 @@ export default function VaultScreen() {
   const bundle = getTripBundle(data, selectedTripId);
   const selectedDocument = bundle.documents.find((item) => item.id === selectedId) ?? null;
   const isVaultUnlocked = !!vaultUnlockedUntil && vaultUnlockedUntil > Date.now();
-  const expiryWarnings = getDocumentExpiryWarnings(bundle.documents);
+  const expiryWarnings = getDocumentExpiryWarnings(bundle.documents, bundle.travellers);
 
   const filteredDocuments = useMemo(() => {
     return bundle.documents.filter((document) => {
@@ -195,13 +196,6 @@ export default function VaultScreen() {
     setPin('');
   }
 
-  function expiryTone(expiryDate: string | null) {
-    if (isPast(expiryDate)) return 'danger';
-    if (isDateWithinDays(expiryDate, 30)) return 'coral';
-    if (isDateWithinDays(expiryDate, 60)) return 'gold';
-    return 'default';
-  }
-
   return (
     <AppScreen title="Vault" subtitle="Traveller-specific documents, grouped views, and clear expiry warnings.">
       <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
@@ -211,9 +205,9 @@ export default function VaultScreen() {
           <View style={styles.warningList}>
             {expiryWarnings.map((document) => (
               <InfoChip
-                key={document.id}
-                label={`${document.holderName || documentLabels[document.documentType]} • ${formatShortDate(document.expiryDate)}`}
-                tone={expiryTone(document.expiryDate)}
+                key={document.document.id}
+                label={`${document.ownerLabel} • ${document.info.relativeLabel}`}
+                tone={document.info.tone}
               />
             ))}
           </View>
@@ -282,6 +276,7 @@ export default function VaultScreen() {
               const traveller = bundle.travellers.find((item) => item.id === document.travellerId);
               const previewUnlocked = isVaultUnlocked || !document.sensitive;
               const numberLabel = previewUnlocked ? document.documentNumber || 'No number saved' : maskSensitive(document.documentNumber);
+              const expiryInfo = getDocumentExpiryInfo(document.documentType, document.expiryDate);
               return (
                 <Pressable
                   key={document.id}
@@ -301,12 +296,20 @@ export default function VaultScreen() {
                   <View style={styles.copy}>
                     <View style={styles.titleRow}>
                       <Text style={styles.title}>{documentLabels[document.documentType]}</Text>
-                      {document.expiryDate ? <InfoChip label={formatShortDate(document.expiryDate)} tone={expiryTone(document.expiryDate)} /> : null}
+                      {(document.expiryDate || expiryInfo.needsExpiryPrompt) ? (
+                        <InfoChip
+                          label={document.expiryDate ? expiryInfo.badgeLabel : 'Add expiry date'}
+                          tone={expiryInfo.tone}
+                        />
+                      ) : null}
                     </View>
                     <View style={styles.inlineRow}>
                       {traveller ? <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} size={26} /> : null}
                       <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
                     </View>
+                    <Text style={styles.meta}>
+                      {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : expiryInfo.needsExpiryPrompt ? 'Add expiry date to enable warnings' : 'No expiry date saved'}
+                    </Text>
                     <Text style={styles.meta}>{numberLabel}</Text>
                   </View>
                   <View style={styles.iconColumn}>
@@ -428,7 +431,22 @@ export default function VaultScreen() {
               </>
             ) : (
               <>
-                <Text style={styles.title}>{documentLabels[selectedDocument.documentType]}</Text>
+                {(() => {
+                  const expiryInfo = getDocumentExpiryInfo(selectedDocument.documentType, selectedDocument.expiryDate);
+                  return (
+                    <>
+                      <View style={styles.inlineRow}>
+                        <Text style={styles.title}>{documentLabels[selectedDocument.documentType]}</Text>
+                        {(selectedDocument.expiryDate || expiryInfo.needsExpiryPrompt) ? (
+                          <InfoChip label={expiryInfo.badgeLabel} tone={expiryInfo.tone} />
+                        ) : null}
+                      </View>
+                      {expiryInfo.passportSixMonthWarning ? (
+                        <Text style={styles.warningText}>Many destinations require passports to stay valid for at least six months beyond travel.</Text>
+                      ) : null}
+                    </>
+                  );
+                })()}
                 <Text style={styles.meta}>Holder: {selectedDocument.holderName || 'Trip-wide'}</Text>
                 <Text style={styles.meta}>Number: {selectedDocument.documentNumber || 'Not set'}</Text>
                 <Text style={styles.meta}>Issue date: {formatShortDate(selectedDocument.issueDate)}</Text>
@@ -513,6 +531,12 @@ const styles = StyleSheet.create({
   meta: {
     color: colors.textMuted,
     fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  warningText: {
+    color: colors.danger,
+    fontFamily: 'Inter_500Medium',
     fontSize: 13,
     lineHeight: 18,
   },

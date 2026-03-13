@@ -2,7 +2,8 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { differenceInCalendarDays, parseISO, subDays } from 'date-fns';
 
-import type { AppDataSnapshot, ReminderKind, ReminderLeadTime } from '@/types/models';
+import type { AppDataSnapshot, DocumentType, ReminderKind, ReminderLeadTime } from '@/types/models';
+import { getDocumentExpiryLeadDays } from '@/utils/documentExpiry';
 import { getTripBundle } from '@/utils/selectors';
 
 Notifications.setNotificationHandler({
@@ -45,6 +46,11 @@ function getLeadTime(snapshot: AppDataSnapshot, tripId: string, kind: ReminderKi
   return getReminderSetting(snapshot, tripId, kind)?.leadTimeDays ?? fallback;
 }
 
+function isDocumentReminderEnabled(snapshot: AppDataSnapshot, tripId: string, kind: Extract<ReminderKind, 'passport_expiry' | 'ghic_expiry'>) {
+  const setting = getReminderSetting(snapshot, tripId, kind);
+  return setting ? setting.enabled : true;
+}
+
 function buildReminderDate(targetIso: string, leadTimeDays: number) {
   const targetDate = parseISO(targetIso);
   const scheduledDate = subDays(targetDate, leadTimeDays);
@@ -53,6 +59,59 @@ function buildReminderDate(targetIso: string, leadTimeDays: number) {
 
 function isFutureDate(date: Date) {
   return date.getTime() > Date.now() + 60_000;
+}
+
+const documentLabelMap: Record<DocumentType, string> = {
+  passport: 'Passport',
+  ghic: 'GHIC / EHIC',
+  insurance: 'Insurance',
+  visa: 'Visa',
+  boarding_pass: 'Boarding pass',
+  hotel_booking: 'Hotel booking',
+  excursion_ticket: 'Excursion ticket',
+  custom: 'Document',
+};
+
+function getExpiryLeadCandidates(documentType: DocumentType) {
+  switch (documentType) {
+    case 'passport':
+      return [getDocumentExpiryLeadDays(documentType), 30, 7].filter((value): value is number => Boolean(value));
+    case 'ghic':
+    case 'insurance':
+    case 'custom':
+      return [30, 7];
+    case 'visa':
+      return [7];
+    default:
+      return [];
+  }
+}
+
+function getDocumentOwnerLabel(holderName: string, fallback: string | undefined) {
+  return holderName || fallback || 'Document';
+}
+
+function formatLeadLabel(leadDays: number) {
+  if (leadDays === 180) return '6 months';
+  if (leadDays === 90) return '3 months';
+  if (leadDays === 30) return '30 days';
+  if (leadDays === 7) return '7 days';
+  if (leadDays === 1) return '1 day';
+  return `${leadDays} days`;
+}
+
+function getDocumentReminderDate(expiryDate: string, documentType: DocumentType) {
+  for (const leadDays of getExpiryLeadCandidates(documentType)) {
+    const scheduledDate = buildReminderDate(expiryDate, leadDays);
+    if (isFutureDate(scheduledDate)) {
+      return {
+        leadDays,
+        scheduledDate,
+      };
+    }
+  }
+
+  return null;
 }
 
 function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[] {
@@ -133,31 +192,27 @@ function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[] {
       }
     }
 
-    if (isReminderEnabled(snapshot, trip.id, 'passport_expiry')) {
-      const lead = getLeadTime(snapshot, trip.id, 'passport_expiry', 30);
-      for (const document of bundle.documents.filter((item) => item.documentType === 'passport' && item.expiryDate)) {
-        const date = buildReminderDate(document.expiryDate as string, lead);
-        if (isFutureDate(date)) {
-          reminders.push({
-            title: `${document.holderName || 'Passport'} expiring soon`,
-            body: `Passport expiry is approaching for ${trip.name}.`,
-            date,
-          });
+    if (trip.status !== 'completed' && snapshot.appPreferences.expiryRemindersEnabled) {
+      for (const document of bundle.documents.filter(
+        (item) => ['passport', 'ghic', 'insurance', 'visa', 'custom'].includes(item.documentType) && item.expiryDate
+      )) {
+        if (document.documentType === 'passport' && !isDocumentReminderEnabled(snapshot, trip.id, 'passport_expiry')) {
+          continue;
         }
-      }
-    }
+        if (document.documentType === 'ghic' && !isDocumentReminderEnabled(snapshot, trip.id, 'ghic_expiry')) {
+          continue;
+        }
+        const traveller = bundle.travellers.find((item) => item.id === document.travellerId);
+        const reminder = getDocumentReminderDate(document.expiryDate as string, document.documentType);
+        if (!reminder) {
+          continue;
+        }
 
-    if (isReminderEnabled(snapshot, trip.id, 'ghic_expiry')) {
-      const lead = getLeadTime(snapshot, trip.id, 'ghic_expiry', 30);
-      for (const document of bundle.documents.filter((item) => item.documentType === 'ghic' && item.expiryDate)) {
-        const date = buildReminderDate(document.expiryDate as string, lead);
-        if (isFutureDate(date)) {
-          reminders.push({
-            title: `${document.holderName || 'GHIC / EHIC'} expiring soon`,
-            body: `GHIC / EHIC expiry is approaching for ${trip.name}.`,
-            date,
-          });
-        }
+        reminders.push({
+          title: `${getDocumentOwnerLabel(document.holderName, traveller?.fullName)} ${documentLabelMap[document.documentType]} expires soon`,
+          body: `${documentLabelMap[document.documentType]} for ${trip.name} expires in ${formatLeadLabel(reminder.leadDays)}.`,
+          date: reminder.scheduledDate,
+        });
       }
     }
   }

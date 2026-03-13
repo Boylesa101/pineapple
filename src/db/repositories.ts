@@ -32,6 +32,7 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
   return {
     id: 'app',
     notificationsEnabled: false,
+    expiryRemindersEnabled: true,
     syncEnabled: false,
     syncMode: 'manual_share',
     syncStatus: 'local_only',
@@ -103,6 +104,7 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     ? {
         ...appPreferencesRaw,
         notificationsEnabled: toBool(appPreferencesRaw.notificationsEnabled),
+        expiryRemindersEnabled: toBool(appPreferencesRaw.expiryRemindersEnabled ?? 1),
         syncEnabled: toBool(appPreferencesRaw.syncEnabled),
       }
     : defaultAppPreferences();
@@ -481,10 +483,11 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const timestamp = now();
 
   await db.runAsync(
-    `INSERT INTO app_preferences (id, notificationsEnabled, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        notificationsEnabled = excluded.notificationsEnabled,
+       expiryRemindersEnabled = excluded.expiryRemindersEnabled,
        syncEnabled = excluded.syncEnabled,
        syncMode = excluded.syncMode,
        syncStatus = excluded.syncStatus,
@@ -494,6 +497,7 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
        updatedAt = excluded.updatedAt`,
     input.id,
     input.notificationsEnabled ? 1 : 0,
+    input.expiryRemindersEnabled ? 1 : 0,
     input.syncEnabled ? 1 : 0,
     input.syncMode,
     input.syncStatus,

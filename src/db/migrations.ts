@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS reminder_settings (
 CREATE TABLE IF NOT EXISTS app_preferences (
   id TEXT PRIMARY KEY NOT NULL,
   notificationsEnabled INTEGER NOT NULL DEFAULT 0,
+  expiryRemindersEnabled INTEGER NOT NULL DEFAULT 1,
   syncEnabled INTEGER NOT NULL DEFAULT 0,
   syncMode TEXT NOT NULL DEFAULT 'manual_share',
   syncStatus TEXT NOT NULL DEFAULT 'local_only',
@@ -306,6 +307,10 @@ async function runPhaseFourMigration(db: SQLiteDatabase) {
   await ensureColumn(db, 'app_preferences', 'lastBackupAt', 'TEXT');
 }
 
+async function runPhaseFiveMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'app_preferences', 'expiryRemindersEnabled', 'INTEGER NOT NULL DEFAULT 1');
+}
+
 export async function runMigrations(db: SQLiteDatabase) {
   await db.execAsync(createLatestTablesSql);
 
@@ -318,6 +323,9 @@ export async function runMigrations(db: SQLiteDatabase) {
   }
   if (version < 4) {
     await runPhaseFourMigration(db);
+  }
+  if (version < 5) {
+    await runPhaseFiveMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

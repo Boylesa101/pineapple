@@ -173,6 +173,7 @@ export interface ReminderSetting {
 export interface AppPreferences {
   id: 'app';
   notificationsEnabled: boolean;
+  expiryRemindersEnabled: boolean;
   syncEnabled: boolean;
   syncMode: SyncMode;
   syncStatus: SyncStatus;

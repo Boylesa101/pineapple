@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.3 - 2026-03-13
+
+- Added a reusable local document-expiry warning system with shared thresholds for expired, 7-day, 30-day, 3-month, and 6-month states
+- Added stronger passport six-month warnings plus traveller-aware insurance and expiry prompts across the dashboard, vault, trip detail, and document detail surfaces
+- Added an `Enable expiry reminders` setting and extended local-only notification scheduling for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
+- Added additive app-preferences migration coverage for expiry reminder settings with offline-safe upgrade handling on native and web storage
+- Updated README documentation for supported document expiry warnings, reminder behavior, and current limitations
+
 ## 1.3.2 - 2026-03-13
 
 - Improved local backup and restore with stricter backup-file validation, explicit replace confirmation, and clearer Settings messaging

@@ -70,6 +70,7 @@ const emptySnapshot: AppDataSnapshot = {
   appPreferences: {
     id: 'app',
     notificationsEnabled: false,
+    expiryRemindersEnabled: true,
     syncEnabled: false,
     syncMode: 'manual_share',
     syncStatus: 'local_only',

@@ -30,6 +30,7 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
   return {
     id: 'app',
     notificationsEnabled: false,
+    expiryRemindersEnabled: true,
     syncEnabled: false,
     syncMode: 'manual_share',
     syncStatus: 'local_only',
@@ -61,7 +62,16 @@ function emptySnapshot(timestamp = now()): AppDataSnapshot {
 }
 
 async function readSnapshot() {
-  return (await get<AppDataSnapshot>(SNAPSHOT_KEY)) ?? emptySnapshot();
+  const snapshot = (await get<AppDataSnapshot>(SNAPSHOT_KEY)) ?? emptySnapshot();
+  return {
+    ...snapshot,
+    appPreferences: {
+      ...defaultAppPreferences(snapshot.appPreferences?.createdAt ?? now()),
+      ...snapshot.appPreferences,
+      expiryRemindersEnabled: snapshot.appPreferences?.expiryRemindersEnabled ?? true,
+      lastBackupAt: snapshot.appPreferences?.lastBackupAt ?? null,
+    },
+  };
 }
 
 async function writeSnapshot(snapshot: AppDataSnapshot) {

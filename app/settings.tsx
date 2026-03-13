@@ -207,8 +207,16 @@ export default function SettingsScreen() {
             onPress={() => saveAppPreferences({ notificationsEnabled: !data.appPreferences.notificationsEnabled })}
           />
         </View>
+        <View style={styles.row}>
+          <Text style={styles.body}>Enable expiry reminders</Text>
+          <AppButton
+            label={data.appPreferences.expiryRemindersEnabled ? 'On' : 'Off'}
+            tone={data.appPreferences.expiryRemindersEnabled ? 'primary' : 'secondary'}
+            onPress={() => saveAppPreferences({ expiryRemindersEnabled: !data.appPreferences.expiryRemindersEnabled })}
+          />
+        </View>
         <Text style={styles.meta}>
-          Trip-level reminder toggles live on each trip detail screen for flights, passport expiry, packing, and excursion reminders.
+          Expiry reminders cover passports, GHIC / EHIC cards, insurance, visas, and supported custom documents. Trip-level reminder toggles still control flights, passport expiry, packing, and excursion reminders.
         </Text>
       </AppCard>
 

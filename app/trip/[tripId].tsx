@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
 import { ListRow } from '@/components/ListRow';
 import { colors, spacing } from '@/constants/theme';
+import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
 import { useAppStore } from '@/store/useAppStore';
 import type {
@@ -33,6 +34,7 @@ import type {
   TravellerDraft,
 } from '@/types/models';
 import { daysLeft, daysUntil, formatDateTime, formatShortDate } from '@/utils/date';
+import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { relationshipLabel, tripDateRange } from '@/utils/format';
 import { getMissingInfoPrompts, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
 import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, validateTraveller } from '@/utils/validation';
@@ -62,6 +64,14 @@ const participantRoleOptions: Array<{ label: string; value: ParticipantRole }> =
   { label: 'Editor', value: 'editor' },
   { label: 'Viewer', value: 'viewer' },
 ];
+
+const documentTypeLabels = {
+  passport: 'passport',
+  ghic: 'GHIC / EHIC',
+  insurance: 'insurance document',
+  visa: 'visa',
+  custom: 'document',
+} as const;
 
 export default function TripDetailScreen() {
   const router = useRouter();
@@ -100,6 +110,10 @@ export default function TripDetailScreen() {
       itinerary: bundle.itineraryEvents.length,
     }),
     [bundle.documents.length, bundle.itineraryEvents.length, bundle.packingItems.length, bundle.travellers.length]
+  );
+  const documentSummary = useMemo(
+    () => getTripDocumentWarningSummary(bundle.documents, bundle.travellers),
+    [bundle.documents, bundle.travellers]
   );
 
   if (!bundle.trip) {
@@ -495,6 +509,28 @@ export default function TripDetailScreen() {
           title={`${bundle.documents.length} document(s)`}
           subtitle="Sensitive previews stay hidden until the vault is unlocked."
         />
+        {(documentSummary.expiringCount || documentSummary.expiredCount || documentSummary.missingExpiryCount || documentSummary.missingInsuranceTravellers.length) ? (
+          <>
+            <View style={styles.chipRow}>
+              {documentSummary.expiringCount ? <InfoChip label={`${documentSummary.expiringCount} document(s) expiring soon`} tone="gold" /> : null}
+              {documentSummary.expiredCount ? <InfoChip label={`${documentSummary.expiredCount} expired`} tone="danger" /> : null}
+              {documentSummary.missingExpiryCount ? <InfoChip label={`${documentSummary.missingExpiryCount} need expiry dates`} tone="coral" /> : null}
+            </View>
+            {documentSummary.warningItems.slice(0, 3).map((item) => {
+              const noun = documentTypeLabels[item.document.documentType as keyof typeof documentTypeLabels] ?? 'document';
+              return (
+                <Text key={item.document.id} style={styles.notes}>
+                  {item.ownerLabel} • {noun} • {getDocumentExpiryRelativeLabel(item.document.expiryDate)}
+                </Text>
+              );
+            })}
+            {documentSummary.missingInsuranceTravellers.slice(0, 2).map((traveller) => (
+              <Text key={traveller.id} style={styles.notes}>
+                {traveller.fullName} has no insurance document.
+              </Text>
+            ))}
+          </>
+        ) : null}
         <AppButton
           label="Open vault"
           onPress={() => {
@@ -606,7 +642,8 @@ export default function TripDetailScreen() {
 
       <AppCard title="Reminder groundwork" subtitle="Local-only reminder preferences scaffolded for phase 3.">
         {Object.entries(reminderMeta).map(([kind, meta]) => {
-          const enabled = bundle.reminderSettings.find((setting) => setting.kind === kind && setting.tripId === tripId)?.enabled ?? false;
+          const enabled = bundle.reminderSettings.find((setting) => setting.kind === kind && setting.tripId === tripId)?.enabled
+            ?? ((kind === 'passport_expiry' || kind === 'ghic_expiry') ? data.appPreferences.expiryRemindersEnabled : false);
           return (
             <ListRow
               key={kind}

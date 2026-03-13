@@ -1,7 +1,21 @@
 import { parseISO } from 'date-fns';
 
 import type { AppDataSnapshot, Document, PackingItem, Traveller } from '@/types/models';
+import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import { daysLeft, daysUntil, isDateWithinDays } from './date';
+import { getDocumentExpiryRelativeLabel } from './documentExpiry';
+
+const documentTypeLabels = {
+  passport: 'passport',
+  ghic: 'GHIC / EHIC',
+  insurance: 'insurance document',
+  visa: 'visa',
+  custom: 'document',
+} as const;
+
+function possessiveOwner(ownerLabel: string) {
+  return ownerLabel === 'Trip-wide' ? 'Trip-wide' : `${ownerLabel}'s`;
+}
 
 export function getTripById(snapshot: AppDataSnapshot, tripId: string | null | undefined) {
   return snapshot.trips.find((trip) => trip.id === tripId) ?? null;
@@ -101,10 +115,8 @@ export function getPackingProgressByTraveller(items: PackingItem[], travellers: 
   });
 }
 
-export function getDocumentExpiryWarnings(documents: Document[]) {
-  return documents
-    .filter((document) => document.expiryDate && isDateWithinDays(document.expiryDate, 60))
-    .sort((left, right) => (left.expiryDate && right.expiryDate ? left.expiryDate.localeCompare(right.expiryDate) : 0));
+export function getDocumentExpiryWarnings(documents: Document[], travellers: Traveller[] = []) {
+  return getTripDocumentWarningSummary(documents, travellers).warningItems;
 }
 
 export function getMissingInfoPrompts(snapshot: AppDataSnapshot, tripId: string | null | undefined) {
@@ -121,30 +133,45 @@ export function getMissingInfoPrompts(snapshot: AppDataSnapshot, tripId: string 
 export function getDashboardAlerts(snapshot: AppDataSnapshot, tripId: string | null | undefined) {
   const bundle = getTripBundle(snapshot, tripId);
   const alerts: Array<{ title: string; subtitle: string; tone: 'gold' | 'coral' | 'danger' }> = [];
+  const documentSummary = getTripDocumentWarningSummary(bundle.documents, bundle.travellers);
 
-  const passportExpiry = bundle.documents.find(
-    (document) => document.documentType === 'passport' && document.expiryDate && isDateWithinDays(document.expiryDate, 60)
-  );
-  if (passportExpiry?.expiryDate) {
+  for (const item of documentSummary.warningItems.slice(0, 3)) {
+    const noun = documentTypeLabels[item.document.documentType as keyof typeof documentTypeLabels] ?? 'document';
+    if (item.info.isExpired) {
+      alerts.push({
+        title: 'Expired document',
+        subtitle: `${possessiveOwner(item.ownerLabel)} ${noun} has expired.`,
+        tone: 'danger',
+      });
+      continue;
+    }
+
+    if (item.info.needsExpiryPrompt) {
+      alerts.push({
+        title: 'Add expiry date',
+        subtitle: `Add an expiry date for ${possessiveOwner(item.ownerLabel)} ${noun}.`,
+        tone: 'gold',
+      });
+      continue;
+    }
+
     alerts.push({
-      title: 'Passport expiring soon',
-      subtitle: `${passportExpiry.holderName || 'A passport'} expires on ${passportExpiry.expiryDate.slice(0, 10)}.`,
-      tone: isDateWithinDays(passportExpiry.expiryDate, 30) ? 'danger' : 'gold',
+      title: item.info.passportSixMonthWarning ? 'Passport six-month warning' : `${noun[0].toUpperCase()}${noun.slice(1)} expiring soon`,
+      subtitle: `${possessiveOwner(item.ownerLabel)} ${noun} ${getDocumentExpiryRelativeLabel(item.document.expiryDate).toLowerCase()}.`,
+      tone: item.info.passportSixMonthWarning ? 'danger' : item.info.bucket === 'within_7_days' || item.info.bucket === 'within_30_days' ? 'coral' : 'gold',
     });
   }
 
-  const ghicExpiry = bundle.documents.find(
-    (document) => document.documentType === 'ghic' && document.expiryDate && isDateWithinDays(document.expiryDate, 60)
-  );
-  if (ghicExpiry?.expiryDate) {
+  if (documentSummary.missingInsuranceTravellers.length) {
     alerts.push({
-      title: 'GHIC / EHIC expiring soon',
-      subtitle: `${ghicExpiry.holderName || 'A GHIC / EHIC'} expires on ${ghicExpiry.expiryDate.slice(0, 10)}.`,
-      tone: isDateWithinDays(ghicExpiry.expiryDate, 30) ? 'coral' : 'gold',
+      title: 'Insurance missing',
+      subtitle:
+        documentSummary.missingInsuranceTravellers.length === 1
+          ? `${documentSummary.missingInsuranceTravellers[0].fullName} has no insurance document.`
+          : `${documentSummary.missingInsuranceTravellers.length} travellers have no insurance document.`,
+      tone: 'coral',
     });
-  }
-
-  if (!bundle.documents.some((document) => document.documentType === 'insurance')) {
+  } else if (!bundle.travellers.length && !bundle.documents.some((document) => document.documentType === 'insurance')) {
     alerts.push({
       title: 'Insurance missing',
       subtitle: 'Add insurance details before departure.',
