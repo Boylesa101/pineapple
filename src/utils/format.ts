@@ -1,0 +1,29 @@
+import { formatShortDate } from './date';
+
+export function maskSensitive(value: string, keep = 4) {
+  if (!value) {
+    return 'Not set';
+  }
+
+  if (value.length <= keep) {
+    return value;
+  }
+
+  return `${'•'.repeat(Math.max(0, value.length - keep))}${value.slice(-keep)}`;
+}
+
+export function percent(value: number, total: number) {
+  if (!total) {
+    return 0;
+  }
+
+  return Math.round((value / total) * 100);
+}
+
+export function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+export function tripDateRange(startDate: string, endDate: string) {
+  return `${formatShortDate(startDate)} - ${formatShortDate(endDate)}`;
+}
