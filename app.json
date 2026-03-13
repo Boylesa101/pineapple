@@ -34,13 +34,11 @@
     },
     "plugins": [
       "expo-router",
-      "expo-image",
       "expo-secure-store",
       "expo-document-picker",
       "expo-local-authentication",
       "expo-notifications",
-      "@react-native-community/datetimepicker",
-      "expo-sharing"
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": false
