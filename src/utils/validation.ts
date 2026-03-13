@@ -1,3 +1,5 @@
+import { isValid, parseISO } from 'date-fns';
+
 import type {
   DocumentDraft,
   EmergencyInfoDraft,
@@ -8,6 +10,7 @@ import type {
   TravellerDraft,
   TripDraft,
 } from '@/types/models';
+import { normalizeExpiryReminderSchedule } from './documentExpiry';
 
 export function validateTrip(input: TripDraft) {
   const errors: string[] = [];
@@ -32,6 +35,14 @@ export function validateDocument(input: DocumentDraft) {
   const errors: string[] = [];
   if (!input.holderName.trim()) errors.push('Holder name is required.');
   if (!input.localFileUri.trim()) errors.push('Choose a local file.');
+  if (input.issueDate && !isValid(parseISO(input.issueDate))) errors.push('Issue date is invalid.');
+  if (input.expiryDate && !isValid(parseISO(input.expiryDate))) errors.push('Expiry date is invalid.');
+  if (input.issueDate && input.expiryDate && input.expiryDate < input.issueDate) {
+    errors.push('Expiry date must be after the issue date.');
+  }
+  if (input.expiryReminderEnabled && !normalizeExpiryReminderSchedule(input.expiryReminderSchedule).length) {
+    errors.push('Choose at least one reminder time, or turn reminders off for this document.');
+  }
   return errors;
 }
 

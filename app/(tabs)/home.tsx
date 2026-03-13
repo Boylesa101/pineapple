@@ -23,6 +23,7 @@ import { tripDateRange } from '@/utils/format';
 import {
   getDashboardAlerts,
   getDashboardTrip,
+  getDocumentExpiryOverview,
   getNextEvent,
   getNextFlight,
   getNextHotel,
@@ -59,6 +60,7 @@ export default function HomeScreen() {
   const nextHotel = getNextHotel(data, dashboardTrip?.id);
   const nextEvent = getNextEvent(data, dashboardTrip?.id);
   const packing = getPackingProgress(data, dashboardTrip?.id);
+  const expiryOverview = getDocumentExpiryOverview(data, dashboardTrip?.id);
   const itineraryPreview = useMemo(
     () => [...bundle.itineraryEvents].sort((left, right) => left.dateTime.localeCompare(right.dateTime)).slice(0, 3),
     [bundle.itineraryEvents]
@@ -93,6 +95,10 @@ export default function HomeScreen() {
     }
     setActiveTrip(dashboardTrip.id);
     router.push({ pathname: '/trip/[tripId]/travel-mode', params: { tripId: dashboardTrip.id } });
+  }
+
+  function openWarnings() {
+    router.push('/warnings');
   }
 
   const statusTone = dashboardTrip?.status === 'active' ? 'blue' : dashboardTrip?.status === 'completed' ? 'default' : 'gold';
@@ -174,6 +180,13 @@ export default function HomeScreen() {
                 value={`${bundle.documents.length} document(s) saved`}
                 icon="lock"
                 tone="coral"
+              />
+              <DashboardSummaryTile
+                title="Expiry status"
+                value={`${expiryOverview.expiredCount} expired • ${expiryOverview.expiringCount} soon`}
+                icon="warning-amber"
+                tone={expiryOverview.expiredCount ? 'coral' : 'gold'}
+                onPress={openWarnings}
               />
               <DashboardSummaryTile
                 title="Next itinerary"

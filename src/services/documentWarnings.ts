@@ -28,12 +28,22 @@ function getOwnerLabel(document: Document, travellers: Traveller[]) {
 function warningSortValue(item: DocumentWarningItem) {
   if (item.info.isExpired) return 0;
   if (item.info.passportSixMonthWarning) return 1;
-  if (item.info.bucket === 'within_7_days') return 2;
-  if (item.info.bucket === 'within_30_days') return 3;
-  if (item.info.bucket === 'within_3_months') return 4;
-  if (item.info.bucket === 'within_6_months') return 5;
-  if (item.info.needsExpiryPrompt) return 6;
-  return 7;
+  if (item.info.bucket === 'within_1_day') return 2;
+  if (item.info.bucket === 'within_7_days') return 3;
+  if (item.info.bucket === 'within_14_days') return 4;
+  if (item.info.bucket === 'within_30_days') return 5;
+  if (item.info.bucket === 'within_90_days') return 6;
+  if (item.info.bucket === 'within_180_days') return 7;
+  if (item.info.needsExpiryPrompt) return 8;
+  return 9;
+}
+
+function expirySortValue(document: Document) {
+  if (!document.expiryDate) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return new Date(document.expiryDate).getTime();
 }
 
 export function getDocumentWarningItems(documents: Document[], travellers: Traveller[]) {
@@ -46,7 +56,14 @@ export function getDocumentWarningItems(documents: Document[], travellers: Trave
       info: getDocumentExpiryInfo(document.documentType, document.expiryDate),
     }))
     .filter((item) => item.info.isExpired || item.info.isExpiring || item.info.needsExpiryPrompt)
-    .sort((left, right) => warningSortValue(left) - warningSortValue(right));
+    .sort((left, right) => {
+      const severity = warningSortValue(left) - warningSortValue(right);
+      if (severity !== 0) {
+        return severity;
+      }
+
+      return expirySortValue(left.document) - expirySortValue(right.document);
+    });
 }
 
 export function getMissingInsuranceTravellers(documents: Document[], travellers: Traveller[]) {

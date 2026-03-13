@@ -41,9 +41,7 @@ import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, valida
 
 type ModalKind = 'traveller' | 'segment' | 'hotel' | 'emergency' | 'export' | 'invite' | null;
 
-const reminderMeta: Record<ReminderKind, { label: string; leadTimeDays: ReminderLeadTime }> = {
-  passport_expiry: { label: 'Passport expiry warning', leadTimeDays: 30 },
-  ghic_expiry: { label: 'GHIC / EHIC expiry warning', leadTimeDays: 30 },
+const reminderMeta: Record<Exclude<ReminderKind, 'passport_expiry' | 'ghic_expiry'>, { label: string; leadTimeDays: ReminderLeadTime }> = {
   packing_incomplete: { label: 'Packing incomplete warning', leadTimeDays: 1 },
   trip_starts_tomorrow: { label: 'Trip starts tomorrow warning', leadTimeDays: 1 },
   insurance_missing: { label: 'Missing insurance warning', leadTimeDays: 7 },
@@ -70,6 +68,8 @@ const documentTypeLabels = {
   ghic: 'GHIC / EHIC',
   insurance: 'insurance document',
   visa: 'visa',
+  driving_licence: 'driving licence',
+  id_card: 'ID card',
   custom: 'document',
 } as const;
 
@@ -270,8 +270,11 @@ export default function TripDetailScreen() {
   }
 
   async function toggleReminder(kind: ReminderKind) {
+    if (!(kind in reminderMeta)) {
+      return;
+    }
     const existing = bundle.reminderSettings.find((setting) => setting.kind === kind && setting.tripId === tripId);
-    const base = reminderMeta[kind];
+    const base = reminderMeta[kind as keyof typeof reminderMeta];
     await saveReminderSetting(
       existing
         ? { ...existing, enabled: !existing.enabled }
@@ -640,10 +643,9 @@ export default function TripDetailScreen() {
         <AppButton label="Export trip PDF" onPress={() => setModalKind('export')} />
       </AppCard>
 
-      <AppCard title="Reminder groundwork" subtitle="Local-only reminder preferences scaffolded for phase 3.">
+      <AppCard title="Trip reminders" subtitle="Trip-level local reminders for departures, packing, flights, and excursions.">
         {Object.entries(reminderMeta).map(([kind, meta]) => {
-          const enabled = bundle.reminderSettings.find((setting) => setting.kind === kind && setting.tripId === tripId)?.enabled
-            ?? ((kind === 'passport_expiry' || kind === 'ghic_expiry') ? data.appPreferences.expiryRemindersEnabled : false);
+          const enabled = bundle.reminderSettings.find((setting) => setting.kind === kind && setting.tripId === tripId)?.enabled ?? false;
           return (
             <ListRow
               key={kind}

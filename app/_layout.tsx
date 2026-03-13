@@ -135,6 +135,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="getting-started" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="warnings" />
           <Stack.Screen name="trip/[tripId]" />
           <Stack.Screen name="trip/[tripId]/travel-mode" />
         </Stack>

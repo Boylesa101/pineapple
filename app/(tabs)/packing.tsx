@@ -265,8 +265,8 @@ export default function PackingScreen() {
             {draft.assignmentScope === 'travellers' ? (
               <View style={styles.field}>
                 <Text style={styles.label}>Travellers</Text>
-                <MultiSelectChips
-                  value={draft.travellerIds}
+                <MultiSelectChips<string>
+                  values={draft.travellerIds}
                   onChange={(travellerIds) =>
                     setDraft((current) => (current ? { ...current, travellerIds } : current))
                   }

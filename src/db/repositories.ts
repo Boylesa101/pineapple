@@ -1,6 +1,12 @@
 import { getDatabase } from './client';
 
 import { createId } from '@/utils/ids';
+import {
+  defaultAppExpiryPreferences,
+  normalizeAppPreferences,
+  normalizeDocumentRecord,
+  serializeExpiryReminderSchedule,
+} from '@/utils/documentExpiry';
 import type {
   AppDataSnapshot,
   AppPreferences,
@@ -32,7 +38,7 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
   return {
     id: 'app',
     notificationsEnabled: false,
-    expiryRemindersEnabled: true,
+    ...defaultAppExpiryPreferences(),
     syncEnabled: false,
     syncMode: 'manual_share',
     syncStatus: 'local_only',
@@ -101,18 +107,26 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
   }, {});
 
   const appPreferences = appPreferencesRaw
-    ? {
+    ? normalizeAppPreferences({
         ...appPreferencesRaw,
         notificationsEnabled: toBool(appPreferencesRaw.notificationsEnabled),
         expiryRemindersEnabled: toBool(appPreferencesRaw.expiryRemindersEnabled ?? 1),
+        expiryReminderSilent: toBool(appPreferencesRaw.expiryReminderSilent ?? 0),
         syncEnabled: toBool(appPreferencesRaw.syncEnabled),
-      }
+      })
     : defaultAppPreferences();
 
   return {
     trips,
     travellers,
-    documents: documents.map((document) => ({ ...document, sensitive: toBool(document.sensitive) })),
+    documents: documents.map((document) =>
+      normalizeDocumentRecord({
+        ...document,
+        sensitive: toBool(document.sensitive),
+        expiryReminderEnabled: toBool(document.expiryReminderEnabled ?? 1),
+        expiryReminderSchedule: document.expiryReminderSchedule,
+      })
+    ),
     packingItems: packingItemsRaw.map((item) => ({
       ...item,
       isPacked: toBool(item.isPacked),
@@ -235,10 +249,11 @@ export async function upsertDocument(input: DocumentDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('document');
+  const normalized = normalizeDocumentRecord(input as any);
 
   await db.runAsync(
-    `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, notes, localFileUri, previewUri, mimeType, sensitive, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, expiryReminderEnabled, expiryReminderSchedule, notes, localFileUri, previewUri, mimeType, sensitive, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        travellerId = excluded.travellerId,
@@ -247,6 +262,8 @@ export async function upsertDocument(input: DocumentDraft) {
        documentNumber = excluded.documentNumber,
        issueDate = excluded.issueDate,
        expiryDate = excluded.expiryDate,
+       expiryReminderEnabled = excluded.expiryReminderEnabled,
+       expiryReminderSchedule = excluded.expiryReminderSchedule,
        notes = excluded.notes,
        localFileUri = excluded.localFileUri,
        previewUri = excluded.previewUri,
@@ -254,18 +271,20 @@ export async function upsertDocument(input: DocumentDraft) {
        sensitive = excluded.sensitive,
        updatedAt = excluded.updatedAt`,
     id,
-    input.tripId,
-    input.travellerId,
-    input.holderName,
-    input.documentType,
-    input.documentNumber,
-    input.issueDate,
-    input.expiryDate,
-    input.notes,
-    input.localFileUri,
-    input.previewUri,
-    input.mimeType,
-    input.sensitive ? 1 : 0,
+    normalized.tripId,
+    normalized.travellerId,
+    normalized.holderName,
+    normalized.documentType,
+    normalized.documentNumber,
+    normalized.issueDate,
+    normalized.expiryDate,
+    normalized.expiryReminderEnabled ? 1 : 0,
+    serializeExpiryReminderSchedule(normalized.expiryReminderSchedule),
+    normalized.notes,
+    normalized.localFileUri,
+    normalized.previewUri,
+    normalized.mimeType,
+    normalized.sensitive ? 1 : 0,
     timestamp,
     timestamp
   );
@@ -481,13 +500,16 @@ export async function upsertReminderSetting(input: ReminderSettingDraft) {
 export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const db = await getDatabase();
   const timestamp = now();
+  const normalized = normalizeAppPreferences(input as any);
 
   await db.runAsync(
-    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        notificationsEnabled = excluded.notificationsEnabled,
        expiryRemindersEnabled = excluded.expiryRemindersEnabled,
+       expiryReminderSchedule = excluded.expiryReminderSchedule,
+       expiryReminderSilent = excluded.expiryReminderSilent,
        syncEnabled = excluded.syncEnabled,
        syncMode = excluded.syncMode,
        syncStatus = excluded.syncStatus,
@@ -495,15 +517,17 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
        lastBackupAt = excluded.lastBackupAt,
        privacyMaskingMode = excluded.privacyMaskingMode,
        updatedAt = excluded.updatedAt`,
-    input.id,
-    input.notificationsEnabled ? 1 : 0,
-    input.expiryRemindersEnabled ? 1 : 0,
-    input.syncEnabled ? 1 : 0,
-    input.syncMode,
-    input.syncStatus,
-    input.lastSyncAt,
-    input.lastBackupAt,
-    input.privacyMaskingMode,
+    normalized.id,
+    normalized.notificationsEnabled ? 1 : 0,
+    normalized.expiryRemindersEnabled ? 1 : 0,
+    serializeExpiryReminderSchedule(normalized.expiryReminderSchedule),
+    normalized.expiryReminderSilent ? 1 : 0,
+    normalized.syncEnabled ? 1 : 0,
+    normalized.syncMode,
+    normalized.syncStatus,
+    normalized.lastSyncAt,
+    normalized.lastBackupAt,
+    normalized.privacyMaskingMode,
     timestamp,
     timestamp
   );

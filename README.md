@@ -14,7 +14,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
-- Reusable document expiry status system for passports, GHIC / EHIC, insurance, visas, and custom docs with expiry dates
+- Reusable document expiry status system for passports, visas, GHIC / EHIC, travel insurance, driving licences, ID cards, and custom docs with expiry dates
 - Packing lists grouped by category with multi-traveller assignment, templates, duplicate action, and priority flags
 - Flight / travel segment management
 - Hotel stay management
@@ -25,6 +25,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Encrypted local backup export/import with `.pineapplebackup` files, validation, and attachment preservation where the original local files are still available
 - Local reminders and notifications for trip start, passport/GHIC expiry, missing insurance, packing completeness, flights, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
+- Dedicated expiry warnings screen with filters for all, expiring soon, expired, and notifications off
 - Optional manual-share trip sync with participant roles, invite records, conflict review, and trip-share export/import
 - Expanded settings surface for security, reminders, sync, backup/restore, and privacy masking
 - Expo web/PWA companion mode for trip overview, packing, itinerary, emergency info, and printable summaries
@@ -134,12 +135,14 @@ npx expo export --platform web
 
 ### Document expiry warnings
 
-- Pineapple surfaces expiry warnings for passports, GHIC / EHIC cards, insurance documents, visas, and custom documents that have an expiry date saved
-- Expiry thresholds are handled locally with reusable buckets for expired, within 7 days, within 30 days, within 3 months, and within 6 months
+- Pineapple surfaces expiry warnings for passports, visas, GHIC / EHIC cards, travel insurance documents, driving licences, ID cards, and custom documents that have an expiry date saved
+- Expiry thresholds are handled locally with reusable buckets for expired, within 1 day, within 7 days, within 14 days, within 30 days, within 90 days, and within 180 days
 - Passports get a stronger six-month warning because many destinations require at least six months of remaining validity
 - Missing expiry dates are prompted for document types that usually need them, but they are not treated as expired
-- Expiry alerts appear in the dashboard, vault, trip detail, and document detail views
-- Local expiry reminders are optional and device-only; Pineapple reschedules them when document records change or a backup restore refreshes local data
+- Expiry alerts appear in the dashboard, vault, trip detail, document detail views, and the dedicated warnings screen
+- Local expiry reminders are optional and device-only; Pineapple reschedules them when document records change, documents are deleted, or a backup restore refreshes local data
+- Each document can keep its own reminder toggle and reminder schedule, while Settings controls the default schedule, master enable switch, and silent reminder preference
+- Pineapple does not currently auto-extract expiry dates from OCR; document expiry entry remains explicit and user-confirmed
 
 ### Brand direction
 

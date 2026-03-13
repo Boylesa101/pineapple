@@ -11,13 +11,23 @@ import { AppTextField } from '@/components/AppTextField';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
+import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { colors, spacing } from '@/constants/theme';
 import { PINEAPPLE_BACKUP_EXTENSION, isBackupFileName } from '@/services/backup';
 import { useAppStore } from '@/store/useAppStore';
-import type { ConflictStatus, PrivacyMaskingMode } from '@/types/models';
+import type { ConflictStatus, ExpiryReminderLeadTime, PrivacyMaskingMode } from '@/types/models';
 import { canUseBiometrics } from '@/utils/security';
 
 type BackupAction = 'export' | 'import';
+const expiryScheduleOptions: Array<{ label: string; value: ExpiryReminderLeadTime }> = [
+  { label: '180d', value: 180 },
+  { label: '90d', value: 90 },
+  { label: '30d', value: 30 },
+  { label: '14d', value: 14 },
+  { label: '7d', value: 7 },
+  { label: '1d', value: 1 },
+  { label: 'Day of', value: 0 },
+];
 
 export default function SettingsScreen() {
   const {
@@ -215,8 +225,24 @@ export default function SettingsScreen() {
             onPress={() => saveAppPreferences({ expiryRemindersEnabled: !data.appPreferences.expiryRemindersEnabled })}
           />
         </View>
+        <View style={styles.fieldBlock}>
+          <Text style={styles.label}>Default expiry reminder schedule</Text>
+          <MultiSelectChips<ExpiryReminderLeadTime>
+            values={data.appPreferences.expiryReminderSchedule}
+            onChange={(values) => saveAppPreferences({ expiryReminderSchedule: values })}
+            options={expiryScheduleOptions}
+          />
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.body}>Silent expiry reminders</Text>
+          <AppButton
+            label={data.appPreferences.expiryReminderSilent ? 'On' : 'Off'}
+            tone={data.appPreferences.expiryReminderSilent ? 'primary' : 'secondary'}
+            onPress={() => saveAppPreferences({ expiryReminderSilent: !data.appPreferences.expiryReminderSilent })}
+          />
+        </View>
         <Text style={styles.meta}>
-          Expiry reminders cover passports, GHIC / EHIC cards, insurance, visas, and supported custom documents. Trip-level reminder toggles still control flights, passport expiry, packing, and excursion reminders.
+          Expiry reminders cover passports, GHIC / EHIC cards, travel insurance, visas, driving licences, ID cards, and supported custom documents. Reminders stay local to this device only and never expose document numbers or files.
         </Text>
       </AppCard>
 
@@ -363,6 +389,9 @@ const styles = StyleSheet.create({
     color: colors.nightNavy,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
+  },
+  fieldBlock: {
+    gap: spacing.xs,
   },
   meta: {
     color: colors.textMuted,

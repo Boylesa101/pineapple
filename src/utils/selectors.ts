@@ -2,7 +2,7 @@ import { parseISO } from 'date-fns';
 
 import type { AppDataSnapshot, Document, PackingItem, Traveller } from '@/types/models';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
-import { daysLeft, daysUntil, isDateWithinDays } from './date';
+import { daysLeft, daysUntil } from './date';
 import { getDocumentExpiryRelativeLabel } from './documentExpiry';
 
 const documentTypeLabels = {
@@ -10,6 +10,8 @@ const documentTypeLabels = {
   ghic: 'GHIC / EHIC',
   insurance: 'insurance document',
   visa: 'visa',
+  driving_licence: 'driving licence',
+  id_card: 'ID card',
   custom: 'document',
 } as const;
 
@@ -119,6 +121,15 @@ export function getDocumentExpiryWarnings(documents: Document[], travellers: Tra
   return getTripDocumentWarningSummary(documents, travellers).warningItems;
 }
 
+export function getDocumentExpiryOverview(snapshot: AppDataSnapshot, tripId?: string | null) {
+  const bundle = getTripBundle(snapshot, tripId);
+  const summary = getTripDocumentWarningSummary(bundle.documents, bundle.travellers);
+  return {
+    expiredCount: summary.expiredCount,
+    expiringCount: summary.expiringCount,
+  };
+}
+
 export function getMissingInfoPrompts(snapshot: AppDataSnapshot, tripId: string | null | undefined) {
   const bundle = getTripBundle(snapshot, tripId);
   const prompts: string[] = [];
@@ -158,7 +169,12 @@ export function getDashboardAlerts(snapshot: AppDataSnapshot, tripId: string | n
     alerts.push({
       title: item.info.passportSixMonthWarning ? 'Passport six-month warning' : `${noun[0].toUpperCase()}${noun.slice(1)} expiring soon`,
       subtitle: `${possessiveOwner(item.ownerLabel)} ${noun} ${getDocumentExpiryRelativeLabel(item.document.expiryDate).toLowerCase()}.`,
-      tone: item.info.passportSixMonthWarning ? 'danger' : item.info.bucket === 'within_7_days' || item.info.bucket === 'within_30_days' ? 'coral' : 'gold',
+      tone:
+        item.info.passportSixMonthWarning
+          ? 'danger'
+          : item.info.bucket === 'within_1_day' || item.info.bucket === 'within_7_days' || item.info.bucket === 'within_14_days' || item.info.bucket === 'within_30_days'
+            ? 'coral'
+            : 'gold',
     });
   }
 

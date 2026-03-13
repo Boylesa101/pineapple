@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 - 2026-03-13
+
+- Expanded document support for driving licences and ID cards and added per-document expiry reminder settings with stored schedules
+- Added a full Step 6 document expiry system with reusable validity states, migration-safe defaults, home dashboard counts, a dedicated warnings screen, and Travel Mode warning surfacing
+- Added configurable default expiry reminder schedules and silent reminder support in Settings, all using local device notifications only
+- Added expiry-safe normalization for older local data, backup restores, and web snapshot storage
+- Added automated tests for expiry calculations, reminder planning, dashboard counts, and legacy normalization
+
 ## 1.3.3 - 2026-03-13
 
 - Added a reusable local document-expiry warning system with shared thresholds for expired, 7-day, 30-day, 3-month, and 6-month states

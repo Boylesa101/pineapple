@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 5;
+const DATABASE_VERSION = 6;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS documents (
   documentNumber TEXT NOT NULL DEFAULT '',
   issueDate TEXT,
   expiryDate TEXT,
+  expiryReminderEnabled INTEGER NOT NULL DEFAULT 1,
+  expiryReminderSchedule TEXT NOT NULL DEFAULT '[90,30,7,1,0]',
   notes TEXT NOT NULL DEFAULT '',
   localFileUri TEXT NOT NULL,
   previewUri TEXT,
@@ -146,6 +148,8 @@ CREATE TABLE IF NOT EXISTS app_preferences (
   id TEXT PRIMARY KEY NOT NULL,
   notificationsEnabled INTEGER NOT NULL DEFAULT 0,
   expiryRemindersEnabled INTEGER NOT NULL DEFAULT 1,
+  expiryReminderSchedule TEXT NOT NULL DEFAULT '[90,30,7,1,0]',
+  expiryReminderSilent INTEGER NOT NULL DEFAULT 0,
   syncEnabled INTEGER NOT NULL DEFAULT 0,
   syncMode TEXT NOT NULL DEFAULT 'manual_share',
   syncStatus TEXT NOT NULL DEFAULT 'local_only',
@@ -311,6 +315,13 @@ async function runPhaseFiveMigration(db: SQLiteDatabase) {
   await ensureColumn(db, 'app_preferences', 'expiryRemindersEnabled', 'INTEGER NOT NULL DEFAULT 1');
 }
 
+async function runPhaseSixMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'documents', 'expiryReminderEnabled', 'INTEGER NOT NULL DEFAULT 1');
+  await ensureColumn(db, 'documents', 'expiryReminderSchedule', "TEXT NOT NULL DEFAULT '[90,30,7,1,0]'");
+  await ensureColumn(db, 'app_preferences', 'expiryReminderSchedule', "TEXT NOT NULL DEFAULT '[90,30,7,1,0]'");
+  await ensureColumn(db, 'app_preferences', 'expiryReminderSilent', 'INTEGER NOT NULL DEFAULT 0');
+}
+
 export async function runMigrations(db: SQLiteDatabase) {
   await db.execAsync(createLatestTablesSql);
 
@@ -326,6 +337,9 @@ export async function runMigrations(db: SQLiteDatabase) {
   }
   if (version < 5) {
     await runPhaseFiveMigration(db);
+  }
+  if (version < 6) {
+    await runPhaseSixMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

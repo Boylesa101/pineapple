@@ -38,6 +38,7 @@ import {
   persistSecurityConfig,
   verifyPin,
 } from '@/utils/security';
+import { defaultAppExpiryPreferences } from '@/utils/documentExpiry';
 import { loadOnboardingComplete, persistOnboardingComplete } from '@/utils/onboarding';
 import type {
   AppDataSnapshot,
@@ -70,7 +71,7 @@ const emptySnapshot: AppDataSnapshot = {
   appPreferences: {
     id: 'app',
     notificationsEnabled: false,
-    expiryRemindersEnabled: true,
+    ...defaultAppExpiryPreferences(),
     syncEnabled: false,
     syncMode: 'manual_share',
     syncStatus: 'local_only',

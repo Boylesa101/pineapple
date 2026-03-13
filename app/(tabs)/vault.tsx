@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -15,13 +16,20 @@ import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
+import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { PinPad } from '@/components/PinPad';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
-import type { DocumentDraft, DocumentType } from '@/types/models';
+import type { DocumentDraft, DocumentType, ExpiryReminderLeadTime } from '@/types/models';
 import { formatShortDate } from '@/utils/date';
-import { getDocumentExpiryInfo } from '@/utils/documentExpiry';
+import {
+  buildDocumentDraftDefaults,
+  documentTypeNeedsExpiryPrompt,
+  documentTypeSupportsExpiryWarnings,
+  getDocumentExpiryInfo,
+  normalizeExpiryReminderSchedule,
+} from '@/utils/documentExpiry';
 import { copyIntoAppStorage } from '@/utils/fileStorage';
 import { maskSensitive } from '@/utils/format';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
@@ -30,18 +38,32 @@ import { validateDocument } from '@/utils/validation';
 const documentLabels: Record<DocumentType, string> = {
   passport: 'Passport',
   ghic: 'GHIC / EHIC',
-  insurance: 'Insurance',
+  insurance: 'Travel insurance',
   visa: 'Visa',
+  driving_licence: 'Driving licence',
+  id_card: 'ID card',
   boarding_pass: 'Boarding pass',
   hotel_booking: 'Hotel booking',
   excursion_ticket: 'Excursion ticket',
   custom: 'Custom',
 };
 
+const scheduleOptions: Array<{ label: string; value: ExpiryReminderLeadTime }> = [
+  { label: '180d', value: 180 },
+  { label: '90d', value: 90 },
+  { label: '30d', value: 30 },
+  { label: '14d', value: 14 },
+  { label: '7d', value: 7 },
+  { label: '1d', value: 1 },
+  { label: 'Day of', value: 0 },
+];
+
 type PrimaryFilter = 'all' | 'traveller' | 'type';
 type GroupMode = 'flat' | 'traveller' | 'type';
 
 export default function VaultScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ editDocumentId?: string }>();
   const {
     data,
     activeTripId,
@@ -64,11 +86,30 @@ export default function VaultScreen() {
   const [travellerFilter, setTravellerFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<DocumentType | 'all'>('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('flat');
+  const openedEditIdRef = useRef<string | null>(null);
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
   const selectedDocument = bundle.documents.find((item) => item.id === selectedId) ?? null;
   const isVaultUnlocked = !!vaultUnlockedUntil && vaultUnlockedUntil > Date.now();
   const expiryWarnings = getDocumentExpiryWarnings(bundle.documents, bundle.travellers);
+
+  useEffect(() => {
+    if (!params.editDocumentId || openedEditIdRef.current === params.editDocumentId) {
+      return;
+    }
+
+    const document = data.documents.find((item) => item.id === params.editDocumentId);
+    if (!document) {
+      return;
+    }
+
+    openedEditIdRef.current = params.editDocumentId;
+    if (document.tripId !== selectedTripId) {
+      setActiveTrip(document.tripId);
+    }
+    setDraft(document);
+    setEditorVisible(true);
+  }, [data.documents, params.editDocumentId, selectedTripId, setActiveTrip]);
 
   const filteredDocuments = useMemo(() => {
     return bundle.documents.filter((document) => {
@@ -132,18 +173,13 @@ export default function VaultScreen() {
       const asset = result.assets[0];
       const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
       setDraft({
-        tripId: selectedTripId,
-        travellerId: null,
-        holderName: '',
-        documentType: 'custom',
-        documentNumber: '',
-        issueDate: null,
-        expiryDate: null,
-        notes: '',
-        localFileUri,
-        previewUri: asset.mimeType?.startsWith('image') ? localFileUri : null,
-        mimeType: asset.mimeType ?? null,
-        sensitive: true,
+        ...buildDocumentDraftDefaults({
+          tripId: selectedTripId,
+          localFileUri,
+          previewUri: asset.mimeType?.startsWith('image') ? localFileUri : null,
+          mimeType: asset.mimeType ?? null,
+        }),
+        expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
       });
       setEditorVisible(true);
       return;
@@ -157,18 +193,13 @@ export default function VaultScreen() {
     const asset = result.assets[0];
     const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
     setDraft({
-      tripId: selectedTripId,
-      travellerId: null,
-      holderName: '',
-      documentType: 'custom',
-      documentNumber: '',
-      issueDate: null,
-      expiryDate: null,
-      notes: '',
-      localFileUri,
-      previewUri: localFileUri,
-      mimeType: asset.mimeType ?? null,
-      sensitive: true,
+      ...buildDocumentDraftDefaults({
+        tripId: selectedTripId,
+        localFileUri,
+        previewUri: localFileUri,
+        mimeType: asset.mimeType ?? null,
+      }),
+      expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
     });
     setEditorVisible(true);
   }
@@ -180,8 +211,32 @@ export default function VaultScreen() {
       Alert.alert('Document needs attention', errors.join('\n'));
       return;
     }
+    if (documentTypeNeedsExpiryPrompt(draft.documentType) && !draft.expiryDate) {
+      Alert.alert(
+        'Add expiry date?',
+        `${documentLabels[draft.documentType]} usually needs an expiry date so Pineapple can warn you before travel.`,
+        [
+          { text: 'Go back', style: 'cancel' },
+          {
+            text: 'Save without expiry',
+            style: 'default',
+            onPress: async () => {
+              await saveDocument(draft);
+              setEditorVisible(false);
+              if (params.editDocumentId) {
+                router.setParams({ editDocumentId: undefined });
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
     await saveDocument(draft);
     setEditorVisible(false);
+    if (params.editDocumentId) {
+      router.setParams({ editDocumentId: undefined });
+    }
   }
 
   async function handleVaultUnlock() {
@@ -343,7 +398,12 @@ export default function VaultScreen() {
       <AppModal
         visible={editorVisible}
         title={draft?.id ? 'Edit document' : 'Add document'}
-        onClose={() => setEditorVisible(false)}
+        onClose={() => {
+          setEditorVisible(false);
+          if (params.editDocumentId) {
+            router.setParams({ editDocumentId: undefined });
+          }
+        }}
       >
         {draft ? (
           <>
@@ -356,9 +416,23 @@ export default function VaultScreen() {
               <Text style={styles.label}>Document type</Text>
               <ChoiceChips<DocumentType>
                 value={draft.documentType}
-                onChange={(value) => setDraft((current) => (current ? { ...current, documentType: value } : current))}
+                onChange={(value) =>
+                  setDraft((current) =>
+                    current
+                      ? {
+                          ...current,
+                          documentType: value,
+                          expiryReminderEnabled: documentTypeSupportsExpiryWarnings(value) ? current.expiryReminderEnabled : false,
+                          expiryReminderSchedule: normalizeExpiryReminderSchedule(current.expiryReminderSchedule),
+                        }
+                      : current
+                  )
+                }
                 options={Object.entries(documentLabels).map(([value, label]) => ({ value: value as DocumentType, label }))}
               />
+              {documentTypeNeedsExpiryPrompt(draft.documentType) ? (
+                <Text style={styles.meta}>Strongly recommended: add an expiry date so Pineapple can warn you in time.</Text>
+              ) : null}
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>Assigned traveller</Text>
@@ -390,6 +464,34 @@ export default function VaultScreen() {
               value={draft.expiryDate}
               onChange={(value) => setDraft((current) => (current ? { ...current, expiryDate: value } : current))}
             />
+            <View style={styles.field}>
+              <Text style={styles.label}>Expiry reminders</Text>
+              <ChoiceChips<'on' | 'off'>
+                value={draft.expiryReminderEnabled ? 'on' : 'off'}
+                onChange={(value) => setDraft((current) => (current ? { ...current, expiryReminderEnabled: value === 'on' } : current))}
+                options={[
+                  { label: 'On', value: 'on' },
+                  { label: 'Off', value: 'off' },
+                ]}
+              />
+              {draft.expiryReminderEnabled ? (
+                <MultiSelectChips<ExpiryReminderLeadTime>
+                  values={draft.expiryReminderSchedule}
+                  onChange={(values) =>
+                    setDraft((current) =>
+                      current
+                        ? {
+                            ...current,
+                            expiryReminderSchedule: normalizeExpiryReminderSchedule(values),
+                          }
+                        : current
+                    )
+                  }
+                  options={scheduleOptions}
+                />
+              ) : null}
+              <Text style={styles.meta}>Reminders stay on this device only and never include document numbers or images.</Text>
+            </View>
             <View style={styles.field}>
               <Text style={styles.label}>Sensitivity</Text>
               <ChoiceChips<'yes' | 'no'>

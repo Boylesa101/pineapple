@@ -4,10 +4,14 @@ export type DocumentType =
   | 'ghic'
   | 'insurance'
   | 'visa'
+  | 'driving_licence'
+  | 'id_card'
   | 'boarding_pass'
   | 'hotel_booking'
   | 'excursion_ticket'
   | 'custom';
+export type ExpiryReminderLeadTime = 180 | 90 | 30 | 14 | 7 | 1 | 0;
+export type ExpiryReminderSchedule = ExpiryReminderLeadTime[];
 export type PackingCategory =
   | 'clothes'
   | 'toiletries'
@@ -77,6 +81,10 @@ export interface Document {
   documentNumber: string;
   issueDate: string | null;
   expiryDate: string | null;
+  expiryReminderEnabled: boolean;
+  expiryReminderSchedule: ExpiryReminderSchedule;
+  expiredStatus: boolean;
+  expiringSoonStatus: boolean;
   notes: string;
   localFileUri: string;
   previewUri: string | null;
@@ -174,6 +182,8 @@ export interface AppPreferences {
   id: 'app';
   notificationsEnabled: boolean;
   expiryRemindersEnabled: boolean;
+  expiryReminderSchedule: ExpiryReminderSchedule;
+  expiryReminderSilent: boolean;
   syncEnabled: boolean;
   syncMode: SyncMode;
   syncStatus: SyncStatus;

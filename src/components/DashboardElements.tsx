@@ -54,13 +54,15 @@ export function DashboardSummaryTile({
   value,
   icon,
   tone = 'default',
+  onPress,
 }: {
   title: string;
   value: string;
   icon: ComponentProps<typeof MaterialIcons>['name'];
   tone?: 'default' | 'blue' | 'gold' | 'coral';
+  onPress?: () => void;
 }) {
-  return (
+  const content = (
     <View style={[styles.summaryTile, summaryToneStyles[tone]]}>
       <View style={styles.summaryIconRow}>
         <MaterialIcons name={icon} size={18} color={colors.nightNavy} />
@@ -69,6 +71,12 @@ export function DashboardSummaryTile({
       <Text style={styles.summaryValue}>{value}</Text>
     </View>
   );
+
+  if (!onPress) {
+    return content;
+  }
+
+  return <Pressable onPress={onPress}>{content}</Pressable>;
 }
 
 export function DashboardAlertCard({

@@ -294,6 +294,8 @@ export function createDemoSnapshot(): AppDataSnapshot {
       id: 'app',
       notificationsEnabled: false,
       expiryRemindersEnabled: true,
+      expiryReminderSchedule: [90, 30, 7, 1, 0],
+      expiryReminderSilent: false,
       syncEnabled: false,
       syncMode: 'manual_share',
       syncStatus: 'local_only',

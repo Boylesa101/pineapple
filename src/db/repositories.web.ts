@@ -1,6 +1,11 @@
 import { del, get, set } from 'idb-keyval';
 
 import { createId } from '@/utils/ids';
+import {
+  defaultAppExpiryPreferences,
+  normalizeAppPreferences,
+  normalizeDocumentRecord,
+} from '@/utils/documentExpiry';
 import type {
   AppDataSnapshot,
   AppPreferences,
@@ -30,7 +35,7 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
   return {
     id: 'app',
     notificationsEnabled: false,
-    expiryRemindersEnabled: true,
+    ...defaultAppExpiryPreferences(),
     syncEnabled: false,
     syncMode: 'manual_share',
     syncStatus: 'local_only',
@@ -65,17 +70,31 @@ async function readSnapshot() {
   const snapshot = (await get<AppDataSnapshot>(SNAPSHOT_KEY)) ?? emptySnapshot();
   return {
     ...snapshot,
+    documents: (snapshot.documents ?? []).map((document) => normalizeDocumentRecord(document as any)),
     appPreferences: {
-      ...defaultAppPreferences(snapshot.appPreferences?.createdAt ?? now()),
-      ...snapshot.appPreferences,
-      expiryRemindersEnabled: snapshot.appPreferences?.expiryRemindersEnabled ?? true,
-      lastBackupAt: snapshot.appPreferences?.lastBackupAt ?? null,
+      ...normalizeAppPreferences({
+        ...defaultAppPreferences(snapshot.appPreferences?.createdAt ?? now()),
+        ...snapshot.appPreferences,
+        lastBackupAt: snapshot.appPreferences?.lastBackupAt ?? null,
+      } as any),
     },
   };
 }
 
+function normalizeSnapshot(snapshot: AppDataSnapshot) {
+  return {
+    ...snapshot,
+    documents: (snapshot.documents ?? []).map((document) => normalizeDocumentRecord(document as any)),
+    appPreferences: normalizeAppPreferences({
+      ...defaultAppPreferences(snapshot.appPreferences?.createdAt ?? now()),
+      ...snapshot.appPreferences,
+      lastBackupAt: snapshot.appPreferences?.lastBackupAt ?? null,
+    } as any),
+  };
+}
+
 async function writeSnapshot(snapshot: AppDataSnapshot) {
-  await set(SNAPSHOT_KEY, snapshot);
+  await set(SNAPSHOT_KEY, normalizeSnapshot(snapshot));
 }
 
 function withUpsert<T extends { id: string }>(items: T[], nextItem: T) {
@@ -160,10 +179,11 @@ export async function upsertDocument(input: DocumentDraft) {
   const snapshot = await readSnapshot();
   const timestamp = now();
   const id = input.id ?? createId('document');
+  const normalized = normalizeDocumentRecord(input as any);
   await writeSnapshot({
     ...snapshot,
     documents: withUpsert(snapshot.documents, {
-      ...input,
+      ...normalized,
       id,
       createdAt: snapshot.documents.find((item) => item.id === id)?.createdAt ?? timestamp,
       updatedAt: timestamp,
@@ -270,12 +290,15 @@ export async function upsertReminderSetting(input: ReminderSettingDraft) {
 
 export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const snapshot = await readSnapshot();
+  const normalized = normalizeAppPreferences({
+    ...snapshot.appPreferences,
+    ...input,
+    id: 'app',
+  } as any);
   await writeSnapshot({
     ...snapshot,
     appPreferences: {
-      ...snapshot.appPreferences,
-      ...input,
-      id: 'app',
+      ...normalized,
       createdAt: snapshot.appPreferences.createdAt,
       updatedAt: now(),
     },

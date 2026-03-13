@@ -10,8 +10,10 @@ import { AppScreen } from '@/components/AppScreen';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { colors, spacing } from '@/constants/theme';
+import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDateTime } from '@/utils/date';
+import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { maskSensitive, tripDateRange } from '@/utils/format';
 import { getNextEvent, getNextFlight, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
 
@@ -51,6 +53,7 @@ export default function TravelModeScreen() {
   const timeline = getUpcomingTimeline(data, tripId);
   const hotel = bundle.hotelStays[0];
   const insuranceDocument = bundle.documents.find((document) => document.documentType === 'insurance');
+  const documentSummary = useMemo(() => getTripDocumentWarningSummary(bundle.documents, bundle.travellers), [bundle.documents, bundle.travellers]);
   const [revealed, setRevealed] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const { width } = useWindowDimensions();
@@ -149,6 +152,16 @@ export default function TravelModeScreen() {
           />
         </View>
       </AppCard>
+
+      {(documentSummary.expiredCount || documentSummary.expiringCount) ? (
+        <AppCard title="Document warning" subtitle="Travel Mode never blocks access, but key travel documents need attention.">
+          {documentSummary.warningItems.slice(0, 2).map((item) => (
+            <Text key={item.document.id} style={styles.smallText}>
+              {item.ownerLabel} • {getDocumentExpiryRelativeLabel(item.document.expiryDate)}
+            </Text>
+          ))}
+        </AppCard>
+      ) : null}
 
       {nextAction ? (
         <AppCard title="Next action" subtitle="Fastest thing to do next while you move.">

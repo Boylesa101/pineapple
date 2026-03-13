@@ -2,34 +2,34 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing } from '@/constants/theme';
 
-type Option = {
+type Option<T extends string | number> = {
   label: string;
-  value: string;
+  value: T;
 };
 
-type Props = {
-  value: string[];
-  onChange: (value: string[]) => void;
-  options: Option[];
+type Props<T extends string | number> = {
+  values: T[];
+  onChange: (values: T[]) => void;
+  options: Array<Option<T>>;
 };
 
-export function MultiSelectChips({ value, onChange, options }: Props) {
-  function toggle(nextValue: string) {
-    if (value.includes(nextValue)) {
-      onChange(value.filter((item) => item !== nextValue));
+export function MultiSelectChips<T extends string | number>({ values, onChange, options }: Props<T>) {
+  function toggle(value: T) {
+    if (values.includes(value)) {
+      onChange(values.filter((current) => current !== value));
       return;
     }
 
-    onChange([...value, nextValue]);
+    onChange([...values, value]);
   }
 
   return (
     <View style={styles.row}>
       {options.map((option) => {
-        const active = value.includes(option.value);
+        const active = values.includes(option.value);
         return (
-          <Pressable key={option.value} onPress={() => toggle(option.value)} style={[styles.chip, active ? styles.activeChip : null]}>
-            <Text style={[styles.label, active ? styles.activeLabel : null]}>{option.label}</Text>
+          <Pressable key={String(option.value)} onPress={() => toggle(option.value)} style={[styles.chip, active ? styles.chipActive : null]}>
+            <Text style={[styles.label, active ? styles.labelActive : null]}>{option.label}</Text>
           </Pressable>
         );
       })}
@@ -44,23 +44,23 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   chip: {
-    borderRadius: radii.pill,
-    backgroundColor: '#F8F5EE',
-    borderWidth: 1,
-    borderColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
   },
-  activeChip: {
-    backgroundColor: colors.nightNavy,
-    borderColor: colors.nightNavy,
+  chipActive: {
+    backgroundColor: '#FFF0CC',
+    borderColor: '#F1CF74',
   },
   label: {
     color: colors.nightNavy,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
   },
-  activeLabel: {
-    color: colors.white,
+  labelActive: {
+    color: '#A26B00',
   },
 });
