@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { AppState, Platform, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
+import { Stack, usePathname, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -48,10 +48,11 @@ function BootErrorView({ message, onRetry }: { message: string; onRetry: () => v
 function RouteGuard() {
   const router = useRouter();
   const pathname = usePathname();
+  const rootNavigationState = useRootNavigationState();
   const { isBootstrapped, security, isUnlocked, hasCompletedOnboarding, data } = useAppStore();
 
   useEffect(() => {
-    if (!isBootstrapped) {
+    if (!isBootstrapped || !rootNavigationState?.key) {
       return;
     }
 
@@ -92,7 +93,16 @@ function RouteGuard() {
     if (security.pinConfigured && isUnlocked && inAuth && !isChecklist) {
       replaceIfNeeded('/home');
     }
-  }, [data.trips.length, hasCompletedOnboarding, isBootstrapped, isUnlocked, pathname, router, security.pinConfigured]);
+  }, [
+    data.trips.length,
+    hasCompletedOnboarding,
+    isBootstrapped,
+    isUnlocked,
+    pathname,
+    rootNavigationState?.key,
+    router,
+    security.pinConfigured,
+  ]);
 
   return null;
 }
