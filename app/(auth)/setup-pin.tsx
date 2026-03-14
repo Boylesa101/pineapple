@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   },
   pinCard: {
     paddingTop: spacing.xs,
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   preferenceCard: {
     backgroundColor: 'rgba(255,255,255,0.14)',

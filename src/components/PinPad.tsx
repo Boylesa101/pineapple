@@ -10,7 +10,12 @@ type Props = {
   onChange: (value: string) => void;
 };
 
-const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'delete'];
+const rows = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['', '0', 'delete'],
+] as const;
 
 export function PinPad({ value, pinLength, onChange }: Props) {
   const dots = useMemo(() => Array.from({ length: pinLength }), [pinLength]);
@@ -33,14 +38,26 @@ export function PinPad({ value, pinLength, onChange }: Props) {
         ))}
       </View>
       <View style={styles.grid}>
-        {digits.map((digit, index) => (
-          <Pressable key={`${digit}-${index}`} onPress={() => handlePress(digit)} style={styles.key}>
-            {digit === 'delete' ? (
-              <MaterialIcons name="backspace" size={24} color={colors.authBlue} />
-            ) : (
-              <Text style={styles.keyLabel}>{digit}</Text>
-            )}
-          </Pressable>
+        {rows.map((row, rowIndex) => (
+          <View key={`row-${rowIndex}`} style={styles.row}>
+            {row.map((digit, index) => {
+              const cellKey = `${digit || 'empty'}-${rowIndex}-${index}`;
+
+              if (!digit) {
+                return <View key={cellKey} style={styles.keySpacer} />;
+              }
+
+              return (
+                <Pressable key={cellKey} onPress={() => handlePress(digit)} style={styles.key}>
+                  {digit === 'delete' ? (
+                    <MaterialIcons name="backspace" size={22} color={colors.authBlue} />
+                  ) : (
+                    <Text style={styles.keyLabel}>{digit}</Text>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
         ))}
       </View>
     </View>
@@ -49,6 +66,7 @@ export function PinPad({ value, pinLength, onChange }: Props) {
 
 const styles = StyleSheet.create({
   wrapper: {
+    alignItems: 'center',
     gap: spacing.md,
   },
   dotsRow: {
@@ -69,22 +87,28 @@ const styles = StyleSheet.create({
     borderColor: colors.white,
   },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
     gap: spacing.xs,
   },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
   key: {
-    width: 74,
-    height: 74,
+    width: 66,
+    height: 66,
     borderRadius: radii.pill,
     backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  keySpacer: {
+    width: 66,
+    height: 66,
+  },
   keyLabel: {
     color: colors.authBlue,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 22,
+    fontSize: 21,
   },
 });

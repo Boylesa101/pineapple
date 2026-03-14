@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   },
   pinCard: {
     paddingTop: spacing.xs,
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   pinTitle: {
     color: colors.white,
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     alignItems: 'center',
     gap: spacing.xs,
-    marginTop: spacing.xs,
+    marginTop: 2,
   },
   biometricIconWrap: {
     width: 64,
