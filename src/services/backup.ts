@@ -2,6 +2,7 @@ import CryptoJS from 'crypto-js';
 import * as Sharing from 'expo-sharing';
 
 import { replaceAllData } from '@/db/repositories';
+import { BACKUP_SCHEMA_VERSION, parseBackupEnvelopeString, validateBackupPayload } from '@/services/backupSchema';
 import type {
   AppDataSnapshot,
   BackupAttachment,
@@ -27,73 +28,12 @@ const BACKUP_PBKDF2_ITERATIONS = 150000;
 export const PINEAPPLE_BACKUP_EXTENSION = '.pineapplebackup';
 export const PINEAPPLE_BACKUP_MIME_TYPE = 'application/json';
 
-function validateBackupPayload(payload: BackupPayload) {
-  if (payload.version !== 3) {
-    throw new Error('Unsupported backup version.');
-  }
-
-  const data = payload.data;
-  if (
-    !Array.isArray(data.trips) ||
-    !Array.isArray(data.travellers) ||
-    !Array.isArray(data.documents) ||
-    !Array.isArray(data.packingItems) ||
-    !Array.isArray(data.travelSegments) ||
-    !Array.isArray(data.hotelStays) ||
-    !Array.isArray(data.itineraryEvents) ||
-    !Array.isArray(data.emergencyInfos) ||
-    !Array.isArray(data.reminderSettings) ||
-    !data.appPreferences ||
-    !Array.isArray(data.tripParticipants) ||
-    !Array.isArray(data.tripInvites) ||
-    !Array.isArray(data.sharedTripStates) ||
-    !Array.isArray(data.syncConflicts) ||
-    !Array.isArray(payload.attachments)
-  ) {
-    throw new Error('Backup file is missing required data sections.');
-  }
-}
-
-function validateBackupEnvelope(envelope: BackupEnvelope) {
-  if (envelope.format !== 'pineapple-backup') {
-    throw new Error('This backup file is not recognised.');
-  }
-
-  if (envelope.version !== 3) {
-    throw new Error('This backup file was created with an unsupported Pineapple version.');
-  }
-
-  if (envelope.encryption !== 'aes-256-cbc+hmac-sha256' || envelope.kdf !== 'pbkdf2') {
-    throw new Error('This backup file uses an unsupported protection format.');
-  }
-
-  if (
-    !envelope.ciphertext ||
-    !envelope.iv ||
-    !envelope.salt ||
-    !envelope.mac ||
-    typeof envelope.iterations !== 'number' ||
-    envelope.iterations < 10000
-  ) {
-    throw new Error('Backup file is incomplete or corrupted.');
-  }
-}
-
 export function isBackupFileName(name: string | null | undefined) {
   return Boolean(name?.toLowerCase().endsWith(PINEAPPLE_BACKUP_EXTENSION));
 }
 
 export function parseBackupEnvelope(encryptedContents: string) {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(encryptedContents);
-  } catch {
-    throw new Error('Backup file is not valid JSON.');
-  }
-
-  const envelope = parsed as BackupEnvelope;
-  validateBackupEnvelope(envelope);
-  return envelope;
+  return parseBackupEnvelopeString(encryptedContents);
 }
 
 function attachmentFileName(uri: string) {
@@ -139,7 +79,7 @@ export async function exportEncryptedBackup({ data, security, password }: Export
   const exportedAt = new Date().toISOString();
   const { attachments, skippedAttachmentCount } = await collectBackupAttachments(data);
   const payload: BackupPayload = {
-    version: 3,
+    version: BACKUP_SCHEMA_VERSION,
     exportedAt,
     settings: {
       autoLockSeconds: security.autoLockSeconds,
@@ -165,7 +105,7 @@ export async function exportEncryptedBackup({ data, security, password }: Export
   const mac = CryptoJS.HmacSHA256(`${ciphertext}.${iv.toString()}`, macKey).toString();
   const envelope: BackupEnvelope = {
     format: 'pineapple-backup',
-    version: 3,
+    version: BACKUP_SCHEMA_VERSION,
     encryption: 'aes-256-cbc+hmac-sha256',
     kdf: 'pbkdf2',
     iterations: BACKUP_PBKDF2_ITERATIONS,

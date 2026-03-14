@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.1 - 2026-03-14
+
+- Added a retryable startup error state so failed local bootstrap does not leave the app hanging silently
+- Stopped ordinary local data refreshes from prompting for notification permission and moved reminder permission requests into the explicit Settings flow
+- Hardened media import UX with clearer denied-permission and picker-failure messaging for vault and trip cover imports
+- Added confirmation before deleting vault documents and improved warnings-screen navigation for faster editing
+- Added onboarding/settings privacy wording plus Google Play draft documentation and release-readiness notes for internal testing
+- Added automated tests for onboarding completion fallback logic and backup schema validation
+
 ## 1.4.0 - 2026-03-13
 
 - Expanded document support for driving licences and ID cards and added per-document expiry reminder settings with stored schedules

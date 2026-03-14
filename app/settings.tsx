@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { colors, spacing } from '@/constants/theme';
+import { hasNotificationPermissions, requestNotificationPermissions } from '@/services/notifications';
 import { PINEAPPLE_BACKUP_EXTENSION, isBackupFileName } from '@/services/backup';
 import { useAppStore } from '@/store/useAppStore';
 import type { ConflictStatus, ExpiryReminderLeadTime, PrivacyMaskingMode } from '@/types/models';
@@ -185,6 +186,25 @@ export default function SettingsScreen() {
     await resolveSyncConflictChoice(conflictId, resolution);
   }
 
+  async function toggleNotificationsEnabled() {
+    if (data.appPreferences.notificationsEnabled) {
+      await saveAppPreferences({ notificationsEnabled: false });
+      return;
+    }
+
+    const alreadyGranted = await hasNotificationPermissions();
+    const granted = alreadyGranted || (await requestNotificationPermissions());
+    if (!granted) {
+      Alert.alert(
+        'Notifications unavailable',
+        'Pineapple only uses local reminders on this device. Turn on notifications in system settings if you want expiry and trip reminders.'
+      );
+      return;
+    }
+
+    await saveAppPreferences({ notificationsEnabled: true });
+  }
+
   return (
     <AppScreen title="Settings" subtitle="Security, reminders, sync, privacy, backup, and recovery controls.">
       <AppCard title="Security">
@@ -214,7 +234,7 @@ export default function SettingsScreen() {
           <AppButton
             label={data.appPreferences.notificationsEnabled ? 'On' : 'Off'}
             tone={data.appPreferences.notificationsEnabled ? 'primary' : 'secondary'}
-            onPress={() => saveAppPreferences({ notificationsEnabled: !data.appPreferences.notificationsEnabled })}
+            onPress={toggleNotificationsEnabled}
           />
         </View>
         <View style={styles.row}>
@@ -243,6 +263,9 @@ export default function SettingsScreen() {
         </View>
         <Text style={styles.meta}>
           Expiry reminders cover passports, GHIC / EHIC cards, travel insurance, visas, driving licences, ID cards, and supported custom documents. Reminders stay local to this device only and never expose document numbers or files.
+        </Text>
+        <Text style={styles.meta}>
+          Pineapple does not connect to your inbox or any cloud service for reminders. Email imports should come from files you choose on this device.
         </Text>
       </AppCard>
 

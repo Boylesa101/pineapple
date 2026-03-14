@@ -18,6 +18,7 @@ import {
 } from '@expo-google-fonts/poppins';
 
 import { PineappleMark } from '@/brand/PineappleMark';
+import { AppButton } from '@/components/AppButton';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -29,6 +30,17 @@ function LoadingView() {
       <PineappleMark size={88} />
       <Text style={styles.loadingTitle}>Pineapple</Text>
       <Text style={styles.loadingSubtitle}>Loading your offline travel organiser</Text>
+    </View>
+  );
+}
+
+function BootErrorView({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <View style={styles.loading}>
+      <PineappleMark size={88} />
+      <Text style={styles.loadingTitle}>Pineapple</Text>
+      <Text style={styles.loadingSubtitle}>{message}</Text>
+      <AppButton label="Try again" onPress={onRetry} />
     </View>
   );
 }
@@ -89,11 +101,12 @@ export default function RootLayout() {
   const handleAppStateChange = useAppStore((state) => state.handleAppStateChange);
   const enforceInactivityLock = useAppStore((state) => state.enforceInactivityLock);
   const isBootstrapped = useAppStore((state) => state.isBootstrapped);
+  const bootError = useAppStore((state) => state.bootError);
   const privacyOverlayVisible = useAppStore((state) => state.privacyOverlayVisible);
   const segments = useSegments();
 
   useEffect(() => {
-    bootstrap().catch(console.error);
+    bootstrap().catch(() => undefined);
   }, [bootstrap]);
 
   useEffect(() => {
@@ -121,6 +134,9 @@ export default function RootLayout() {
   }, []);
 
   if (!fontsLoaded || !isBootstrapped) {
+    if (fontsLoaded && bootError) {
+      return <BootErrorView message={bootError} onRetry={() => bootstrap().catch(() => undefined)} />;
+    }
     return <LoadingView />;
   }
 

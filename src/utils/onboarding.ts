@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
+export { deriveOnboardingCompletionStatus } from './onboardingState';
+
 const ONBOARDING_KEY = 'pineapple.onboarding.completed';
 
 function canUseLocalStorage() {

@@ -30,6 +30,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Expanded settings surface for security, reminders, sync, backup/restore, and privacy masking
 - Expo web/PWA companion mode for trip overview, packing, itinerary, emergency info, and printable summaries
 - Five-screen first-launch onboarding with PIN setup, first-trip creation, and a setup checklist
+- Retryable startup recovery if local bootstrap fails unexpectedly
 - Development-only demo data reset for QA
 
 ### Stack
@@ -89,6 +90,7 @@ npm run start
 4. Run checks:
 
 ```bash
+npm test
 npm run typecheck
 npx expo export --platform ios --platform android
 npx expo export --platform web
@@ -123,6 +125,7 @@ npx expo export --platform web
 - Shared trip sync is optional and manual-share only in phase 3
 - Conflict review is explicit; Pineapple does not silently overwrite local trip changes
 - Web/PWA is supported as a companion surface, but the Android app remains the most secure home for sensitive vault images
+- Notification text stays privacy-aware and does not include document numbers, images, or full document contents
 
 ### Backup and restore
 
@@ -143,6 +146,13 @@ npx expo export --platform web
 - Local expiry reminders are optional and device-only; Pineapple reschedules them when document records change, documents are deleted, or a backup restore refreshes local data
 - Each document can keep its own reminder toggle and reminder schedule, while Settings controls the default schedule, master enable switch, and silent reminder preference
 - Pineapple does not currently auto-extract expiry dates from OCR; document expiry entry remains explicit and user-confirmed
+
+### Permissions and privacy
+
+- Pineapple only requests notification access when the user explicitly enables local reminders in Settings
+- Photo library access is requested only when the user chooses to import a local image for a trip or document
+- File picker access is used only for user-selected local files such as PDFs, images, shared-trip packets, and encrypted backups
+- Pineapple does not connect to a live inbox; any “email import” workflow is limited to local files the user chooses on-device
 
 ### Brand direction
 
@@ -169,3 +179,8 @@ npx expo export --platform web
 - Optional encrypted sync destinations beyond manual-share packet exchange
 - Better in-app PDF viewing
 - Multi-trip archive filtering and search
+
+### Release support docs
+
+- Google Play draft copy and screenshot guidance: [docs/GOOGLE_PLAY_DRAFT.md](docs/GOOGLE_PLAY_DRAFT.md)
+- Internal release-readiness notes: [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md)

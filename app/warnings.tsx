@@ -94,6 +94,10 @@ export default function WarningsScreen() {
               eyebrow={trip?.destination ?? 'Trip'}
               title={`${documentLabels[document.documentType]}${traveller ? ` • ${traveller.fullName}` : ''}`}
               subtitle={`${formatShortDate(document.expiryDate)} • ${info.relativeLabel}`}
+              onPress={() => {
+                setActiveTrip(document.tripId);
+                router.push({ pathname: '/vault', params: { editDocumentId: document.id } });
+              }}
               right={
                 <View style={styles.rowRight}>
                   <InfoChip label={info.badgeLabel} tone={info.tone} />

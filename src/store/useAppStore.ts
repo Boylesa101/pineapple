@@ -40,6 +40,7 @@ import {
 } from '@/utils/security';
 import { defaultAppExpiryPreferences } from '@/utils/documentExpiry';
 import { loadOnboardingComplete, persistOnboardingComplete } from '@/utils/onboarding';
+import { deriveOnboardingCompletionStatus } from '@/utils/onboardingState';
 import type {
   AppDataSnapshot,
   ConflictStatus,
@@ -90,6 +91,7 @@ const emptySnapshot: AppDataSnapshot = {
 type StoreState = {
   isBootstrapped: boolean;
   isBusy: boolean;
+  bootError: string | null;
   isUnlocked: boolean;
   hasCompletedOnboarding: boolean;
   privacyOverlayVisible: boolean;
@@ -148,12 +150,13 @@ function nextActiveTripId(state: StoreState, snapshot: AppDataSnapshot) {
 }
 
 async function syncNotificationState(snapshot: AppDataSnapshot) {
-  await rescheduleLocalNotifications(snapshot);
+  await rescheduleLocalNotifications(snapshot, { requestPermissions: false });
 }
 
 export const useAppStore = create<StoreState>((set, get) => ({
   isBootstrapped: false,
   isBusy: false,
+  bootError: null,
   isUnlocked: false,
   hasCompletedOnboarding: false,
   privacyOverlayVisible: false,
@@ -170,30 +173,42 @@ export const useAppStore = create<StoreState>((set, get) => ({
       return;
     }
 
-    set({ isBusy: true });
-    await ensureAppDirectories();
-    const [security, data, onboardingStatus] = await Promise.all([
-      loadSecurityConfig(),
-      loadSnapshot(),
-      loadOnboardingComplete(),
-    ]);
-    const hasCompletedOnboarding = onboardingStatus ?? (security.pinConfigured || data.trips.length > 0);
-    if (onboardingStatus === null && hasCompletedOnboarding) {
-      await persistOnboardingComplete(true);
+    set({ isBusy: true, bootError: null });
+    try {
+      await ensureAppDirectories();
+      const [security, data, onboardingStatus] = await Promise.all([
+        loadSecurityConfig(),
+        loadSnapshot(),
+        loadOnboardingComplete(),
+      ]);
+      const hasCompletedOnboarding = deriveOnboardingCompletionStatus(onboardingStatus, {
+        pinConfigured: security.pinConfigured,
+        tripCount: data.trips.length,
+      });
+      if (onboardingStatus === null && hasCompletedOnboarding) {
+        await persistOnboardingComplete(true);
+      }
+      set({
+        security,
+        data,
+        hasCompletedOnboarding,
+        activeTripId: data.trips[0]?.id ?? null,
+        isUnlocked: false,
+        isBootstrapped: true,
+        isBusy: false,
+        bootError: null,
+        lastInteractionAt: Date.now(),
+      });
+      setTimeout(() => {
+        syncNotificationState(data).catch(() => undefined);
+      }, 0);
+    } catch {
+      set({
+        isBusy: false,
+        isBootstrapped: false,
+        bootError: 'Pineapple could not finish loading local data. Try again in a moment.',
+      });
     }
-    set({
-      security,
-      data,
-      hasCompletedOnboarding,
-      activeTripId: data.trips[0]?.id ?? null,
-      isUnlocked: false,
-      isBootstrapped: true,
-      isBusy: false,
-      lastInteractionAt: Date.now(),
-    });
-    setTimeout(() => {
-      syncNotificationState(data).catch(() => undefined);
-    }, 0);
   },
   refreshData: async () => {
     const snapshot = await loadSnapshot();

@@ -54,14 +54,27 @@ export default function TripsScreen() {
   }
 
   async function pickCover() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Photos permission needed',
+          'Allow photo library access if you want to add a local cover image for this trip.'
+        );
+        return;
+      }
 
-    if (result.canceled || !result.assets[0]) return;
-    const localUri = await copyIntoAppStorage(result.assets[0].uri, 'trips', result.assets[0].mimeType);
-    setDraft((current) => ({ ...current, coverImageUri: localUri }));
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+      const localUri = await copyIntoAppStorage(result.assets[0].uri, 'trips', result.assets[0].mimeType);
+      setDraft((current) => ({ ...current, coverImageUri: localUri }));
+    } catch {
+      Alert.alert('Cover image unavailable', 'Pineapple could not import that image right now. Try a different photo.');
+    }
   }
 
   async function handleSave() {

@@ -37,7 +37,7 @@ const slides = [
     icon: 'mail-outline' as const,
     heading: 'Bring plans in from elsewhere',
     body:
-      'Import travel files from device storage and keep shared-trip packets ready for manual sync. Pineapple stays useful even without an account or cloud backend.',
+      'Import saved travel files from this device and keep shared-trip packets ready for manual sync. Pineapple does not connect to your inbox or depend on a cloud backend.',
   },
   {
     key: 'expiry-warnings',

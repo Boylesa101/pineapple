@@ -106,6 +106,7 @@ export default function HomeScreen() {
   return (
     <AppScreen scroll title={undefined} subtitle={undefined}>
       <DashboardHeader title="Your next trip" onSettings={() => router.push('/settings')} />
+      <Text style={styles.promise}>Your travel documents, tickets, and key trip info in one place.</Text>
 
       {!dashboardTrip ? (
         <AppCard>
@@ -293,6 +294,12 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   section: {
     gap: spacing.sm,
+  },
+  promise: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
   },
   coverImage: {
     width: '100%',

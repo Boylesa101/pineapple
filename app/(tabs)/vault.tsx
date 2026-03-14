@@ -164,10 +164,40 @@ export default function VaultScreen() {
 
   async function handleSourcePick(source: 'files' | 'photos') {
     if (!selectedTripId) return;
-    if (source === 'files') {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
-        copyToCacheDirectory: true,
+    try {
+      if (source === 'files') {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: ['application/pdf', 'image/*'],
+          copyToCacheDirectory: true,
+        });
+        if (result.canceled || !result.assets[0]) return;
+        const asset = result.assets[0];
+        const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
+        setDraft({
+          ...buildDocumentDraftDefaults({
+            tripId: selectedTripId,
+            localFileUri,
+            previewUri: asset.mimeType?.startsWith('image') ? localFileUri : null,
+            mimeType: asset.mimeType ?? null,
+          }),
+          expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
+        });
+        setEditorVisible(true);
+        return;
+      }
+
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Photos permission needed',
+          'Allow photo library access if you want Pineapple to import document images from your device.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
       });
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
@@ -176,32 +206,20 @@ export default function VaultScreen() {
         ...buildDocumentDraftDefaults({
           tripId: selectedTripId,
           localFileUri,
-          previewUri: asset.mimeType?.startsWith('image') ? localFileUri : null,
+          previewUri: localFileUri,
           mimeType: asset.mimeType ?? null,
         }),
         expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
       });
       setEditorVisible(true);
-      return;
+    } catch {
+      Alert.alert(
+        source === 'files' ? 'Import unavailable' : 'Photo import unavailable',
+        source === 'files'
+          ? 'Pineapple could not import that file. Try another PDF or image saved on this device.'
+          : 'Pineapple could not import that image right now. Try a different photo.'
+      );
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
-    const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
-    setDraft({
-      ...buildDocumentDraftDefaults({
-        tripId: selectedTripId,
-        localFileUri,
-        previewUri: localFileUri,
-        mimeType: asset.mimeType ?? null,
-      }),
-      expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
-    });
-    setEditorVisible(true);
   }
 
   async function handleSave() {
@@ -249,6 +267,17 @@ export default function VaultScreen() {
     unlockVault();
     setPinPromptVisible(false);
     setPin('');
+  }
+
+  function confirmDeleteDocument(documentId: string) {
+    Alert.alert('Delete document?', 'This removes the local file reference and reminder settings for this document.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => deleteRecord('documents', documentId),
+      },
+    ]);
   }
 
   return (
@@ -377,7 +406,7 @@ export default function VaultScreen() {
                     >
                       <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
                     </Pressable>
-                    <Pressable onPress={() => deleteRecord('documents', document.id)} style={styles.iconButton}>
+                    <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
                       <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
                     </Pressable>
                   </View>

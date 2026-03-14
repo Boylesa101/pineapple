@@ -30,7 +30,19 @@ export async function requestNotificationPermissions() {
   return requested.granted || requested.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
 }
 
-export async function rescheduleLocalNotifications(snapshot: AppDataSnapshot) {
+export async function hasNotificationPermissions() {
+  if (!isNativeNotificationsSupported()) {
+    return false;
+  }
+
+  const existing = await Notifications.getPermissionsAsync();
+  return existing.granted || existing.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+}
+
+export async function rescheduleLocalNotifications(
+  snapshot: AppDataSnapshot,
+  options: { requestPermissions?: boolean } = {}
+) {
   if (!isNativeNotificationsSupported()) {
     return 0;
   }
@@ -40,7 +52,7 @@ export async function rescheduleLocalNotifications(snapshot: AppDataSnapshot) {
     return 0;
   }
 
-  const hasPermissions = await requestNotificationPermissions();
+  const hasPermissions = options.requestPermissions ? await requestNotificationPermissions() : await hasNotificationPermissions();
   if (!hasPermissions) {
     return 0;
   }
