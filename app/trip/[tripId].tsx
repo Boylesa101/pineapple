@@ -37,6 +37,7 @@ import { daysLeft, daysUntil, formatDateTime, formatShortDate } from '@/utils/da
 import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { relationshipLabel, tripDateRange } from '@/utils/format';
 import { getMissingInfoPrompts, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
+import { toUserMessage } from '@/utils/userErrors';
 import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, validateTraveller } from '@/utils/validation';
 
 type ModalKind = 'traveller' | 'segment' | 'hotel' | 'emergency' | 'export' | 'invite' | null;
@@ -292,7 +293,7 @@ export default function TripDetailScreen() {
       await exportTripPdfFile(tripId, exportOptions);
       setModalKind(null);
     } catch (error) {
-      Alert.alert('Export failed', error instanceof Error ? error.message : 'Unable to export PDF.');
+      Alert.alert('Export failed', toUserMessage(error, 'Unable to export PDF right now.'));
     }
   }
 
@@ -301,7 +302,7 @@ export default function TripDetailScreen() {
       await exportSharedTripFile(tripId);
       Alert.alert('Shared trip exported', 'A local share file was created for manual import on another device.');
     } catch (error) {
-      Alert.alert('Share export failed', error instanceof Error ? error.message : 'Unable to export shared trip.');
+      Alert.alert('Share export failed', toUserMessage(error, 'Unable to export that shared trip right now.'));
     }
   }
 
@@ -323,7 +324,7 @@ export default function TripDetailScreen() {
         Alert.alert('Shared trip imported', 'Trip data was updated from the incoming share file.');
       }
     } catch (error) {
-      Alert.alert('Share import failed', error instanceof Error ? error.message : 'Unable to import shared trip.');
+      Alert.alert('Share import failed', toUserMessage(error, 'Unable to import that shared trip right now.'));
     }
   }
 

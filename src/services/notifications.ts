@@ -6,6 +6,9 @@ import { createReminderContent } from '@/services/notificationPlanner';
 type NotificationsModule = typeof import('expo-notifications');
 
 let notificationsModulePromise: Promise<NotificationsModule | null> | null = null;
+let pendingRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingSnapshot: AppDataSnapshot | null = null;
+let pendingRequestPermissions = false;
 
 function isNativeNotificationsSupported() {
   return Platform.OS === 'android' || Platform.OS === 'ios';
@@ -96,19 +99,47 @@ export async function rescheduleLocalNotifications(
 
   const content = createReminderContent(snapshot);
 
-  for (const reminder of content) {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: reminder.title,
-        body: reminder.body,
-        ...(reminder.silent ? {} : { sound: 'default' }),
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: reminder.date,
-      },
-    });
-  }
+  await Promise.all(
+    content.map((reminder) =>
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: reminder.title,
+          body: reminder.body,
+          ...(reminder.silent ? {} : { sound: 'default' }),
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: reminder.date,
+        },
+      })
+    )
+  );
 
   return content.length;
+}
+
+export function queueNotificationRefresh(
+  snapshot: AppDataSnapshot,
+  options: { requestPermissions?: boolean; delayMs?: number } = {}
+) {
+  pendingSnapshot = snapshot;
+  pendingRequestPermissions = pendingRequestPermissions || Boolean(options.requestPermissions);
+
+  if (pendingRefreshTimer) {
+    clearTimeout(pendingRefreshTimer);
+  }
+
+  pendingRefreshTimer = setTimeout(() => {
+    const nextSnapshot = pendingSnapshot;
+    const requestPermissions = pendingRequestPermissions;
+    pendingSnapshot = null;
+    pendingRequestPermissions = false;
+    pendingRefreshTimer = null;
+
+    if (!nextSnapshot) {
+      return;
+    }
+
+    rescheduleLocalNotifications(nextSnapshot, { requestPermissions }).catch(() => undefined);
+  }, options.delayMs ?? 350);
 }

@@ -26,7 +26,7 @@ import {
   upsertTripParticipant,
 } from '@/db/repositories';
 import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup';
-import { rescheduleLocalNotifications } from '@/services/notifications';
+import { queueNotificationRefresh } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
 import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, resolveConflict } from '@/services/sync';
 import {
@@ -150,10 +150,6 @@ function nextActiveTripId(state: StoreState, snapshot: AppDataSnapshot) {
   return snapshot.trips[0]?.id ?? null;
 }
 
-async function syncNotificationState(snapshot: AppDataSnapshot) {
-  await rescheduleLocalNotifications(snapshot, { requestPermissions: false });
-}
-
 export const useAppStore = create<StoreState>((set, get) => ({
   isBootstrapped: false,
   isBusy: false,
@@ -211,9 +207,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
         bootError: null,
         lastInteractionAt: Date.now(),
       });
-      setTimeout(() => {
-        syncNotificationState(data).catch(() => undefined);
-      }, 0);
+      queueNotificationRefresh(data, { requestPermissions: false, delayMs: 150 });
     } catch {
       set({
         isBusy: false,
@@ -228,9 +222,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
       data: snapshot,
       activeTripId: nextActiveTripId(state, snapshot),
     }));
-    setTimeout(() => {
-      syncNotificationState(snapshot).catch(() => undefined);
-    }, 0);
+    queueNotificationRefresh(snapshot, { requestPermissions: false });
   },
   completeOnboarding: async () => {
     await persistOnboardingComplete(true);

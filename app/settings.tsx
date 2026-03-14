@@ -22,6 +22,7 @@ import { PINEAPPLE_BACKUP_EXTENSION, isBackupFileName } from '@/services/backup'
 import { useAppStore } from '@/store/useAppStore';
 import type { ConflictStatus, ExpiryReminderLeadTime, PrivacyMaskingMode } from '@/types/models';
 import { canUseBiometrics } from '@/utils/security';
+import { toUserMessage } from '@/utils/userErrors';
 
 type BackupAction = 'export' | 'import';
 const expiryScheduleOptions: Array<{ label: string; value: ExpiryReminderLeadTime }> = [
@@ -156,7 +157,7 @@ export default function SettingsScreen() {
     } catch (error) {
       Alert.alert(
         'Backup failed',
-        error instanceof Error && error.message ? error.message : 'Pineapple could not complete that backup action.'
+        toUserMessage(error, 'Pineapple could not complete that backup action.')
       );
     } finally {
       setBusy(false);
@@ -184,9 +185,7 @@ export default function SettingsScreen() {
     } catch (error) {
       Alert.alert(
         'Import failed',
-        error instanceof Error && error.message
-          ? error.message
-          : 'Pineapple could not import that shared trip file.'
+        toUserMessage(error, 'Pineapple could not import that shared trip file.')
       );
     }
   }
