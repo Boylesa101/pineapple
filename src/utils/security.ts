@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -5,6 +6,10 @@ import * as SecureStore from 'expo-secure-store';
 import type { PinLength, StoredSecurityConfig } from '@/types/models';
 
 const SECURITY_KEY = 'pineapple.security';
+
+function canUseWebStorage() {
+  return Platform.OS === 'web' && typeof window !== 'undefined' && 'localStorage' in window;
+}
 
 export const defaultSecurityConfig: StoredSecurityConfig = {
   pinConfigured: false,
@@ -39,6 +44,19 @@ async function hashPinV2(pin: string, salt: string) {
 }
 
 export async function loadSecurityConfig() {
+  if (canUseWebStorage()) {
+    const raw = window.localStorage.getItem(SECURITY_KEY);
+    if (!raw) {
+      return defaultSecurityConfig;
+    }
+
+    try {
+      return { ...defaultSecurityConfig, ...(JSON.parse(raw) as StoredSecurityConfig) };
+    } catch {
+      return defaultSecurityConfig;
+    }
+  }
+
   const raw = await SecureStore.getItemAsync(SECURITY_KEY);
   if (!raw) {
     return defaultSecurityConfig;
@@ -52,6 +70,11 @@ export async function loadSecurityConfig() {
 }
 
 export async function persistSecurityConfig(config: StoredSecurityConfig) {
+  if (canUseWebStorage()) {
+    window.localStorage.setItem(SECURITY_KEY, JSON.stringify(config));
+    return;
+  }
+
   await SecureStore.setItemAsync(SECURITY_KEY, JSON.stringify(config));
 }
 

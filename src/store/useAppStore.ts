@@ -28,7 +28,6 @@ import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup
 import { rescheduleLocalNotifications } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
 import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, resolveConflict } from '@/services/sync';
-import { ensureAppDirectories } from '@/utils/fileStorage';
 import {
   authenticateBiometrics,
   canUseBiometrics,
@@ -175,7 +174,6 @@ export const useAppStore = create<StoreState>((set, get) => ({
 
     set({ isBusy: true, bootError: null });
     try {
-      await ensureAppDirectories();
       const [security, data, onboardingStatus] = await Promise.all([
         loadSecurityConfig(),
         loadSnapshot(),

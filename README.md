@@ -32,6 +32,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Expo web/PWA companion mode for trip overview, packing, itinerary, emergency info, and printable summaries
 - Five-screen first-launch onboarding with PIN setup, first-trip creation, and a setup checklist
 - Retryable startup recovery if local bootstrap fails unexpectedly
+- Lighter startup path with lazy file-directory creation for faster cold launch
 - Development-only demo data reset for QA
 
 ### Stack
@@ -156,6 +157,7 @@ npx expo export --platform web
 - Photo library access is requested only when the user chooses to import a local image for a trip or document
 - File picker access is used only for user-selected local files such as PDFs, images, shared-trip packets, and encrypted backups
 - Pineapple does not connect to a live inbox; any “email import” workflow is limited to local files the user chooses on-device
+- The web companion uses browser-safe local storage fallbacks for onboarding and security state instead of relying on native secure storage APIs
 
 ### Brand direction
 

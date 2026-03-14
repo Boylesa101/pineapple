@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.3 - 2026-03-14
+
+- Fixed startup blocking by removing app-managed directory creation from the boot path
+- Added platform-safe local storage fallbacks so the web companion no longer depends on native-only secure/file storage behavior during startup
+- Kept file-directory creation lazy so Android import, export, and backup flows still work without slowing cold launch
+
 ## 1.4.2 - 2026-03-14
 
 - Fixed orphaned local file cleanup when deleting vault documents, deleting trips, replacing trip cover images, clearing local data, and restoring backups
