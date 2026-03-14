@@ -2,6 +2,7 @@ export const colors = {
   pineappleGold: '#F4B400',
   leafGreen: '#4E9F6D',
   oceanBlue: '#2BA6CB',
+  authBlue: '#1EAAF0',
   sunsetCoral: '#FF7A59',
   sand: '#F7E7CE',
   warmSand: '#FFF6EA',

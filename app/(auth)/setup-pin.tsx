@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PineappleMark } from '@/brand/PineappleMark';
 import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { ChoiceChips } from '@/components/ChoiceChips';
+import { FingerprintIcon } from '@/components/FingerprintIcon';
 import { PinPad } from '@/components/PinPad';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
@@ -56,7 +57,7 @@ export default function SetupPinScreen() {
   }, [biometricsAvailable, biometricsPreferred, confirmPin, createPin, pin, pinLength, step, updateSecurityPreferences]);
 
   return (
-    <AppScreen scroll={false}>
+    <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor>
       <View style={styles.hero}>
         <PineappleMark size={96} />
         <Text style={styles.title}>Secure your holiday details</Text>
@@ -79,8 +80,15 @@ export default function SetupPinScreen() {
       />
       {biometricsAvailable ? (
         <View style={styles.preferenceCard}>
-          <Text style={styles.preferenceTitle}>Biometric unlock</Text>
-          <Text style={styles.preferenceSubtitle}>Use fingerprint or face unlock after your PIN is created.</Text>
+          <View style={styles.preferenceHeader}>
+            <View style={styles.fingerprintWrap}>
+              <FingerprintIcon size={34} color={colors.authBlue} />
+            </View>
+            <View style={styles.preferenceCopy}>
+              <Text style={styles.preferenceTitle}>Biometric unlock</Text>
+              <Text style={styles.preferenceSubtitle}>Use fingerprint or face unlock after your PIN is created.</Text>
+            </View>
+          </View>
           <ChoiceChips<'on' | 'off'>
             value={biometricsPreferred ? 'on' : 'off'}
             onChange={(value) => setBiometricsPreferred(value === 'on')}
@@ -98,16 +106,16 @@ export default function SetupPinScreen() {
         </Text>
         <PinPad value={step === 'create' ? pin : confirmPin} pinLength={pinLength} onChange={step === 'create' ? setPin : setConfirmPin} />
       </View>
-      <AppButton
-        label={step === 'create' ? 'Reset entry' : 'Start again'}
-        tone="secondary"
+      <Pressable
         onPress={() => {
           setPin('');
           setConfirmPin('');
           setStep('create');
         }}
-        loading={saving}
-      />
+        style={styles.resetButton}
+      >
+        <Text style={styles.resetButtonText}>{step === 'create' ? 'Reset entry' : 'Start again'}</Text>
+      </Pressable>
     </AppScreen>
   );
 }
@@ -120,55 +128,84 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   title: {
-    color: colors.nightNavy,
+    color: colors.white,
     fontFamily: 'Poppins_700Bold',
     fontSize: 28,
     textAlign: 'center',
   },
   subtitle: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.88)',
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
     lineHeight: 21,
     textAlign: 'center',
   },
   pinCard: {
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.28)',
     padding: spacing.lg,
     gap: spacing.md,
   },
   preferenceCard: {
-    backgroundColor: '#FFF8EE',
+    backgroundColor: 'rgba(255,255,255,0.14)',
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.28)',
     padding: spacing.lg,
     gap: spacing.sm,
   },
+  preferenceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  fingerprintWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preferenceCopy: {
+    flex: 1,
+    gap: 2,
+  },
   preferenceTitle: {
-    color: colors.nightNavy,
+    color: colors.white,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 16,
   },
   preferenceSubtitle: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.86)',
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     lineHeight: 20,
   },
   pinTitle: {
-    color: colors.nightNavy,
+    color: colors.white,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 22,
     textAlign: 'center',
   },
   pinSubtitle: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.86)',
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     textAlign: 'center',
+  },
+  resetButton: {
+    alignSelf: 'center',
+    minHeight: 48,
+    borderRadius: 24,
+    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
+  },
+  resetButtonText: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
   },
 });

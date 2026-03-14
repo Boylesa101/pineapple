@@ -78,6 +78,15 @@ export async function persistSecurityConfig(config: StoredSecurityConfig) {
   await SecureStore.setItemAsync(SECURITY_KEY, JSON.stringify(config));
 }
 
+export async function clearSecurityConfig() {
+  if (canUseWebStorage()) {
+    window.localStorage.removeItem(SECURITY_KEY);
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(SECURITY_KEY);
+}
+
 export async function createPinConfig(pin: string, pinLength: PinLength) {
   const salt = bytesToHex(Crypto.getRandomBytes(16));
   const hash = await hashPinV2(pin, salt);

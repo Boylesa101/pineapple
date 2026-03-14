@@ -1,4 +1,5 @@
 import { AppStateStatus } from 'react-native';
+import Constants from 'expo-constants';
 
 import { create } from 'zustand';
 
@@ -31,6 +32,7 @@ import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, 
 import {
   authenticateBiometrics,
   canUseBiometrics,
+  clearSecurityConfig,
   createPinConfig,
   defaultSecurityConfig,
   loadSecurityConfig,
@@ -174,11 +176,23 @@ export const useAppStore = create<StoreState>((set, get) => ({
 
     set({ isBusy: true, bootError: null });
     try {
-      const [security, data, onboardingStatus] = await Promise.all([
+      const [loadedSecurity, data, onboardingStatus] = await Promise.all([
         loadSecurityConfig(),
         loadSnapshot(),
         loadOnboardingComplete(),
       ]);
+      let security = loadedSecurity;
+      const shouldResetStaleExpoGoPin =
+        Boolean(Constants.expoGoConfig) &&
+        onboardingStatus === null &&
+        data.trips.length === 0 &&
+        loadedSecurity.pinConfigured;
+
+      if (shouldResetStaleExpoGoPin) {
+        await clearSecurityConfig();
+        security = defaultSecurityConfig;
+      }
+
       const hasCompletedOnboarding = deriveOnboardingCompletionStatus(onboardingStatus, {
         pinConfigured: security.pinConfigured,
         tripCount: data.trips.length,

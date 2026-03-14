@@ -36,7 +36,7 @@ export function PinPad({ value, pinLength, onChange }: Props) {
         {digits.map((digit, index) => (
           <Pressable key={`${digit}-${index}`} onPress={() => handlePress(digit)} style={styles.key}>
             {digit === 'delete' ? (
-              <MaterialIcons name="backspace" size={24} color={colors.nightNavy} />
+              <MaterialIcons name="backspace" size={24} color={colors.authBlue} />
             ) : (
               <Text style={styles.keyLabel}>{digit}</Text>
             )}
@@ -61,12 +61,12 @@ const styles = StyleSheet.create({
     width: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
+    borderColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(255,255,255,0.38)',
   },
   dotFilled: {
-    backgroundColor: colors.nightNavy,
-    borderColor: colors.nightNavy,
+    backgroundColor: colors.white,
+    borderColor: colors.white,
   },
   grid: {
     flexDirection: 'row',
@@ -75,17 +75,15 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   key: {
-    width: 88,
-    height: 64,
-    borderRadius: radii.lg,
+    width: 84,
+    height: 84,
+    borderRadius: radii.pill,
     backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   keyLabel: {
-    color: colors.nightNavy,
+    color: colors.authBlue,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 24,
   },

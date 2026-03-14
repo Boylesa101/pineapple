@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PineappleMark } from '@/brand/PineappleMark';
-import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
+import { FingerprintIcon } from '@/components/FingerprintIcon';
 import { PinPad } from '@/components/PinPad';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
@@ -34,7 +34,7 @@ export default function LockScreen() {
   }, [blockedSeconds, pin, security.pinLength, unlockWithPin]);
 
   return (
-    <AppScreen scroll={false}>
+    <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor>
       <View style={styles.hero}>
         <PineappleMark size={92} />
         <Text style={styles.title}>Welcome back</Text>
@@ -46,12 +46,12 @@ export default function LockScreen() {
         <PinPad value={pin} pinLength={security.pinLength} onChange={setPin} />
       </View>
       {security.biometricEnabled ? (
-        <AppButton
-          label="Use biometrics"
-          tone="secondary"
-          onPress={() => unlockWithBiometrics('app')}
-          loading={submitting}
-        />
+        <Pressable onPress={() => unlockWithBiometrics('app')} style={styles.biometricButton} disabled={submitting}>
+          <View style={styles.biometricIconWrap}>
+            <FingerprintIcon size={32} color={colors.authBlue} />
+          </View>
+          <Text style={styles.biometricButtonText}>Use biometrics</Text>
+        </Pressable>
       ) : null}
     </AppScreen>
   );
@@ -64,36 +64,54 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxl,
   },
   title: {
-    color: colors.nightNavy,
+    color: colors.white,
     fontFamily: 'Poppins_700Bold',
     fontSize: 28,
     textAlign: 'center',
   },
   subtitle: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.88)',
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
     lineHeight: 21,
     textAlign: 'center',
   },
   pinCard: {
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.28)',
     padding: spacing.lg,
     gap: spacing.md,
   },
   pinTitle: {
-    color: colors.nightNavy,
+    color: colors.white,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 22,
     textAlign: 'center',
   },
   blockedText: {
-    color: colors.danger,
-    fontFamily: 'Inter_500Medium',
+    color: '#FFF1A8',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
     textAlign: 'center',
+  },
+  biometricButton: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  biometricIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  biometricButtonText: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
   },
 });

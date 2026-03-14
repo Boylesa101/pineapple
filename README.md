@@ -6,6 +6,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 
 - PIN setup and lock flow with 4-digit or 6-digit PIN support
 - Optional biometric unlock when the device supports it
+- Expo Go first-run testing now clears stale PIN state when no onboarding or trip data exists yet
 - Auto-lock after inactivity and best-effort privacy overlay for the app switcher
 - Bottom-tab shell for Home, Trips, Packing, Itinerary, and Vault
 - Trip CRUD with optional local cover image

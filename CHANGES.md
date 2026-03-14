@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.6 - 2026-03-14
+
+- Reset stale Expo Go first-run PIN state when there is no onboarding flag and no trip data, so fresh testing no longer gets blocked by an old PIN
+- Restyled the setup-pin and lock screens with the requested blue background, round white keypad buttons, and blue keypad text
+- Added the provided fingerprint SVG as the biometric icon inside white circular auth controls
+
 ## 1.4.5 - 2026-03-14
 
 - Replaced the generated pineapple artwork with the provided sunglasses icon pack across launcher, splash, favicon, and adaptive icon assets

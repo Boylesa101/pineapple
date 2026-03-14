@@ -9,9 +9,19 @@ type Props = PropsWithChildren<{
   subtitle?: string;
   scroll?: boolean;
   footer?: ReactNode;
+  backgroundColor?: string;
+  hideBackgroundDecor?: boolean;
 }>;
 
-export function AppScreen({ title, subtitle, scroll = true, children, footer }: Props) {
+export function AppScreen({
+  title,
+  subtitle,
+  scroll = true,
+  children,
+  footer,
+  backgroundColor,
+  hideBackgroundDecor = false,
+}: Props) {
   const content = (
     <View style={styles.content}>
       {(title || subtitle) && (
@@ -25,9 +35,9 @@ export function AppScreen({ title, subtitle, scroll = true, children, footer }: 
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.backgroundBlobOne} />
-      <View style={styles.backgroundBlobTwo} />
+    <SafeAreaView style={[styles.safeArea, backgroundColor ? { backgroundColor } : null]} edges={['top']}>
+      {!hideBackgroundDecor ? <View style={styles.backgroundBlobOne} /> : null}
+      {!hideBackgroundDecor ? <View style={styles.backgroundBlobTwo} /> : null}
       {scroll ? <ScrollView contentContainerStyle={styles.scroll}>{content}</ScrollView> : content}
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </SafeAreaView>
