@@ -169,6 +169,7 @@ npx expo export --platform web
 - Poppins for headings
 - Inter for body copy
 - Minimal geometric pineapple mark for icon, splash, and lock flows
+- Supplied sunglasses pineapple artwork for launcher, splash, and in-app brand mark assets
 
 ### Current phase 3 additions
 

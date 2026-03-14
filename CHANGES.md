@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.5 - 2026-03-14
+
+- Replaced the generated pineapple artwork with the provided sunglasses icon pack across launcher, splash, favicon, and adaptive icon assets
+- Updated the in-app Pineapple brand mark to render the supplied icon/mark artwork instead of the old SVG drawing
+- Updated the brand asset generator so future asset rebuilds continue using the provided logo files
+
 ## 1.4.4 - 2026-03-14
 
 - Fixed an Expo Go Android crash by lazy-loading `expo-notifications` only in supported runtimes instead of importing it during app boot
