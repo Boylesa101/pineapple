@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.4 - 2026-03-14
+
+- Fixed an Expo Go Android crash by lazy-loading `expo-notifications` only in supported runtimes instead of importing it during app boot
+- Added clearer Settings messaging when reminders are unavailable in Expo Go on Android, while keeping notifications available in development and release builds
+- Verified web and Android exports after the startup/runtime compatibility fix
+
 ## 1.4.3 - 2026-03-14
 
 - Fixed startup blocking by removing app-managed directory creation from the boot path

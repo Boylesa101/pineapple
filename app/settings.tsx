@@ -13,7 +13,11 @@ import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { colors, spacing } from '@/constants/theme';
-import { hasNotificationPermissions, requestNotificationPermissions } from '@/services/notifications';
+import {
+  hasNotificationPermissions,
+  isNotificationsRuntimeSupported,
+  requestNotificationPermissions,
+} from '@/services/notifications';
 import { PINEAPPLE_BACKUP_EXTENSION, isBackupFileName } from '@/services/backup';
 import { useAppStore } from '@/store/useAppStore';
 import type { ConflictStatus, ExpiryReminderLeadTime, PrivacyMaskingMode } from '@/types/models';
@@ -207,6 +211,14 @@ export default function SettingsScreen() {
   }
 
   async function toggleNotificationsEnabled() {
+    if (!isNotificationsRuntimeSupported()) {
+      Alert.alert(
+        'Notifications unavailable here',
+        'Local reminders are not available in Expo Go on Android. Use a development build or release build to test notifications.'
+      );
+      return;
+    }
+
     if (data.appPreferences.notificationsEnabled) {
       await saveAppPreferences({ notificationsEnabled: false });
       return;
@@ -291,6 +303,11 @@ export default function SettingsScreen() {
         {data.appPreferences.notificationsEnabled && notificationAccess === false ? (
           <Text style={styles.meta}>
             Notifications are currently disabled at device level, so Pineapple will keep warning states in-app but cannot deliver local alerts until permission is restored.
+          </Text>
+        ) : null}
+        {!isNotificationsRuntimeSupported() ? (
+          <Text style={styles.meta}>
+            This runtime does not support Pineapple reminders. Expo Go on Android can open the app, but notification testing needs a development build or release build.
           </Text>
         ) : null}
       </AppCard>

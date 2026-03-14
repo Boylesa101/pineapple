@@ -158,6 +158,7 @@ npx expo export --platform web
 - File picker access is used only for user-selected local files such as PDFs, images, shared-trip packets, and encrypted backups
 - Pineapple does not connect to a live inbox; any “email import” workflow is limited to local files the user chooses on-device
 - The web companion uses browser-safe local storage fallbacks for onboarding and security state instead of relying on native secure storage APIs
+- Expo Go on Android can run Pineapple for general testing, but reminder notifications themselves still require a development build or release build
 
 ### Brand direction
 

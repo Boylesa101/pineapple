@@ -1,23 +1,58 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import type { AppDataSnapshot } from '@/types/models';
 import { createReminderContent } from '@/services/notificationPlanner';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
+
+let notificationsModulePromise: Promise<NotificationsModule | null> | null = null;
 
 function isNativeNotificationsSupported() {
   return Platform.OS === 'android' || Platform.OS === 'ios';
 }
 
-export async function requestNotificationPermissions() {
+export function isNotificationsRuntimeSupported() {
   if (!isNativeNotificationsSupported()) {
+    return false;
+  }
+
+  // Expo Go on Android no longer supports the native notifications runtime that
+  // expo-notifications expects, so importing the module there can crash boot.
+  if (Platform.OS === 'android' && Boolean(Constants.expoGoConfig)) {
+    return false;
+  }
+
+  return true;
+}
+
+async function loadNotificationsModule() {
+  if (!isNotificationsRuntimeSupported()) {
+    return null;
+  }
+
+  if (!notificationsModulePromise) {
+    notificationsModulePromise = import('expo-notifications')
+      .then((Notifications) => {
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+            shouldShowBanner: true,
+            shouldShowList: true,
+          }),
+        });
+
+        return Notifications;
+      })
+      .catch(() => null);
+  }
+
+  return notificationsModulePromise;
+}
+
+export async function requestNotificationPermissions() {
+  const Notifications = await loadNotificationsModule();
+  if (!Notifications) {
     return false;
   }
 
@@ -31,7 +66,8 @@ export async function requestNotificationPermissions() {
 }
 
 export async function hasNotificationPermissions() {
-  if (!isNativeNotificationsSupported()) {
+  const Notifications = await loadNotificationsModule();
+  if (!Notifications) {
     return false;
   }
 
@@ -43,7 +79,8 @@ export async function rescheduleLocalNotifications(
   snapshot: AppDataSnapshot,
   options: { requestPermissions?: boolean } = {}
 ) {
-  if (!isNativeNotificationsSupported()) {
+  const Notifications = await loadNotificationsModule();
+  if (!Notifications) {
     return 0;
   }
 
