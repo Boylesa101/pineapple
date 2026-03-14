@@ -60,7 +60,7 @@ export default function SetupPinScreen() {
     <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor>
       <View style={styles.hero}>
         <PineappleMark size={96} />
-        <Text style={styles.title}>Secure your holiday details</Text>
+        <Text style={styles.title}>Let&apos;s get set up</Text>
         <Text style={styles.subtitle}>
           Pineapple keeps everything on-device first. Create a PIN to protect documents, plans, and emergency info.
         </Text>
@@ -124,8 +124,8 @@ const styles = StyleSheet.create({
   hero: {
     alignItems: 'center',
     gap: spacing.sm,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xs,
   },
   title: {
     color: colors.white,
@@ -141,12 +141,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   pinCard: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    padding: spacing.lg,
-    gap: spacing.md,
+    paddingTop: spacing.xs,
+    gap: spacing.sm,
   },
   preferenceCard: {
     backgroundColor: 'rgba(255,255,255,0.14)',
@@ -187,13 +183,13 @@ const styles = StyleSheet.create({
   pinTitle: {
     color: colors.white,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 22,
+    fontSize: 20,
     textAlign: 'center',
   },
   pinSubtitle: {
     color: 'rgba(255,255,255,0.86)',
     fontFamily: 'Inter_400Regular',
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
   },
   resetButton: {

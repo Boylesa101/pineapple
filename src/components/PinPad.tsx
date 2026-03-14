@@ -49,7 +49,7 @@ export function PinPad({ value, pinLength, onChange }: Props) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    gap: spacing.lg,
+    gap: spacing.md,
   },
   dotsRow: {
     flexDirection: 'row',
@@ -72,11 +72,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   key: {
-    width: 84,
-    height: 84,
+    width: 74,
+    height: 74,
     borderRadius: radii.pill,
     backgroundColor: colors.white,
     justifyContent: 'center',
@@ -85,6 +85,6 @@ const styles = StyleSheet.create({
   keyLabel: {
     color: colors.authBlue,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 24,
+    fontSize: 22,
   },
 });

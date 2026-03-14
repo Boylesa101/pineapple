@@ -38,7 +38,6 @@ export default function LockScreen() {
       <View style={styles.hero}>
         <PineappleMark size={92} />
         <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.subtitle}>Unlock your trips, documents, and quick-access travel mode.</Text>
       </View>
       <View style={styles.pinCard}>
         <Text style={styles.pinTitle}>Enter your PIN</Text>
@@ -61,7 +60,7 @@ const styles = StyleSheet.create({
   hero: {
     alignItems: 'center',
     gap: spacing.sm,
-    paddingTop: spacing.xxl,
+    paddingTop: spacing.xl,
   },
   title: {
     color: colors.white,
@@ -69,25 +68,14 @@ const styles = StyleSheet.create({
     fontSize: 28,
     textAlign: 'center',
   },
-  subtitle: {
-    color: 'rgba(255,255,255,0.88)',
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    lineHeight: 21,
-    textAlign: 'center',
-  },
   pinCard: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    padding: spacing.lg,
-    gap: spacing.md,
+    paddingTop: spacing.xs,
+    gap: spacing.sm,
   },
   pinTitle: {
     color: colors.white,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 22,
+    fontSize: 20,
     textAlign: 'center',
   },
   blockedText: {
@@ -99,12 +87,13 @@ const styles = StyleSheet.create({
   biometricButton: {
     alignSelf: 'center',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   biometricIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
