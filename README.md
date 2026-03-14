@@ -12,6 +12,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
+- Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
 - Reusable document expiry status system for passports, visas, GHIC / EHIC, travel insurance, driving licences, ID cards, and custom docs with expiry dates
@@ -135,10 +136,12 @@ npx expo export --platform web
 - Restore validates the backup structure, schema version, and encryption envelope before decrypting
 - Restore currently replaces the existing local database after an explicit confirmation step; Pineapple does not silently merge or overwrite data
 - Security-sensitive unlock material such as the PIN hash itself is not bundled into backups
+- Deleting trips, deleting documents, and replacing current local data during restore now clean up superseded managed files where possible
 
 ### Document expiry warnings
 
 - Pineapple surfaces expiry warnings for passports, visas, GHIC / EHIC cards, travel insurance documents, driving licences, ID cards, and custom documents that have an expiry date saved
+- Documents can be saved with or without an attached local file, so expiry tracking still works when a scan or import is not available yet
 - Expiry thresholds are handled locally with reusable buckets for expired, within 1 day, within 7 days, within 14 days, within 30 days, within 90 days, and within 180 days
 - Passports get a stronger six-month warning because many destinations require at least six months of remaining validity
 - Missing expiry dates are prompted for document types that usually need them, but they are not treated as expired

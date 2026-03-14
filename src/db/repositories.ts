@@ -7,6 +7,7 @@ import {
   normalizeDocumentRecord,
   serializeExpiryReminderSchedule,
 } from '@/utils/documentExpiry';
+import { deleteLocalFile } from '@/utils/fileStorage';
 import type {
   AppDataSnapshot,
   AppPreferences,
@@ -28,6 +29,34 @@ import type {
 
 function now() {
   return new Date().toISOString();
+}
+
+async function cleanupDocumentFiles(document: { localFileUri: string; previewUri: string | null } | null | undefined) {
+  if (!document) {
+    return;
+  }
+
+  const uris = new Set([document.localFileUri, document.previewUri].filter((value): value is string => Boolean(value)));
+  for (const uri of uris) {
+    await deleteLocalFile(uri);
+  }
+}
+
+async function cleanupTripFiles(tripId: string) {
+  const db = await getDatabase();
+  const trip = await db.getFirstAsync<{ coverImageUri: string | null }>('SELECT coverImageUri FROM trips WHERE id = ?', tripId);
+  const documents = await db.getAllAsync<{ localFileUri: string; previewUri: string | null }>(
+    'SELECT localFileUri, previewUri FROM documents WHERE tripId = ?',
+    tripId
+  );
+
+  if (trip?.coverImageUri) {
+    await deleteLocalFile(trip.coverImageUri);
+  }
+
+  for (const document of documents) {
+    await cleanupDocumentFiles(document);
+  }
 }
 
 function toBool(value: number | boolean | null | undefined) {
@@ -158,6 +187,9 @@ export async function upsertTrip(input: TripDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('trip');
+  const existing = input.id
+    ? await db.getFirstAsync<{ coverImageUri: string | null }>('SELECT coverImageUri FROM trips WHERE id = ?', input.id)
+    : null;
 
   await db.runAsync(
     `INSERT INTO trips (id, name, destination, startDate, endDate, coverImageUri, notes, status, createdAt, updatedAt)
@@ -182,6 +214,10 @@ export async function upsertTrip(input: TripDraft) {
     timestamp,
     timestamp
   );
+
+  if (existing?.coverImageUri && existing.coverImageUri !== input.coverImageUri) {
+    await deleteLocalFile(existing.coverImageUri);
+  }
 
   await db.runAsync(
     `INSERT OR IGNORE INTO shared_trip_states (
@@ -250,6 +286,12 @@ export async function upsertDocument(input: DocumentDraft) {
   const timestamp = now();
   const id = input.id ?? createId('document');
   const normalized = normalizeDocumentRecord(input as any);
+  const existing = input.id
+    ? await db.getFirstAsync<{ localFileUri: string; previewUri: string | null }>(
+        'SELECT localFileUri, previewUri FROM documents WHERE id = ?',
+        input.id
+      )
+    : null;
 
   await db.runAsync(
     `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, expiryReminderEnabled, expiryReminderSchedule, notes, localFileUri, previewUri, mimeType, sensitive, createdAt, updatedAt)
@@ -288,6 +330,18 @@ export async function upsertDocument(input: DocumentDraft) {
     timestamp,
     timestamp
   );
+
+  if (
+    existing &&
+    (existing.localFileUri !== normalized.localFileUri || existing.previewUri !== normalized.previewUri)
+  ) {
+    const nextUris = new Set([normalized.localFileUri, normalized.previewUri].filter((value): value is string => Boolean(value)));
+    for (const uri of [existing.localFileUri, existing.previewUri].filter((value): value is string => Boolean(value))) {
+      if (!nextUris.has(uri)) {
+        await deleteLocalFile(uri);
+      }
+    }
+  }
 
   return id;
 }
@@ -662,11 +716,38 @@ export async function upsertSyncConflict(input: SyncConflictDraft) {
 
 export async function deleteById(table: string, id: string) {
   const db = await getDatabase();
+  if (table === 'documents') {
+    const document = await db.getFirstAsync<{ localFileUri: string; previewUri: string | null }>(
+      'SELECT localFileUri, previewUri FROM documents WHERE id = ?',
+      id
+    );
+    await cleanupDocumentFiles(document);
+  }
+
+  if (table === 'trips') {
+    await cleanupTripFiles(id);
+  }
+
   await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, id);
 }
 
 export async function clearAllData() {
   const db = await getDatabase();
+  const [trips, documents] = await Promise.all([
+    db.getAllAsync<{ coverImageUri: string | null }>('SELECT coverImageUri FROM trips'),
+    db.getAllAsync<{ localFileUri: string; previewUri: string | null }>('SELECT localFileUri, previewUri FROM documents'),
+  ]);
+
+  for (const trip of trips) {
+    if (trip.coverImageUri) {
+      await deleteLocalFile(trip.coverImageUri);
+    }
+  }
+
+  for (const document of documents) {
+    await cleanupDocumentFiles(document);
+  }
+
   await db.execAsync(`
     DELETE FROM sync_conflicts;
     DELETE FROM trip_invites;

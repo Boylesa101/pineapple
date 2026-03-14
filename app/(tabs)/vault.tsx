@@ -30,6 +30,7 @@ import {
   getDocumentExpiryInfo,
   normalizeExpiryReminderSchedule,
 } from '@/utils/documentExpiry';
+import { findPotentialDocumentDuplicate } from '@/utils/documentDuplicates';
 import { copyIntoAppStorage } from '@/utils/fileStorage';
 import { maskSensitive } from '@/utils/format';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
@@ -222,6 +223,34 @@ export default function VaultScreen() {
     }
   }
 
+  function openManualDocument() {
+    if (!selectedTripId) return;
+
+    setDraft({
+      ...buildDocumentDraftDefaults({
+        tripId: selectedTripId,
+        localFileUri: '',
+        previewUri: null,
+        mimeType: null,
+      }),
+      expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
+    });
+    setEditorVisible(true);
+  }
+
+  async function confirmDuplicateSave() {
+    return new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Possible duplicate document',
+        'Pineapple found another document with the same type and matching holder or file details. Save this anyway?',
+        [
+          { text: 'Go back', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Save anyway', style: 'default', onPress: () => resolve(true) },
+        ]
+      );
+    });
+  }
+
   async function handleSave() {
     if (!draft) return;
     const errors = validateDocument(draft);
@@ -250,6 +279,15 @@ export default function VaultScreen() {
       );
       return;
     }
+
+    const duplicate = findPotentialDocumentDuplicate(bundle.documents, draft);
+    if (duplicate) {
+      const shouldContinue = await confirmDuplicateSave();
+      if (!shouldContinue) {
+        return;
+      }
+    }
+
     await saveDocument(draft);
     setEditorVisible(false);
     if (params.editDocumentId) {
@@ -302,6 +340,7 @@ export default function VaultScreen() {
         <View style={styles.buttonRow}>
           <AppButton label="Add from files" tone="secondary" onPress={() => handleSourcePick('files')} />
           <AppButton label="Add from photos" tone="secondary" onPress={() => handleSourcePick('photos')} />
+          <AppButton label="Add without file" tone="secondary" onPress={openManualDocument} />
         </View>
         <AppButton
           label={isVaultUnlocked ? 'Vault unlocked' : 'Unlock previews'}
@@ -395,6 +434,7 @@ export default function VaultScreen() {
                       {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : expiryInfo.needsExpiryPrompt ? 'Add expiry date to enable warnings' : 'No expiry date saved'}
                     </Text>
                     <Text style={styles.meta}>{numberLabel}</Text>
+                    {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
                   </View>
                   <View style={styles.iconColumn}>
                     <Pressable
@@ -521,6 +561,11 @@ export default function VaultScreen() {
               ) : null}
               <Text style={styles.meta}>Reminders stay on this device only and never include document numbers or images.</Text>
             </View>
+            <Text style={styles.meta}>
+              {draft.localFileUri
+                ? 'This document includes a local file stored on the device.'
+                : 'This is a metadata-only document entry. You can still track numbers, dates, and reminders without attaching a file.'}
+            </Text>
             <View style={styles.field}>
               <Text style={styles.label}>Sensitivity</Text>
               <ChoiceChips<'yes' | 'no'>
@@ -582,10 +627,11 @@ export default function VaultScreen() {
                 <Text style={styles.meta}>Number: {selectedDocument.documentNumber || 'Not set'}</Text>
                 <Text style={styles.meta}>Issue date: {formatShortDate(selectedDocument.issueDate)}</Text>
                 <Text style={styles.meta}>Expiry date: {formatShortDate(selectedDocument.expiryDate)}</Text>
+                {!selectedDocument.localFileUri ? <Text style={styles.meta}>No local file saved for this document.</Text> : null}
                 {selectedDocument.previewUri ? (
                   <Image source={selectedDocument.previewUri} style={styles.preview} contentFit="contain" />
                 ) : null}
-                {selectedDocument.mimeType === 'application/pdf' ? (
+                {selectedDocument.mimeType === 'application/pdf' && selectedDocument.localFileUri ? (
                   <AppButton
                     label="Open PDF locally"
                     tone="secondary"

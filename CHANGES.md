@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.2 - 2026-03-14
+
+- Fixed orphaned local file cleanup when deleting vault documents, deleting trips, replacing trip cover images, clearing local data, and restoring backups
+- Added proper metadata-only document support so users can save passports, insurance, and other records even when no file is attached yet
+- Added duplicate-document detection in the vault save flow to catch accidental re-imports before creating another record
+- Improved reminders settings messaging for revoked notification permission and tightened a few remaining backup/import error messages
+- Added automated tests for metadata-only document validation and duplicate-document detection
+
 ## 1.4.1 - 2026-03-14
 
 - Added a retryable startup error state so failed local bootstrap does not leave the app hanging silently

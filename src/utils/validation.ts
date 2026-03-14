@@ -34,7 +34,6 @@ export function validateTraveller(input: TravellerDraft) {
 export function validateDocument(input: DocumentDraft) {
   const errors: string[] = [];
   if (!input.holderName.trim()) errors.push('Holder name is required.');
-  if (!input.localFileUri.trim()) errors.push('Choose a local file.');
   if (input.issueDate && !isValid(parseISO(input.issueDate))) errors.push('Issue date is invalid.');
   if (input.expiryDate && !isValid(parseISO(input.expiryDate))) errors.push('Expiry date is invalid.');
   if (input.issueDate && input.expiryDate && input.expiryDate < input.issueDate) {

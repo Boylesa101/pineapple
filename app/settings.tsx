@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -47,6 +47,7 @@ export default function SettingsScreen() {
   const [backupSource, setBackupSource] = useState<string | null>(null);
   const [backupSourceLabel, setBackupSourceLabel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notificationAccess, setNotificationAccess] = useState<boolean | null>(null);
 
   const openConflicts = useMemo(
     () => data.syncConflicts.filter((conflict) => conflict.status === 'open'),
@@ -55,6 +56,12 @@ export default function SettingsScreen() {
   const lastBackupLabel = data.appPreferences.lastBackupAt
     ? new Date(data.appPreferences.lastBackupAt).toLocaleString()
     : 'Never';
+
+  useEffect(() => {
+    hasNotificationPermissions()
+      .then(setNotificationAccess)
+      .catch(() => setNotificationAccess(null));
+  }, [data.appPreferences.notificationsEnabled]);
 
   function closeBackupModal() {
     setBackupVisible(false);
@@ -98,7 +105,12 @@ export default function SettingsScreen() {
       setBackupAction('import');
       setBackupVisible(true);
     } catch (error) {
-      Alert.alert('Restore unavailable', error instanceof Error ? error.message : 'Unable to open the file picker.');
+      Alert.alert(
+        'Restore unavailable',
+        error instanceof Error && error.message
+          ? 'Pineapple could not open the backup picker right now. Try again in a moment.'
+          : 'Pineapple could not open the backup picker right now.'
+      );
     }
   }
 
@@ -138,7 +150,10 @@ export default function SettingsScreen() {
 
       closeBackupModal();
     } catch (error) {
-      Alert.alert('Backup failed', error instanceof Error ? error.message : 'Unable to complete the backup action.');
+      Alert.alert(
+        'Backup failed',
+        error instanceof Error && error.message ? error.message : 'Pineapple could not complete that backup action.'
+      );
     } finally {
       setBusy(false);
     }
@@ -163,7 +178,12 @@ export default function SettingsScreen() {
         Alert.alert('Shared trip imported', 'Trip data was merged into your local database.');
       }
     } catch (error) {
-      Alert.alert('Import failed', error instanceof Error ? error.message : 'Unable to import this shared trip file.');
+      Alert.alert(
+        'Import failed',
+        error instanceof Error && error.message
+          ? error.message
+          : 'Pineapple could not import that shared trip file.'
+      );
     }
   }
 
@@ -194,6 +214,7 @@ export default function SettingsScreen() {
 
     const alreadyGranted = await hasNotificationPermissions();
     const granted = alreadyGranted || (await requestNotificationPermissions());
+    setNotificationAccess(granted);
     if (!granted) {
       Alert.alert(
         'Notifications unavailable',
@@ -267,6 +288,11 @@ export default function SettingsScreen() {
         <Text style={styles.meta}>
           Pineapple does not connect to your inbox or any cloud service for reminders. Email imports should come from files you choose on this device.
         </Text>
+        {data.appPreferences.notificationsEnabled && notificationAccess === false ? (
+          <Text style={styles.meta}>
+            Notifications are currently disabled at device level, so Pineapple will keep warning states in-app but cannot deliver local alerts until permission is restored.
+          </Text>
+        ) : null}
       </AppCard>
 
       <AppCard title="Sync" subtitle="Optional manual-share sync. Pineapple still works fully in local-only mode.">
