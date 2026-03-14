@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { AppState, Platform, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import { SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -47,7 +47,7 @@ function BootErrorView({ message, onRetry }: { message: string; onRetry: () => v
 
 function RouteGuard() {
   const router = useRouter();
-  const segments = useSegments();
+  const pathname = usePathname();
   const { isBootstrapped, security, isUnlocked, hasCompletedOnboarding, data } = useAppStore();
 
   useEffect(() => {
@@ -55,34 +55,44 @@ function RouteGuard() {
       return;
     }
 
-    const inAuth = segments[0] === '(auth)';
-    const secondSegment = segments.at(1);
-    const isChecklist = segments[0] === 'getting-started';
+    const currentPath = pathname || '/';
+    const inAuth =
+      currentPath === '/onboarding' ||
+      currentPath === '/setup-pin' ||
+      currentPath === '/lock' ||
+      currentPath === '/create-first-trip';
+    const isChecklist = currentPath === '/getting-started';
 
-    if (!hasCompletedOnboarding && !(inAuth && secondSegment === 'onboarding')) {
-      router.replace('/onboarding');
+    function replaceIfNeeded(target: string) {
+      if (currentPath !== target) {
+        router.replace(target);
+      }
+    }
+
+    if (!hasCompletedOnboarding && currentPath !== '/onboarding') {
+      replaceIfNeeded('/onboarding');
       return;
     }
 
-    if (hasCompletedOnboarding && !security.pinConfigured && !(inAuth && secondSegment === 'setup-pin')) {
-      router.replace('/setup-pin');
+    if (hasCompletedOnboarding && !security.pinConfigured && currentPath !== '/setup-pin') {
+      replaceIfNeeded('/setup-pin');
       return;
     }
 
-    if (security.pinConfigured && !isUnlocked && !(segments[0] === '(auth)' && secondSegment === 'lock')) {
-      router.replace('/lock');
+    if (security.pinConfigured && !isUnlocked && currentPath !== '/lock') {
+      replaceIfNeeded('/lock');
       return;
     }
 
-    if (security.pinConfigured && isUnlocked && data.trips.length === 0 && !(inAuth && secondSegment === 'create-first-trip')) {
-      router.replace('/create-first-trip');
+    if (security.pinConfigured && isUnlocked && data.trips.length === 0 && currentPath !== '/create-first-trip') {
+      replaceIfNeeded('/create-first-trip');
       return;
     }
 
     if (security.pinConfigured && isUnlocked && inAuth && !isChecklist) {
-      router.replace('/home');
+      replaceIfNeeded('/home');
     }
-  }, [data.trips.length, hasCompletedOnboarding, isBootstrapped, isUnlocked, router, security.pinConfigured, segments]);
+  }, [data.trips.length, hasCompletedOnboarding, isBootstrapped, isUnlocked, pathname, router, security.pinConfigured]);
 
   return null;
 }
