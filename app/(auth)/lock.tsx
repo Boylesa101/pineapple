@@ -36,7 +36,7 @@ export default function LockScreen() {
   return (
     <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor>
       <View style={styles.hero}>
-        <PineappleMark size={92} />
+        <PineappleMark size={72} />
         <Text style={styles.title}>Welcome back</Text>
       </View>
       <View style={styles.pinCard}>
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   hero: {
     alignItems: 'center',
     gap: spacing.sm,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
   },
   title: {
     color: colors.white,

@@ -57,6 +57,7 @@ function RouteGuard() {
     }
 
     const currentPath = pathname || '/';
+    const isEntry = currentPath === '/';
     const inAuth =
       currentPath === '/onboarding' ||
       currentPath === '/setup-pin' ||
@@ -70,6 +71,10 @@ function RouteGuard() {
       }
     }
 
+    if (isEntry) {
+      return;
+    }
+
     if (!hasCompletedOnboarding && currentPath !== '/onboarding') {
       replaceIfNeeded('/onboarding');
       return;
@@ -81,7 +86,7 @@ function RouteGuard() {
     }
 
     if (security.pinConfigured && !isUnlocked && currentPath !== '/lock') {
-      replaceIfNeeded('/lock');
+      replaceIfNeeded('/');
       return;
     }
 
