@@ -8,6 +8,7 @@ import type {
   ExpiryReminderLeadTime,
   ExpiryReminderSchedule,
 } from '@/types/models';
+import { normalizePassportData } from './passport';
 
 export type DocumentExpiryBucket =
   | 'missing'
@@ -183,6 +184,7 @@ export function normalizeDocumentRecord(document: Omit<Document, 'expiredStatus'
     ...document,
     expiryReminderEnabled: document.expiryReminderEnabled ?? documentTypeSupportsExpiryWarnings(document.documentType),
     expiryReminderSchedule: normalizeExpiryReminderSchedule(document.expiryReminderSchedule),
+    passportData: normalizePassportData(document.passportData),
     expiredStatus: expiryInfo.isExpired,
     expiringSoonStatus: expiryInfo.isExpiring,
   };
@@ -202,6 +204,7 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     localFileUri: partial.localFileUri,
     previewUri: partial.previewUri,
     mimeType: partial.mimeType,
+    passportData: null,
     sensitive: true,
     createdAt: '',
     updatedAt: '',
@@ -223,6 +226,7 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     localFileUri: normalized.localFileUri,
     previewUri: normalized.previewUri,
     mimeType: normalized.mimeType,
+    passportData: normalized.passportData,
     sensitive: normalized.sensitive,
   };
 }

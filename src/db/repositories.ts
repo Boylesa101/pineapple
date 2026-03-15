@@ -8,6 +8,7 @@ import {
   serializeExpiryReminderSchedule,
 } from '@/utils/documentExpiry';
 import { deleteLocalFile } from '@/utils/fileStorage';
+import { normalizePassportData } from '@/utils/passport';
 import type {
   AppDataSnapshot,
   AppPreferences,
@@ -29,6 +30,18 @@ import type {
 
 function now() {
   return new Date().toISOString();
+}
+
+function parsePassportData(value: unknown) {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    return normalizePassportData(JSON.parse(value));
+  } catch {
+    return null;
+  }
 }
 
 async function cleanupDocumentFiles(document: { localFileUri: string; previewUri: string | null } | null | undefined) {
@@ -154,6 +167,7 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         sensitive: toBool(document.sensitive),
         expiryReminderEnabled: toBool(document.expiryReminderEnabled ?? 1),
         expiryReminderSchedule: document.expiryReminderSchedule,
+        passportData: parsePassportData(document.passportData),
       })
     ),
     packingItems: packingItemsRaw.map((item) => ({
@@ -294,8 +308,8 @@ export async function upsertDocument(input: DocumentDraft) {
     : null;
 
   await db.runAsync(
-    `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, expiryReminderEnabled, expiryReminderSchedule, notes, localFileUri, previewUri, mimeType, sensitive, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, expiryReminderEnabled, expiryReminderSchedule, notes, localFileUri, previewUri, mimeType, passportData, sensitive, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        travellerId = excluded.travellerId,
@@ -310,6 +324,7 @@ export async function upsertDocument(input: DocumentDraft) {
        localFileUri = excluded.localFileUri,
        previewUri = excluded.previewUri,
        mimeType = excluded.mimeType,
+       passportData = excluded.passportData,
        sensitive = excluded.sensitive,
        updatedAt = excluded.updatedAt`,
     id,
@@ -326,6 +341,7 @@ export async function upsertDocument(input: DocumentDraft) {
     normalized.localFileUri,
     normalized.previewUri,
     normalized.mimeType,
+    normalized.passportData ? JSON.stringify(normalized.passportData) : null,
     normalized.sensitive ? 1 : 0,
     timestamp,
     timestamp

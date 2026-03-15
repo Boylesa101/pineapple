@@ -13,6 +13,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
+- Passport documents now render with a dedicated physical passport cover and identity spread experience instead of a generic document card
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking

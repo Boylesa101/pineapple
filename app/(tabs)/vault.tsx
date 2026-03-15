@@ -18,6 +18,9 @@ import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { PinPad } from '@/components/PinPad';
+import { CopyDataButton } from '@/components/passport/CopyDataButton';
+import { PassportDocument } from '@/components/passport/PassportDocument';
+import { VerificationBadge } from '@/components/passport/VerificationBadge';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
@@ -33,6 +36,7 @@ import {
 import { findPotentialDocumentDuplicate } from '@/utils/documentDuplicates';
 import { copyIntoAppStorage } from '@/utils/fileStorage';
 import { maskSensitive } from '@/utils/format';
+import { buildPassportCopyPayload, ensurePassportDraftData, getPassportVerificationStatus } from '@/utils/passport';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
 import { validateDocument } from '@/utils/validation';
 
@@ -87,10 +91,14 @@ export default function VaultScreen() {
   const [travellerFilter, setTravellerFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<DocumentType | 'all'>('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('flat');
+  const [passportOpen, setPassportOpen] = useState(false);
   const openedEditIdRef = useRef<string | null>(null);
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
   const selectedDocument = bundle.documents.find((item) => item.id === selectedId) ?? null;
+  const selectedTraveller = selectedDocument
+    ? bundle.travellers.find((item) => item.id === selectedDocument.travellerId) ?? null
+    : null;
   const isVaultUnlocked = !!vaultUnlockedUntil && vaultUnlockedUntil > Date.now();
   const expiryWarnings = getDocumentExpiryWarnings(bundle.documents, bundle.travellers);
 
@@ -111,6 +119,12 @@ export default function VaultScreen() {
     setDraft(document);
     setEditorVisible(true);
   }, [data.documents, params.editDocumentId, selectedTripId, setActiveTrip]);
+
+  useEffect(() => {
+    if (!detailVisible) {
+      setPassportOpen(false);
+    }
+  }, [detailVisible, selectedId]);
 
   const filteredDocuments = useMemo(() => {
     return bundle.documents.filter((document) => {
@@ -400,6 +414,50 @@ export default function VaultScreen() {
               const previewUnlocked = isVaultUnlocked || !document.sensitive;
               const numberLabel = previewUnlocked ? document.documentNumber || 'No number saved' : maskSensitive(document.documentNumber);
               const expiryInfo = getDocumentExpiryInfo(document.documentType, document.expiryDate);
+
+              if (document.documentType === 'passport') {
+                return (
+                  <View key={document.id} style={styles.passportRow}>
+                    <PassportDocument
+                      document={document}
+                      traveller={traveller}
+                      onPress={() => {
+                        setSelectedId(document.id);
+                        setPassportOpen(false);
+                        setDetailVisible(true);
+                      }}
+                      compact
+                    />
+                    <View style={styles.passportMeta}>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.title}>Passport</Text>
+                        <VerificationBadge status={getPassportVerificationStatus(document, traveller)} />
+                      </View>
+                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+                      <Text style={styles.meta}>
+                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
+                      </Text>
+                      <Text style={styles.meta}>{numberLabel}</Text>
+                      {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
+                    </View>
+                    <View style={styles.iconColumn}>
+                      <Pressable
+                        onPress={() => {
+                          setDraft(document);
+                          setEditorVisible(true);
+                        }}
+                        style={styles.iconButton}
+                      >
+                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+                      </Pressable>
+                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
+                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              }
+
               return (
                 <Pressable
                   key={document.id}
@@ -486,16 +544,22 @@ export default function VaultScreen() {
               <ChoiceChips<DocumentType>
                 value={draft.documentType}
                 onChange={(value) =>
-                  setDraft((current) =>
-                    current
-                      ? {
-                          ...current,
-                          documentType: value,
-                          expiryReminderEnabled: documentTypeSupportsExpiryWarnings(value) ? current.expiryReminderEnabled : false,
-                          expiryReminderSchedule: normalizeExpiryReminderSchedule(current.expiryReminderSchedule),
-                        }
-                      : current
-                  )
+                  setDraft((current) => {
+                    if (!current) {
+                      return current;
+                    }
+
+                    const traveller = bundle.travellers.find((item) => item.id === current.travellerId) ?? null;
+                    return ensurePassportDraftData(
+                      {
+                        ...current,
+                        documentType: value,
+                        expiryReminderEnabled: documentTypeSupportsExpiryWarnings(value) ? current.expiryReminderEnabled : false,
+                        expiryReminderSchedule: normalizeExpiryReminderSchedule(current.expiryReminderSchedule),
+                      },
+                      traveller
+                    );
+                  })
                 }
                 options={Object.entries(documentLabels).map(([value, label]) => ({ value: value as DocumentType, label }))}
               />
@@ -508,7 +572,20 @@ export default function VaultScreen() {
               <ChoiceChips<string>
                 value={draft.travellerId ?? 'trip'}
                 onChange={(value) =>
-                  setDraft((current) => (current ? { ...current, travellerId: value === 'trip' ? null : value } : current))
+                  setDraft((current) => {
+                    if (!current) {
+                      return current;
+                    }
+
+                    const traveller = bundle.travellers.find((item) => item.id === (value === 'trip' ? null : value)) ?? null;
+                    return ensurePassportDraftData(
+                      {
+                        ...current,
+                        travellerId: value === 'trip' ? null : value,
+                      },
+                      traveller
+                    );
+                  })
                 }
                 options={[
                   { label: 'Whole trip', value: 'trip' },
@@ -521,6 +598,89 @@ export default function VaultScreen() {
               value={draft.documentNumber}
               onChangeText={(value) => setDraft((current) => (current ? { ...current, documentNumber: value } : current))}
             />
+            {draft.documentType === 'passport' && draft.passportData ? (
+              <>
+                <View style={styles.detailHeader}>
+                  <Text style={styles.label}>Passport extracted fields</Text>
+                  <VerificationBadge
+                    status={getPassportVerificationStatus(
+                      { localFileUri: draft.localFileUri, passportData: draft.passportData },
+                      bundle.travellers.find((item) => item.id === draft.travellerId) ?? null
+                    )}
+                  />
+                </View>
+                <AppTextField
+                  label="Passport type"
+                  value={draft.passportData.passportType}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.passportData
+                        ? { ...current, passportData: { ...current.passportData, passportType: value.toUpperCase() } }
+                        : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Country code"
+                  value={draft.passportData.countryCode}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.passportData
+                        ? { ...current, passportData: { ...current.passportData, countryCode: value.toUpperCase().slice(0, 3) } }
+                        : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Surname"
+                  value={draft.passportData.surname}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.passportData ? { ...current, passportData: { ...current.passportData, surname: value } } : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Given names"
+                  value={draft.passportData.givenNames}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.passportData ? { ...current, passportData: { ...current.passportData, givenNames: value } } : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Nationality"
+                  value={draft.passportData.nationality}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.passportData ? { ...current, passportData: { ...current.passportData, nationality: value } } : current
+                    )
+                  }
+                />
+                <DateTimeField
+                  label="Date of birth"
+                  mode="date"
+                  value={draft.passportData.dateOfBirth}
+                  onChange={(value) =>
+                    setDraft((current) =>
+                      current?.passportData
+                        ? { ...current, passportData: { ...current.passportData, dateOfBirth: value } }
+                        : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Place of birth"
+                  value={draft.passportData.placeOfBirth}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.passportData ? { ...current, passportData: { ...current.passportData, placeOfBirth: value } } : current
+                    )
+                  }
+                />
+              </>
+            ) : null}
             <DateTimeField
               label="Issue date"
               mode="date"
@@ -597,7 +757,7 @@ export default function VaultScreen() {
         ) : null}
       </AppModal>
 
-      <AppModal visible={detailVisible} title="Document detail" onClose={() => setDetailVisible(false)}>
+      <AppModal visible={detailVisible} title={selectedDocument?.documentType === 'passport' ? 'Passport detail' : 'Document detail'} onClose={() => setDetailVisible(false)}>
         {selectedDocument ? (
           <>
             {selectedDocument.sensitive && !isVaultUnlocked ? (
@@ -607,38 +767,78 @@ export default function VaultScreen() {
               </>
             ) : (
               <>
-                {(() => {
-                  const expiryInfo = getDocumentExpiryInfo(selectedDocument.documentType, selectedDocument.expiryDate);
-                  return (
-                    <>
-                      <View style={styles.inlineRow}>
-                        <Text style={styles.title}>{documentLabels[selectedDocument.documentType]}</Text>
-                        {(selectedDocument.expiryDate || expiryInfo.needsExpiryPrompt) ? (
-                          <InfoChip label={expiryInfo.badgeLabel} tone={expiryInfo.tone} />
-                        ) : null}
-                      </View>
-                      {expiryInfo.passportSixMonthWarning ? (
-                        <Text style={styles.warningText}>Many destinations require passports to stay valid for at least six months beyond travel.</Text>
-                      ) : null}
-                    </>
-                  );
-                })()}
-                <Text style={styles.meta}>Holder: {selectedDocument.holderName || 'Trip-wide'}</Text>
-                <Text style={styles.meta}>Number: {selectedDocument.documentNumber || 'Not set'}</Text>
-                <Text style={styles.meta}>Issue date: {formatShortDate(selectedDocument.issueDate)}</Text>
-                <Text style={styles.meta}>Expiry date: {formatShortDate(selectedDocument.expiryDate)}</Text>
-                {!selectedDocument.localFileUri ? <Text style={styles.meta}>No local file saved for this document.</Text> : null}
-                {selectedDocument.previewUri ? (
-                  <Image source={selectedDocument.previewUri} style={styles.preview} contentFit="contain" />
-                ) : null}
-                {selectedDocument.mimeType === 'application/pdf' && selectedDocument.localFileUri ? (
-                  <AppButton
-                    label="Open PDF locally"
-                    tone="secondary"
-                    onPress={() => Linking.openURL(selectedDocument.localFileUri)}
-                  />
-                ) : null}
-                {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
+                {selectedDocument.documentType === 'passport' ? (
+                  <>
+                    <PassportDocument
+                      document={selectedDocument}
+                      traveller={selectedTraveller}
+                      open={passportOpen}
+                      interactive
+                    />
+                    <AppButton
+                      label={passportOpen ? 'Close passport' : 'Open passport'}
+                      tone="secondary"
+                      onPress={() => setPassportOpen((value) => !value)}
+                    />
+                    <View style={styles.buttonRow}>
+                      <CopyDataButton payload={buildPassportCopyPayload(selectedDocument, selectedTraveller)} />
+                      <AppButton
+                        label="Edit extracted fields"
+                        tone="secondary"
+                        onPress={() => {
+                          setDraft(selectedDocument);
+                          setDetailVisible(false);
+                          setEditorVisible(true);
+                        }}
+                      />
+                      <AppButton
+                        label={selectedDocument.mimeType === 'application/pdf' ? 'View original PDF' : 'View original scan'}
+                        tone="secondary"
+                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        disabled={!selectedDocument.localFileUri}
+                      />
+                    </View>
+                    {!selectedDocument.localFileUri ? (
+                      <Text style={styles.meta}>No original scan is attached yet. You can still keep passport details and expiry tracking locally.</Text>
+                    ) : null}
+                    {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
+                  </>
+                ) : (
+                  <>
+                    {(() => {
+                      const expiryInfo = getDocumentExpiryInfo(selectedDocument.documentType, selectedDocument.expiryDate);
+                      return (
+                        <>
+                          <View style={styles.inlineRow}>
+                            <Text style={styles.title}>{documentLabels[selectedDocument.documentType]}</Text>
+                            {(selectedDocument.expiryDate || expiryInfo.needsExpiryPrompt) ? (
+                              <InfoChip label={expiryInfo.badgeLabel} tone={expiryInfo.tone} />
+                            ) : null}
+                          </View>
+                          {expiryInfo.passportSixMonthWarning ? (
+                            <Text style={styles.warningText}>Many destinations require passports to stay valid for at least six months beyond travel.</Text>
+                          ) : null}
+                        </>
+                      );
+                    })()}
+                    <Text style={styles.meta}>Holder: {selectedDocument.holderName || 'Trip-wide'}</Text>
+                    <Text style={styles.meta}>Number: {selectedDocument.documentNumber || 'Not set'}</Text>
+                    <Text style={styles.meta}>Issue date: {formatShortDate(selectedDocument.issueDate)}</Text>
+                    <Text style={styles.meta}>Expiry date: {formatShortDate(selectedDocument.expiryDate)}</Text>
+                    {!selectedDocument.localFileUri ? <Text style={styles.meta}>No local file saved for this document.</Text> : null}
+                    {selectedDocument.previewUri ? (
+                      <Image source={selectedDocument.previewUri} style={styles.preview} contentFit="contain" />
+                    ) : null}
+                    {selectedDocument.mimeType === 'application/pdf' && selectedDocument.localFileUri ? (
+                      <AppButton
+                        label="Open PDF locally"
+                        tone="secondary"
+                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                      />
+                    ) : null}
+                    {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
+                  </>
+                )}
               </>
             )}
           </>
@@ -673,6 +873,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.xs,
   },
+  passportRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
   thumbnail: {
     width: 72,
     height: 72,
@@ -688,6 +894,11 @@ const styles = StyleSheet.create({
   copy: {
     flex: 1,
     gap: 4,
+  },
+  passportMeta: {
+    flex: 1,
+    gap: spacing.xs,
+    justifyContent: 'center',
   },
   titleRow: {
     flexDirection: 'row',
@@ -728,5 +939,11 @@ const styles = StyleSheet.create({
     height: 320,
     borderRadius: radii.md,
     backgroundColor: '#F8F5EE',
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
 });

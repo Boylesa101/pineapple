@@ -42,6 +42,7 @@ export type SyncStatus = 'local_only' | 'ready' | 'pending_export' | 'pending_im
 export type ConflictStatus = 'open' | 'resolved_keep_local' | 'resolved_use_incoming';
 export type PrivacyMaskingMode = 'always' | 'travel_mode';
 export type PinLength = 4 | 6;
+export type PassportVerificationStatus = 'verified' | 'review' | 'unverified';
 
 export interface Trip {
   id: string;
@@ -89,9 +90,20 @@ export interface Document {
   localFileUri: string;
   previewUri: string | null;
   mimeType: string | null;
+  passportData?: PassportData | null;
   sensitive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PassportData {
+  passportType: string;
+  countryCode: string;
+  surname: string;
+  givenNames: string;
+  nationality: string;
+  dateOfBirth: string | null;
+  placeOfBirth: string;
 }
 
 export interface PackingItem {

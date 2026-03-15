@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.7 - 2026-03-15
+
+- Added a passport-specific Vault experience with a physical closed cover, an interactive passport spread, editable extracted passport fields, MRZ-style presentation, copy action, scan entry point, expiry badge, and verification badge
+- Added safe local passport-data persistence and migration support without refactoring the wider document system
+- Added regression tests for passport data derivation, verification state, copy payload generation, and MRZ-style formatting
+
 ## 1.4.6 - 2026-03-14
 
 - Reset stale Expo Go first-run PIN state when there is no onboarding flag and no trip data, so fresh testing no longer gets blocked by an old PIN

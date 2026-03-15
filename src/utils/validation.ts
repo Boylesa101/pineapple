@@ -42,6 +42,9 @@ export function validateDocument(input: DocumentDraft) {
   if (input.expiryReminderEnabled && !normalizeExpiryReminderSchedule(input.expiryReminderSchedule).length) {
     errors.push('Choose at least one reminder time, or turn reminders off for this document.');
   }
+  if (input.documentType === 'passport' && input.passportData?.dateOfBirth && !isValid(parseISO(input.passportData.dateOfBirth))) {
+    errors.push('Passport date of birth is invalid.');
+  }
   return errors;
 }
 
