@@ -51,6 +51,15 @@ export function validateDocument(input: DocumentDraft) {
   if (input.documentType === 'ghic' && input.healthCardData?.countryCode && input.healthCardData.countryCode.length < 2) {
     errors.push('Health card country code is invalid.');
   }
+  if (input.documentType === 'payment_card') {
+    const digits = input.documentNumber.replace(/\D/g, '');
+    if (digits && digits.length < 12) {
+      errors.push('Card number looks too short.');
+    }
+    if (input.paymentCardData?.cvv && !/^\d{3,4}$/.test(input.paymentCardData.cvv)) {
+      errors.push('Security code must be 3 or 4 digits.');
+    }
+  }
   return errors;
 }
 

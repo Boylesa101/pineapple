@@ -92,3 +92,12 @@ test('legacy health-card records normalize with healthCardData intact', () => {
   assert.equal(document.healthCardData?.issuer, 'NHS');
   assert.equal(document.expiredStatus, false);
 });
+
+test('health card OCR flags ambiguous values for review', () => {
+  const parsed = parseHealthCardOcrText(
+    `Name: Henry Boyle\nCard Number: GHIC11223344\nNumber: GHIC99887766\nIssue Date: 01.01.2024\nExpiry Date: 01.01.2029\nValid Until: 01.01.2030`
+  );
+
+  assert.ok(parsed);
+  assert.equal(parsed.warnings.length >= 1, true);
+});

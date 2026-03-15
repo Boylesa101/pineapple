@@ -19,6 +19,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { HealthCardDocument } from '@/components/health-card/HealthCardDocument';
 import { InfoChip } from '@/components/InfoChip';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
+import { PaymentCardDocument } from '@/components/payment-card/PaymentCardDocument';
 import { PinPad } from '@/components/PinPad';
 import { CopyDataButton } from '@/components/passport/CopyDataButton';
 import { PassportDocument } from '@/components/passport/PassportDocument';
@@ -49,6 +50,12 @@ import { copyIntoAppStorage } from '@/utils/fileStorage';
 import { maskSensitive } from '@/utils/format';
 import { buildHealthCardCopyPayload, ensureHealthCardDraftData, getHealthCardVerificationStatus } from '@/utils/healthCard';
 import { applyHealthCardOcrToDraft, canRunHealthCardOcr } from '@/utils/healthCardOcr';
+import {
+  buildPaymentCardCopyPayload,
+  ensurePaymentCardDraftData,
+  getPaymentCardVerificationStatus,
+  maskPaymentCardNumber,
+} from '@/utils/paymentCard';
 import { buildPassportCopyPayload, ensurePassportDraftData, getPassportVerificationStatus } from '@/utils/passport';
 import { applyPassportOcrToDraft, hasPassportImageForOcr } from '@/utils/passportOcr';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
@@ -60,6 +67,7 @@ const documentLabels: Record<DocumentType, string> = {
   insurance: 'Travel insurance',
   visa: 'Visa',
   driving_licence: 'Driving licence',
+  payment_card: 'Payment card',
   id_card: 'ID card',
   boarding_pass: 'Boarding pass',
   hotel_booking: 'Hotel booking',
@@ -110,6 +118,7 @@ export default function VaultScreen() {
   const [passportOpen, setPassportOpen] = useState(false);
   const [drivingLicenceOpen, setDrivingLicenceOpen] = useState(false);
   const [healthCardOpen, setHealthCardOpen] = useState(false);
+  const [paymentCardOpen, setPaymentCardOpen] = useState(false);
   const [passportOcrLoading, setPassportOcrLoading] = useState(false);
   const [drivingLicenceOcrLoading, setDrivingLicenceOcrLoading] = useState(false);
   const [healthCardOcrLoading, setHealthCardOcrLoading] = useState(false);
@@ -138,7 +147,12 @@ export default function VaultScreen() {
       setActiveTrip(document.tripId);
     }
     const traveller = data.travellers.find((item) => item.id === document.travellerId) ?? null;
-    setDraft(ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(document, traveller), traveller), traveller));
+    setDraft(
+      ensurePaymentCardDraftData(
+        ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(document, traveller), traveller), traveller),
+        traveller
+      )
+    );
     setEditorVisible(true);
   }, [data.documents, params.editDocumentId, selectedTripId, setActiveTrip]);
 
@@ -147,6 +161,7 @@ export default function VaultScreen() {
       setPassportOpen(false);
       setDrivingLicenceOpen(false);
       setHealthCardOpen(false);
+      setPaymentCardOpen(false);
     }
   }, [detailVisible, selectedId]);
 
@@ -154,11 +169,15 @@ export default function VaultScreen() {
     setPassportOpen(false);
     setDrivingLicenceOpen(false);
     setHealthCardOpen(false);
+    setPaymentCardOpen(false);
   }, [selectedId]);
 
   function withSpecializedDocumentData(source: DocumentDraft) {
     const traveller = bundle.travellers.find((item) => item.id === source.travellerId) ?? null;
-    return ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(source, traveller), traveller), traveller);
+    return ensurePaymentCardDraftData(
+      ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(source, traveller), traveller), traveller),
+      traveller
+    );
   }
 
   const filteredDocuments = useMemo(() => {
@@ -431,9 +450,12 @@ export default function VaultScreen() {
 
       Alert.alert(
         'Passport fields extracted',
-        extracted.source === 'mrz'
-          ? 'Pineapple read the passport MRZ and filled the passport fields. Review them before saving.'
-          : 'Pineapple filled the passport fields from the scan text. Review them before saving.'
+        [
+          extracted.source === 'mrz'
+            ? 'Pineapple read the passport MRZ and filled the passport fields.'
+            : 'Pineapple filled the passport fields from the scan text.',
+          extracted.warnings.length ? `Review notes:\n- ${extracted.warnings.join('\n- ')}` : 'Review them before saving.',
+        ].join('\n\n')
       );
     } catch (error) {
       Alert.alert(
@@ -493,7 +515,13 @@ export default function VaultScreen() {
         setEditorVisible(true);
       }
 
-      Alert.alert('Licence fields extracted', 'Pineapple filled the driving licence fields from the front scan. Review them before saving.');
+      Alert.alert(
+        'Licence fields extracted',
+        [
+          'Pineapple filled the driving licence fields from the front scan.',
+          extracted.warnings.length ? `Review notes:\n- ${extracted.warnings.join('\n- ')}` : 'Review them before saving.',
+        ].join('\n\n')
+      );
     } catch (error) {
       Alert.alert(
         'Driving licence OCR unavailable',
@@ -552,7 +580,13 @@ export default function VaultScreen() {
         setEditorVisible(true);
       }
 
-      Alert.alert('Health-card fields extracted', 'Pineapple filled the health-card fields from the scan. Review them before saving.');
+      Alert.alert(
+        'Health-card fields extracted',
+        [
+          'Pineapple filled the health-card fields from the scan.',
+          extracted.warnings.length ? `Review notes:\n- ${extracted.warnings.join('\n- ')}` : 'Review them before saving.',
+        ].join('\n\n')
+      );
     } catch (error) {
       Alert.alert(
         'Health-card OCR unavailable',
@@ -797,6 +831,49 @@ export default function VaultScreen() {
                 );
               }
 
+              if (document.documentType === 'payment_card') {
+                return (
+                  <View key={document.id} style={styles.passportRow}>
+                    <PaymentCardDocument
+                      document={document}
+                      traveller={traveller}
+                      onPress={() => {
+                        setSelectedId(document.id);
+                        setPaymentCardOpen(false);
+                        setDetailVisible(true);
+                      }}
+                      compact
+                    />
+                    <View style={styles.passportMeta}>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.title}>Payment card</Text>
+                        <VerificationBadge status={getPaymentCardVerificationStatus(document)} />
+                      </View>
+                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+                      <Text style={styles.meta}>
+                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
+                      </Text>
+                      <Text style={styles.meta}>{maskPaymentCardNumber(document.documentNumber)}</Text>
+                      {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
+                    </View>
+                    <View style={styles.iconColumn}>
+                      <Pressable
+                        onPress={() => {
+                          setDraft(withSpecializedDocumentData(document));
+                          setEditorVisible(true);
+                        }}
+                        style={styles.iconButton}
+                      >
+                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+                      </Pressable>
+                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
+                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              }
+
               return (
                 <Pressable
                   key={document.id}
@@ -913,13 +990,16 @@ export default function VaultScreen() {
                     }
 
                     const traveller = bundle.travellers.find((item) => item.id === (value === 'trip' ? null : value)) ?? null;
-                    return ensureHealthCardDraftData(
-                      ensureDrivingLicenceDraftData(
-                        ensurePassportDraftData(
-                          {
-                            ...current,
-                            travellerId: value === 'trip' ? null : value,
-                          },
+                    return ensurePaymentCardDraftData(
+                      ensureHealthCardDraftData(
+                        ensureDrivingLicenceDraftData(
+                          ensurePassportDraftData(
+                            {
+                              ...current,
+                              travellerId: value === 'trip' ? null : value,
+                            },
+                            traveller
+                          ),
                           traveller
                         ),
                         traveller
@@ -935,9 +1015,19 @@ export default function VaultScreen() {
               />
             </View>
             <AppTextField
-              label="Document number"
+              label={draft.documentType === 'payment_card' ? 'Card number' : 'Document number'}
               value={draft.documentNumber}
-              onChangeText={(value) => setDraft((current) => (current ? { ...current, documentNumber: value } : current))}
+              onChangeText={(value) =>
+                setDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        documentNumber: draft.documentType === 'payment_card' ? value.replace(/[^0-9 ]/g, '') : value,
+                      }
+                    : current
+                )
+              }
+              keyboardType={draft.documentType === 'payment_card' ? 'numeric' : 'default'}
             />
             {draft.documentType === 'passport' && draft.passportData ? (
               <>
@@ -1215,6 +1305,62 @@ export default function VaultScreen() {
                 </View>
               </>
             ) : null}
+            {draft.documentType === 'payment_card' && draft.paymentCardData ? (
+              <>
+                <View style={styles.detailHeader}>
+                  <Text style={styles.label}>Payment card record</Text>
+                  <VerificationBadge
+                    status={getPaymentCardVerificationStatus({
+                      localFileUri: draft.localFileUri,
+                      paymentCardData: draft.paymentCardData,
+                      documentNumber: draft.documentNumber,
+                    })}
+                  />
+                </View>
+                <AppTextField
+                  label="Card type"
+                  value={draft.paymentCardData.cardType}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.paymentCardData ? { ...current, paymentCardData: { ...current.paymentCardData, cardType: value } } : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Bank"
+                  value={draft.paymentCardData.bank}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.paymentCardData ? { ...current, paymentCardData: { ...current.paymentCardData, bank: value } } : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Billing details or travel note"
+                  value={draft.paymentCardData.billingDetails}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.paymentCardData ? { ...current, paymentCardData: { ...current.paymentCardData, billingDetails: value } } : current
+                    )
+                  }
+                  multiline
+                />
+                <AppTextField
+                  label="Security code"
+                  value={draft.paymentCardData.cvv}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.paymentCardData
+                        ? { ...current, paymentCardData: { ...current.paymentCardData, cvv: value.replace(/[^0-9]/g, '').slice(0, 4) } }
+                        : current
+                    )
+                  }
+                  keyboardType="numeric"
+                  secureTextEntry
+                  helper="Stored locally for your own reference. Pineapple never shows it by default in the card view."
+                />
+              </>
+            ) : null}
             <DateTimeField
               label="Issue date"
               mode="date"
@@ -1260,6 +1406,10 @@ export default function VaultScreen() {
                 ? draft.localFileUri || draft.secondaryLocalFileUri
                   ? `This driving licence keeps ${draft.localFileUri ? 'the front' : 'no front'}${draft.secondaryLocalFileUri ? ' and the reverse' : ''} scan locally on the device.`
                   : 'This is a metadata-only driving licence entry. You can still track numbers, dates, and reminders without attaching scans yet.'
+                : draft.documentType === 'payment_card'
+                  ? draft.localFileUri
+                    ? 'This payment card keeps its stored image locally on the device. Card numbers stay masked by default.'
+                    : 'This is a metadata-only payment card entry. You can still keep expiry tracking and masked card details without attaching an image yet.'
                 : draft.localFileUri
                   ? 'This document includes a local file stored on the device.'
                   : 'This is a metadata-only document entry. You can still track numbers, dates, and reminders without attaching a file.'}
@@ -1304,6 +1454,8 @@ export default function VaultScreen() {
               ? 'Driving licence detail'
               : selectedDocument?.documentType === 'ghic'
                 ? 'Health card detail'
+                : selectedDocument?.documentType === 'payment_card'
+                  ? 'Payment card detail'
               : 'Document detail'
         }
         onClose={() => setDetailVisible(false)}
@@ -1456,6 +1608,46 @@ export default function VaultScreen() {
                     {!selectedDocument.localFileUri ? (
                       <Text style={styles.meta}>No original scan is attached yet. You can still keep health-card details and expiry tracking locally.</Text>
                     ) : null}
+                    {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
+                  </>
+                ) : selectedDocument.documentType === 'payment_card' ? (
+                  <>
+                    <PaymentCardDocument
+                      document={selectedDocument}
+                      traveller={selectedTraveller}
+                      open={paymentCardOpen}
+                      interactive
+                    />
+                    <AppButton
+                      label={paymentCardOpen ? 'Close payment card' : 'Open payment card'}
+                      tone="secondary"
+                      onPress={() => setPaymentCardOpen((value) => !value)}
+                    />
+                    <View style={styles.buttonRow}>
+                      <CopyDataButton
+                        label="Copy card summary"
+                        payload={buildPaymentCardCopyPayload(selectedDocument)}
+                      />
+                      <AppButton
+                        label="Edit stored fields"
+                        tone="secondary"
+                        onPress={() => {
+                          setDraft(withSpecializedDocumentData(selectedDocument));
+                          setDetailVisible(false);
+                          setEditorVisible(true);
+                        }}
+                      />
+                      <AppButton
+                        label={selectedDocument.mimeType === 'application/pdf' ? 'View stored PDF' : 'View stored image'}
+                        tone="secondary"
+                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        disabled={!selectedDocument.localFileUri}
+                      />
+                    </View>
+                    {!selectedDocument.localFileUri ? (
+                      <Text style={styles.meta}>No card image is attached yet. Pineapple still keeps the masked card record and expiry locally.</Text>
+                    ) : null}
+                    <Text style={styles.meta}>Full card numbers stay hidden until you deliberately reveal them. Security codes are not shown in this view.</Text>
                     {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
                   </>
                 ) : (

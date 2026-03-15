@@ -5,6 +5,7 @@ export type DocumentType =
   | 'insurance'
   | 'visa'
   | 'driving_licence'
+  | 'payment_card'
   | 'id_card'
   | 'boarding_pass'
   | 'hotel_booking'
@@ -97,6 +98,7 @@ export interface Document {
   secondaryMimeType?: string | null;
   drivingLicenceData?: DrivingLicenceData | null;
   healthCardData?: HealthCardData | null;
+  paymentCardData?: PaymentCardData | null;
   sensitive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -125,6 +127,13 @@ export interface HealthCardData {
   countryCode: string;
   emergencyLine: string;
   status: string;
+}
+
+export interface PaymentCardData {
+  cardType: string;
+  bank: string;
+  billingDetails: string;
+  cvv: string;
 }
 
 export interface PackingItem {

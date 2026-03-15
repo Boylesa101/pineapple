@@ -8,6 +8,7 @@ export interface HealthCardOcrResult {
   issueDate: string | null;
   expiryDate: string | null;
   healthCardData: Partial<HealthCardData>;
+  warnings: string[];
 }
 
 function normalizeLine(value: string) {
@@ -36,6 +37,32 @@ function normalizeDate(value: string) {
   }
 
   return null;
+}
+
+function collectNormalizedDates(rawText: string) {
+  const matches = rawText.match(/\b(?:\d{4}[-/.]\d{2}[-/.]\d{2}|\d{2}[-/.]\d{2}[-/.]\d{4})\b/g) ?? [];
+  return Array.from(new Set(matches.map(normalizeDate).filter((value): value is string => Boolean(value))));
+}
+
+function collectNumberCandidates(rawText: string) {
+  const matches = rawText.match(/\b[A-Z0-9]{8,20}\b/g) ?? [];
+  return Array.from(new Set(matches.filter((value) => /\d/.test(value))));
+}
+
+function buildHealthCardWarnings(rawText: string, documentNumber: string) {
+  const warnings: string[] = [];
+  const dates = collectNormalizedDates(rawText);
+  const numbers = collectNumberCandidates(rawText);
+
+  if (dates.length > 2) {
+    warnings.push('Multiple date candidates were detected. Review the health-card dates before saving.');
+  }
+
+  if (numbers.length > 1 && documentNumber && numbers.some((value) => value !== documentNumber)) {
+    warnings.push('Multiple card-number candidates were detected. Confirm the extracted health-card number before saving.');
+  }
+
+  return warnings;
 }
 
 function extractValue(lines: string[], patterns: string[]) {
@@ -83,6 +110,7 @@ export function parseHealthCardOcrText(rawText: string) {
       countryCode,
       emergencyLine,
     },
+    warnings: buildHealthCardWarnings(rawText, documentNumber),
   } satisfies HealthCardOcrResult;
 }
 
@@ -116,7 +144,7 @@ export function applyHealthCardOcrToDraft(draft: DocumentDraft, result: HealthCa
     healthCardData: {
       ...merged.healthCardData,
       ...result.healthCardData,
-      status: merged.healthCardData.status || 'Active',
+      status: result.warnings.length ? 'Pending review' : merged.healthCardData.status || 'Active',
     },
   };
 }

@@ -6,12 +6,14 @@ import type {
   DocumentDraft,
   DrivingLicenceData,
   HealthCardData,
+  PaymentCardData,
   DocumentType,
   ExpiryReminderLeadTime,
   ExpiryReminderSchedule,
 } from '@/types/models';
 import { normalizeDrivingLicenceData } from './drivingLicence';
 import { normalizeHealthCardData } from './healthCard';
+import { normalizePaymentCardData } from './paymentCard';
 import { normalizePassportData } from './passport';
 
 export type DocumentExpiryBucket =
@@ -29,8 +31,8 @@ type ExpiryTone = 'default' | 'success' | 'gold' | 'coral' | 'danger';
 
 export const DEFAULT_EXPIRY_REMINDER_SCHEDULE: ExpiryReminderSchedule = [90, 30, 7, 1, 0];
 export const EXPIRY_WARNING_THRESHOLDS: ExpiryReminderLeadTime[] = [180, 90, 30, 14, 7, 1];
-const EXPIRY_PROMPT_TYPES: DocumentType[] = ['passport', 'ghic', 'insurance', 'visa', 'driving_licence', 'id_card'];
-const EXPIRY_WARNING_TYPES: DocumentType[] = ['passport', 'ghic', 'insurance', 'visa', 'driving_licence', 'id_card', 'custom'];
+const EXPIRY_PROMPT_TYPES: DocumentType[] = ['passport', 'ghic', 'insurance', 'visa', 'driving_licence', 'payment_card', 'id_card'];
+const EXPIRY_WARNING_TYPES: DocumentType[] = ['passport', 'ghic', 'insurance', 'visa', 'driving_licence', 'payment_card', 'id_card', 'custom'];
 
 function isIsoDate(value: string | null | undefined) {
   if (!value) {
@@ -194,6 +196,7 @@ export function normalizeDocumentRecord(document: Omit<Document, 'expiredStatus'
     secondaryMimeType: document.secondaryMimeType ?? null,
     drivingLicenceData: normalizeDrivingLicenceData(document.drivingLicenceData as DrivingLicenceData | null | undefined),
     healthCardData: normalizeHealthCardData(document.healthCardData as HealthCardData | null | undefined),
+    paymentCardData: normalizePaymentCardData(document.paymentCardData as PaymentCardData | null | undefined),
     expiredStatus: expiryInfo.isExpired,
     expiringSoonStatus: expiryInfo.isExpiring,
   };
@@ -219,6 +222,7 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     secondaryMimeType: null,
     drivingLicenceData: null,
     healthCardData: null,
+    paymentCardData: null,
     sensitive: true,
     createdAt: '',
     updatedAt: '',
@@ -246,6 +250,7 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     secondaryMimeType: normalized.secondaryMimeType,
     drivingLicenceData: normalized.drivingLicenceData,
     healthCardData: normalized.healthCardData,
+    paymentCardData: normalized.paymentCardData,
     sensitive: normalized.sensitive,
   };
 }

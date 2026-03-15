@@ -62,6 +62,15 @@ test('passport OCR result merges into draft fields', () => {
   assert.equal(merged.passportData?.countryCode, 'UTO');
 });
 
+test('passport OCR warns when multiple dates or numbers are present in labelled text', () => {
+  const parsed = parsePassportOcrText(
+    `Passport Number: C01X00AA1\nDocument Number: B99Y22ZZ0\nDate of Birth: 12.04.1988\nDate of Issue: 01.05.2023\nDate of Expiry: 01.05.2033`
+  );
+
+  assert.ok(parsed);
+  assert.equal(parsed.warnings.length >= 1, true);
+});
+
 test('passport OCR only enables for local image scans', () => {
   assert.equal(hasPassportImageForOcr(passportDraft), true);
   assert.equal(

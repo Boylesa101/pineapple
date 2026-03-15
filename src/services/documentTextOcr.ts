@@ -2,20 +2,52 @@ import { Platform } from 'react-native';
 
 import { deleteLocalFile } from '@/utils/fileStorage';
 
+const MAX_PDF_OCR_PAGES = 3;
+
 function createUnavailableError(message: string) {
   const error = new Error(message);
   error.name = 'DocumentOcrUnavailableError';
   return error;
 }
 
-async function resolveOcrSource(localFileUri: string, mimeType?: string | null) {
+type OcrSource = {
+  imageUris: string[];
+  generatedUris: string[];
+};
+
+export type DocumentTextOcrResult = {
+  rawText: string;
+  pageCount: number;
+  pageTexts: string[];
+};
+
+async function resolveOcrSource(localFileUri: string, mimeType?: string | null): Promise<OcrSource> {
   if (mimeType !== 'application/pdf' && !localFileUri.toLowerCase().endsWith('.pdf')) {
-    return { imageUri: localFileUri, generated: false };
+    return { imageUris: [localFileUri], generatedUris: [] };
   }
 
   const PdfPageImage = (await import('react-native-pdf-page-image')).default;
-  const pageImage = await PdfPageImage.generate(localFileUri, 1, 2);
-  return { imageUri: pageImage.uri, generated: true };
+  const generatedUris: string[] = [];
+
+  for (let pageNumber = 1; pageNumber <= MAX_PDF_OCR_PAGES; pageNumber += 1) {
+    try {
+      const pageImage = await PdfPageImage.generate(localFileUri, pageNumber, 2);
+      if (pageImage?.uri) {
+        generatedUris.push(pageImage.uri);
+      }
+    } catch (error) {
+      if (pageNumber === 1) {
+        throw error;
+      }
+      break;
+    }
+  }
+
+  if (!generatedUris.length) {
+    throw new Error('Pineapple could not render that PDF for OCR.');
+  }
+
+  return { imageUris: generatedUris, generatedUris };
 }
 
 export async function recognizeDocumentText(localFileUri: string, mimeType: string | null | undefined, label: string) {
@@ -23,13 +55,23 @@ export async function recognizeDocumentText(localFileUri: string, mimeType: stri
     throw createUnavailableError(`${label} OCR is available in the Android app, not the web companion.`);
   }
 
-  let generatedImageUri: string | null = null;
+  let generatedImageUris: string[] = [];
   try {
     const source = await resolveOcrSource(localFileUri, mimeType);
-    generatedImageUri = source.generated ? source.imageUri : null;
+    generatedImageUris = source.generatedUris;
     const { recognizeText } = await import('@infinitered/react-native-mlkit-text-recognition');
-    const result = await recognizeText(source.imageUri);
-    return result.text;
+    const pageTexts: string[] = [];
+
+    for (const imageUri of source.imageUris) {
+      const result = await recognizeText(imageUri);
+      pageTexts.push(result.text || '');
+    }
+
+    return {
+      rawText: pageTexts.filter(Boolean).join('\n'),
+      pageCount: pageTexts.length,
+      pageTexts,
+    } satisfies DocumentTextOcrResult;
   } catch (error) {
     if (error instanceof Error) {
       if (error.name === 'DocumentOcrUnavailableError') {
@@ -52,7 +94,7 @@ export async function recognizeDocumentText(localFileUri: string, mimeType: stri
 
     throw new Error(`${label} OCR is unavailable right now.`);
   } finally {
-    if (generatedImageUri) {
+    for (const generatedImageUri of generatedImageUris) {
       await deleteLocalFile(generatedImageUri);
     }
   }

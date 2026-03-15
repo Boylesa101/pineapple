@@ -11,6 +11,7 @@ export interface PassportOcrResult {
   expiryDate: string | null;
   holderName: string;
   passportData: Partial<PassportData>;
+  warnings: string[];
 }
 
 function normalizeLine(value: string) {
@@ -99,6 +100,38 @@ function normalizeExtractedDate(value: string) {
   return null;
 }
 
+function collectNormalizedDates(rawText: string) {
+  const matches = rawText.match(/\b(?:\d{4}[-/.]\d{2}[-/.]\d{2}|\d{2}[-/.]\d{2}[-/.]\d{4})\b/g) ?? [];
+  return Array.from(new Set(matches.map(normalizeExtractedDate).filter((value): value is string => Boolean(value))));
+}
+
+function collectDocumentNumberCandidates(rawText: string) {
+  const matches = rawText.match(/\b[A-Z0-9<]{7,14}\b/g) ?? [];
+  return Array.from(
+    new Set(
+      matches
+        .map((value) => value.replace(/</g, '').trim())
+        .filter((value) => /[A-Z]/.test(value) && /\d/.test(value))
+    )
+  );
+}
+
+function buildPassportWarnings(rawText: string, result: Pick<PassportOcrResult, 'documentNumber' | 'expiryDate'>) {
+  const warnings: string[] = [];
+  const dates = collectNormalizedDates(rawText);
+  const numbers = collectDocumentNumberCandidates(rawText);
+
+  if (dates.length > 2) {
+    warnings.push('Multiple date candidates were detected. Review the passport dates before saving.');
+  }
+
+  if (numbers.length > 1 && result.documentNumber && numbers.some((value) => value !== result.documentNumber)) {
+    warnings.push('Multiple passport-number candidates were detected. Confirm the extracted number before saving.');
+  }
+
+  return warnings;
+}
+
 function parseLabelValue(rawText: string, labels: string[]) {
   const pattern = labels
     .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
@@ -148,6 +181,7 @@ function parseMrz(rawText: string): PassportOcrResult | null {
     issueDate: null,
     expiryDate: parseMrzDate(lineTwo.slice(21, 27), 'expiry'),
     holderName,
+    warnings: [],
     passportData: {
       passportType: lineOne.slice(0, 1).replace(/</g, '') || 'P',
       countryCode,
@@ -189,6 +223,7 @@ function parseFallbackText(rawText: string): PassportOcrResult | null {
     issueDate,
     expiryDate,
     holderName: titleCasePassportName([givenNames, surname].filter(Boolean).join(' ')),
+    warnings: [],
     passportData: {
       passportType: parseLabelValue(normalized, ['TYPE']).slice(0, 2) || 'P',
       countryCode,
@@ -207,7 +242,15 @@ export function parsePassportOcrText(rawText: string) {
     return null;
   }
 
-  return parseMrz(trimmed) ?? parseFallbackText(trimmed);
+  const parsed = parseMrz(trimmed) ?? parseFallbackText(trimmed);
+  if (!parsed) {
+    return null;
+  }
+
+  return {
+    ...parsed,
+    warnings: buildPassportWarnings(trimmed, parsed),
+  };
 }
 
 export function hasPassportImageForOcr(document: Pick<DocumentDraft, 'localFileUri' | 'mimeType' | 'previewUri' | 'documentType'>) {

@@ -16,6 +16,7 @@ const documentLabelMap: Record<DocumentType, string> = {
   insurance: 'Travel insurance',
   visa: 'Visa',
   driving_licence: 'Driving licence',
+  payment_card: 'Payment card',
   id_card: 'ID card',
   boarding_pass: 'Boarding pass',
   hotel_booking: 'Hotel booking',
@@ -162,7 +163,7 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
     if (trip.status !== 'completed' && snapshot.appPreferences.expiryRemindersEnabled) {
       for (const document of bundle.documents.filter(
         (item) =>
-          ['passport', 'ghic', 'insurance', 'visa', 'driving_licence', 'id_card', 'custom'].includes(item.documentType) &&
+          ['passport', 'ghic', 'insurance', 'visa', 'driving_licence', 'payment_card', 'id_card', 'custom'].includes(item.documentType) &&
           item.expiryDate &&
           item.expiryReminderEnabled
       )) {

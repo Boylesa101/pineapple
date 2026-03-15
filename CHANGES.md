@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.11 - 2026-03-15
+
+- Extended on-device OCR for passports, driving licences, and health cards so attached PDFs can be read across multiple pages instead of only the first page
+- Added OCR review warnings when Pineapple detects competing dates or document/card numbers, and surfaced those notes directly in the Vault extraction flow
+- Added a dedicated payment-card Vault experience with a premium closed card, a secure details drawer, masked-number defaults, explicit reveal/hide action, and non-sensitive copy behaviour
+- Added safe local persistence and migration support for payment-card records plus regression tests for OCR review warnings and secure card masking/copy rules
+
 ## 1.4.10 - 2026-03-15
 
 - Added on-device driving-licence OCR for local front-scan images and PDFs in the Android build, with editable extracted fields kept in the existing Vault flow

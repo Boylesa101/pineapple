@@ -73,3 +73,12 @@ test('driving licence OCR supports local images and pdfs', () => {
     true
   );
 });
+
+test('driving licence OCR flags ambiguous dates or numbers for review', () => {
+  const parsed = parseDrivingLicenceOcrText(
+    `1. DOE\n2. JANE ALICE\n3. 14.08.1990\n4A. 01.06.2020\n4B. 01.06.2030\n5. DOEJA908140AA9BC\nLICENCE NUMBER: DOEJA908140XX1YY\n8. 12 SAMPLE STREET`
+  );
+
+  assert.ok(parsed);
+  assert.equal(parsed.warnings.length >= 1, true);
+});

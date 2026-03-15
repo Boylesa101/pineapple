@@ -20,6 +20,7 @@ const documentLabels = {
   insurance: 'Travel insurance',
   visa: 'Visa',
   driving_licence: 'Driving licence',
+  payment_card: 'Payment card',
   id_card: 'ID card',
   boarding_pass: 'Boarding pass',
   hotel_booking: 'Hotel booking',

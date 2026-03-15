@@ -11,6 +11,7 @@ const documentTypeLabels = {
   insurance: 'insurance document',
   visa: 'visa',
   driving_licence: 'driving licence',
+  payment_card: 'payment card',
   id_card: 'ID card',
   custom: 'document',
 } as const;

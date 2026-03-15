@@ -17,6 +17,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Passport image scans and passport PDFs can now prefill passport fields with on-device OCR and MRZ parsing in the Android build, while keeping the extracted fields editable before save
 - Driving licences now render with their own UK photocard object and fuller official record view, including front/back scan support and Android OCR from front scans
 - GHIC / EHIC cards now render with a dedicated health-card object that prioritises quick expiry, issuer, emergency, and card-number access
+- Payment cards now render with their own secure premium-card object, masked number defaults, explicit reveal/hide action, and non-sensitive copy behaviour
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
@@ -109,7 +110,9 @@ npx expo export --platform web
 
 - Passport OCR is available in the Android native build of Pineapple
 - It works with local image scans and attached passport PDFs stored on the device
+- PDF OCR now reads multiple pages when needed, instead of stopping at only the first page
 - Pineapple always lets the user review and edit extracted passport fields before saving
+- When multiple candidate dates or numbers are detected, Pineapple now surfaces review notes before save
 
 ### Driving Licence
 
@@ -117,12 +120,21 @@ npx expo export --platform web
 - The closed state behaves like a compact licence card and the open state reveals a fuller official record layout
 - Pineapple can keep front and reverse scans separately so the photocard and endorsements stay together offline
 - Driving-licence OCR is available in the Android native build for local front images and PDFs, with extracted fields kept editable before save
+- Driving-licence OCR now flags ambiguous dates or licence numbers for manual review in the Vault flow
 
 ### Health Cards
 
 - GHIC / EHIC cards use a dedicated health-card component instead of the generic document card
 - The closed state behaves like a real travel health card and the open state prioritises holder, issuer, emergency line, and expiry details
 - Health-card OCR is available in the Android native build for local images and PDFs, with extracted fields always reviewable and editable before save
+- Health-card OCR now flags ambiguous dates or card numbers for manual review in the Vault flow
+
+### Payment Cards
+
+- Payment cards use a dedicated premium-card component instead of the generic document card
+- The closed state always masks the card number except the last 4 digits
+- The open state behaves like a secure stored-record drawer with explicit reveal/hide control for the full number
+- Pineapple does not show the security code by default in the payment-card detail view, and copy actions only include non-sensitive masked data
 
 ### Local data model
 
