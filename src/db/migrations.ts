@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 10;
+const DATABASE_VERSION = 11;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS documents (
   drivingLicenceData TEXT,
   healthCardData TEXT,
   paymentCardData TEXT,
+  formalDocumentData TEXT,
   sensitive INTEGER NOT NULL DEFAULT 1,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
@@ -348,6 +349,10 @@ async function runPhaseTenMigration(db: SQLiteDatabase) {
   await ensureColumn(db, 'documents', 'paymentCardData', 'TEXT');
 }
 
+async function runPhaseElevenMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'documents', 'formalDocumentData', 'TEXT');
+}
+
 export async function runMigrations(db: SQLiteDatabase) {
   await db.execAsync(createLatestTablesSql);
 
@@ -378,6 +383,9 @@ export async function runMigrations(db: SQLiteDatabase) {
   }
   if (version < 10) {
     await runPhaseTenMigration(db);
+  }
+  if (version < 11) {
+    await runPhaseElevenMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

@@ -8,6 +8,7 @@ import {
   serializeExpiryReminderSchedule,
 } from '@/utils/documentExpiry';
 import { normalizeDrivingLicenceData } from '@/utils/drivingLicence';
+import { normalizeFormalDocumentData } from '@/utils/formalDocument';
 import { normalizeHealthCardData } from '@/utils/healthCard';
 import { deleteLocalFile } from '@/utils/fileStorage';
 import { normalizePaymentCardData } from '@/utils/paymentCard';
@@ -78,6 +79,18 @@ function parsePaymentCardData(value: unknown) {
 
   try {
     return normalizePaymentCardData(JSON.parse(value));
+  } catch {
+    return null;
+  }
+}
+
+function parseFormalDocumentData(value: unknown) {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    return normalizeFormalDocumentData(JSON.parse(value));
   } catch {
     return null;
   }
@@ -232,6 +245,7 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         drivingLicenceData: parseDrivingLicenceData(document.drivingLicenceData),
         healthCardData: parseHealthCardData(document.healthCardData),
         paymentCardData: parsePaymentCardData(document.paymentCardData),
+        formalDocumentData: parseFormalDocumentData(document.formalDocumentData),
       })
     ),
     packingItems: packingItemsRaw.map((item) => ({
@@ -377,8 +391,8 @@ export async function upsertDocument(input: DocumentDraft) {
     : null;
 
   await db.runAsync(
-    `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, expiryReminderEnabled, expiryReminderSchedule, notes, localFileUri, previewUri, mimeType, passportData, secondaryLocalFileUri, secondaryPreviewUri, secondaryMimeType, drivingLicenceData, healthCardData, paymentCardData, sensitive, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, expiryReminderEnabled, expiryReminderSchedule, notes, localFileUri, previewUri, mimeType, passportData, secondaryLocalFileUri, secondaryPreviewUri, secondaryMimeType, drivingLicenceData, healthCardData, paymentCardData, formalDocumentData, sensitive, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        travellerId = excluded.travellerId,
@@ -400,6 +414,7 @@ export async function upsertDocument(input: DocumentDraft) {
        drivingLicenceData = excluded.drivingLicenceData,
        healthCardData = excluded.healthCardData,
        paymentCardData = excluded.paymentCardData,
+       formalDocumentData = excluded.formalDocumentData,
        sensitive = excluded.sensitive,
        updatedAt = excluded.updatedAt`,
     id,
@@ -423,6 +438,7 @@ export async function upsertDocument(input: DocumentDraft) {
     normalized.drivingLicenceData ? JSON.stringify(normalized.drivingLicenceData) : null,
     normalized.healthCardData ? JSON.stringify(normalized.healthCardData) : null,
     normalized.paymentCardData ? JSON.stringify(normalized.paymentCardData) : null,
+    normalized.formalDocumentData ? JSON.stringify(normalized.formalDocumentData) : null,
     normalized.sensitive ? 1 : 0,
     timestamp,
     timestamp

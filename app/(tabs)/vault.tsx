@@ -16,6 +16,7 @@ import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { DrivingLicenceDocument } from '@/components/driving-licence/DrivingLicenceDocument';
 import { EmptyState } from '@/components/EmptyState';
+import { FormalDocumentRecord } from '@/components/formal-document/FormalDocumentRecord';
 import { HealthCardDocument } from '@/components/health-card/HealthCardDocument';
 import { InfoChip } from '@/components/InfoChip';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
@@ -27,6 +28,7 @@ import { VerificationBadge } from '@/components/passport/VerificationBadge';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, spacing } from '@/constants/theme';
 import { recognizeDrivingLicenceScan } from '@/services/drivingLicenceOcr';
+import { recognizeFormalDocumentScan } from '@/services/formalDocumentOcr';
 import { recognizeHealthCardScan } from '@/services/healthCardOcr';
 import { recognizePassportScan } from '@/services/passportOcr';
 import { useAppStore } from '@/store/useAppStore';
@@ -47,6 +49,13 @@ import {
 } from '@/utils/drivingLicence';
 import { applyDrivingLicenceOcrToDraft, canRunDrivingLicenceOcr } from '@/utils/drivingLicenceOcr';
 import { copyIntoAppStorage } from '@/utils/fileStorage';
+import {
+  buildFormalDocumentCopyPayload,
+  ensureFormalDocumentDraftData,
+  getFormalDocumentVerificationStatus,
+  isFormalDocumentType,
+} from '@/utils/formalDocument';
+import { applyFormalDocumentOcrToDraft, canRunFormalDocumentOcr } from '@/utils/formalDocumentOcr';
 import { maskSensitive } from '@/utils/format';
 import { buildHealthCardCopyPayload, ensureHealthCardDraftData, getHealthCardVerificationStatus } from '@/utils/healthCard';
 import { applyHealthCardOcrToDraft, canRunHealthCardOcr } from '@/utils/healthCardOcr';
@@ -119,9 +128,11 @@ export default function VaultScreen() {
   const [drivingLicenceOpen, setDrivingLicenceOpen] = useState(false);
   const [healthCardOpen, setHealthCardOpen] = useState(false);
   const [paymentCardOpen, setPaymentCardOpen] = useState(false);
+  const [formalDocumentOpen, setFormalDocumentOpen] = useState(false);
   const [passportOcrLoading, setPassportOcrLoading] = useState(false);
   const [drivingLicenceOcrLoading, setDrivingLicenceOcrLoading] = useState(false);
   const [healthCardOcrLoading, setHealthCardOcrLoading] = useState(false);
+  const [formalDocumentOcrLoading, setFormalDocumentOcrLoading] = useState(false);
   const openedEditIdRef = useRef<string | null>(null);
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
@@ -149,7 +160,10 @@ export default function VaultScreen() {
     const traveller = data.travellers.find((item) => item.id === document.travellerId) ?? null;
     setDraft(
       ensurePaymentCardDraftData(
-        ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(document, traveller), traveller), traveller),
+        ensureFormalDocumentDraftData(
+          ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(document, traveller), traveller), traveller),
+          traveller
+        ),
         traveller
       )
     );
@@ -162,6 +176,7 @@ export default function VaultScreen() {
       setDrivingLicenceOpen(false);
       setHealthCardOpen(false);
       setPaymentCardOpen(false);
+      setFormalDocumentOpen(false);
     }
   }, [detailVisible, selectedId]);
 
@@ -170,12 +185,16 @@ export default function VaultScreen() {
     setDrivingLicenceOpen(false);
     setHealthCardOpen(false);
     setPaymentCardOpen(false);
+    setFormalDocumentOpen(false);
   }, [selectedId]);
 
   function withSpecializedDocumentData(source: DocumentDraft) {
     const traveller = bundle.travellers.find((item) => item.id === source.travellerId) ?? null;
     return ensurePaymentCardDraftData(
-      ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(source, traveller), traveller), traveller),
+      ensureFormalDocumentDraftData(
+        ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(source, traveller), traveller), traveller),
+        traveller
+      ),
       traveller
     );
   }
@@ -617,6 +636,71 @@ export default function VaultScreen() {
     await runHealthCardOcrOnDraft(editableDraft, { openEditor: true });
   }
 
+  async function runFormalDocumentOcrOnDraft(sourceDraft: DocumentDraft, options?: { openEditor?: boolean }) {
+    const openEditor = options?.openEditor ?? false;
+    if (!canRunFormalDocumentOcr(sourceDraft)) {
+      Alert.alert(
+        'Scan needed',
+        sourceDraft.localFileUri
+          ? 'Formal-document OCR can read local image scans and PDFs in the Android build.'
+          : 'Attach a scan or PDF first, then Pineapple can extract document metadata for review.'
+      );
+      return;
+    }
+
+    try {
+      setFormalDocumentOcrLoading(true);
+      const extracted = await recognizeFormalDocumentScan(sourceDraft.localFileUri, sourceDraft.mimeType);
+      const merged = applyFormalDocumentOcrToDraft(sourceDraft, extracted);
+      setDraft((current) => {
+        if (current?.id && sourceDraft.id && current.id !== sourceDraft.id) {
+          return current;
+        }
+        return merged;
+      });
+
+      if (openEditor) {
+        setDetailVisible(false);
+        setEditorVisible(true);
+      }
+
+      Alert.alert(
+        'Document fields extracted',
+        [
+          'Pineapple filled the formal-document fields from the scan.',
+          extracted.warnings.length ? `Review notes:\n- ${extracted.warnings.join('\n- ')}` : 'Review them before saving.',
+        ].join('\n\n')
+      );
+    } catch (error) {
+      Alert.alert(
+        'Formal-document OCR unavailable',
+        error instanceof Error
+          ? error.message
+          : 'Pineapple could not read that document right now. You can still enter the document fields manually.'
+      );
+    } finally {
+      setFormalDocumentOcrLoading(false);
+    }
+  }
+
+  async function handleDraftFormalDocumentOcr() {
+    if (!draft) {
+      return;
+    }
+
+    await runFormalDocumentOcrOnDraft(draft);
+  }
+
+  async function handleSelectedFormalDocumentOcr() {
+    if (!selectedDocument) {
+      return;
+    }
+
+    const editableDraft = withSpecializedDocumentData(selectedDocument);
+    setDraft(editableDraft);
+    await runFormalDocumentOcrOnDraft(editableDraft, { openEditor: true });
+  }
+
   return (
     <AppScreen title="Vault" subtitle="Traveller-specific documents, grouped views, and clear expiry warnings.">
       <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
@@ -874,6 +958,50 @@ export default function VaultScreen() {
                 );
               }
 
+              if (isFormalDocumentType(document.documentType)) {
+                return (
+                  <View key={document.id} style={styles.passportRow}>
+                    <FormalDocumentRecord
+                      document={document}
+                      traveller={traveller}
+                      onPress={() => {
+                        setSelectedId(document.id);
+                        setFormalDocumentOpen(false);
+                        setDetailVisible(true);
+                      }}
+                      compact
+                      onOpenSource={() => document.localFileUri && Linking.openURL(document.localFileUri)}
+                    />
+                    <View style={styles.passportMeta}>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.title}>{documentLabels[document.documentType]}</Text>
+                        <VerificationBadge status={getFormalDocumentVerificationStatus(document)} />
+                      </View>
+                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+                      <Text style={styles.meta}>
+                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : expiryInfo.needsExpiryPrompt ? 'Add expiry date to enable warnings' : 'No expiry date saved'}
+                      </Text>
+                      <Text style={styles.meta}>{numberLabel}</Text>
+                      {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
+                    </View>
+                    <View style={styles.iconColumn}>
+                      <Pressable
+                        onPress={() => {
+                          setDraft(withSpecializedDocumentData(document));
+                          setEditorVisible(true);
+                        }}
+                        style={styles.iconButton}
+                      >
+                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+                      </Pressable>
+                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
+                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              }
+
               return (
                 <Pressable
                   key={document.id}
@@ -991,13 +1119,16 @@ export default function VaultScreen() {
 
                     const traveller = bundle.travellers.find((item) => item.id === (value === 'trip' ? null : value)) ?? null;
                     return ensurePaymentCardDraftData(
-                      ensureHealthCardDraftData(
-                        ensureDrivingLicenceDraftData(
-                          ensurePassportDraftData(
-                            {
-                              ...current,
-                              travellerId: value === 'trip' ? null : value,
-                            },
+                      ensureFormalDocumentDraftData(
+                        ensureHealthCardDraftData(
+                          ensureDrivingLicenceDraftData(
+                            ensurePassportDraftData(
+                              {
+                                ...current,
+                                travellerId: value === 'trip' ? null : value,
+                              },
+                              traveller
+                            ),
                             traveller
                           ),
                           traveller
@@ -1305,6 +1436,104 @@ export default function VaultScreen() {
                 </View>
               </>
             ) : null}
+            {isFormalDocumentType(draft.documentType) && draft.formalDocumentData ? (
+              <>
+                <View style={styles.detailHeader}>
+                  <Text style={styles.label}>Document record</Text>
+                  <VerificationBadge
+                    status={getFormalDocumentVerificationStatus({
+                      localFileUri: draft.localFileUri,
+                      mimeType: draft.mimeType,
+                      formalDocumentData: draft.formalDocumentData,
+                      documentNumber: draft.documentNumber,
+                      notes: draft.notes,
+                    })}
+                  />
+                </View>
+                <AppButton
+                  label="Extract from scan"
+                  tone="secondary"
+                  onPress={handleDraftFormalDocumentOcr}
+                  disabled={!canRunFormalDocumentOcr(draft)}
+                  loading={formalDocumentOcrLoading}
+                />
+                {!canRunFormalDocumentOcr(draft) ? (
+                  <Text style={styles.meta}>
+                    {draft.localFileUri
+                      ? 'Formal-document OCR can read local image scans and PDFs in the Android build.'
+                      : 'Attach a document image or PDF to extract metadata automatically.'}
+                  </Text>
+                ) : null}
+                <AppTextField
+                  label="Document title"
+                  value={draft.formalDocumentData.title}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, title: value } } : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Issuer"
+                  value={draft.formalDocumentData.issuer}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, issuer: value } } : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Reference"
+                  value={draft.formalDocumentData.referenceCode}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.formalDocumentData
+                        ? {
+                            ...current,
+                            documentNumber: value,
+                            formalDocumentData: { ...current.formalDocumentData, referenceCode: value },
+                          }
+                        : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Location"
+                  value={draft.formalDocumentData.location}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, location: value } } : current
+                    )
+                  }
+                />
+                <View style={styles.field}>
+                  <Text style={styles.label}>Status</Text>
+                  <ChoiceChips<string>
+                    value={draft.formalDocumentData.status || 'Stored'}
+                    onChange={(value) =>
+                      setDraft((current) =>
+                        current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, status: value } } : current
+                      )
+                    }
+                    options={[
+                      { label: 'Stored', value: 'Stored' },
+                      { label: 'Needs review', value: 'Needs review' },
+                      { label: 'Confirmed', value: 'Confirmed' },
+                    ]}
+                  />
+                </View>
+                <AppTextField
+                  label="Summary"
+                  value={draft.formalDocumentData.summary}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, summary: value } } : current
+                    )
+                  }
+                  multiline
+                />
+              </>
+            ) : null}
             {draft.documentType === 'payment_card' && draft.paymentCardData ? (
               <>
                 <View style={styles.detailHeader}>
@@ -1406,6 +1635,10 @@ export default function VaultScreen() {
                 ? draft.localFileUri || draft.secondaryLocalFileUri
                   ? `This driving licence keeps ${draft.localFileUri ? 'the front' : 'no front'}${draft.secondaryLocalFileUri ? ' and the reverse' : ''} scan locally on the device.`
                   : 'This is a metadata-only driving licence entry. You can still track numbers, dates, and reminders without attaching scans yet.'
+                : isFormalDocumentType(draft.documentType)
+                  ? draft.localFileUri
+                    ? 'This formal document keeps its image or PDF locally on the device for quick reference.'
+                    : 'This is a metadata-only formal document entry. You can still keep issuer, reference, and renewal details without attaching a file yet.'
                 : draft.documentType === 'payment_card'
                   ? draft.localFileUri
                     ? 'This payment card keeps its stored image locally on the device. Card numbers stay masked by default.'
@@ -1456,6 +1689,8 @@ export default function VaultScreen() {
                 ? 'Health card detail'
                 : selectedDocument?.documentType === 'payment_card'
                   ? 'Payment card detail'
+                  : selectedDocument && isFormalDocumentType(selectedDocument.documentType)
+                    ? 'Formal document detail'
               : 'Document detail'
         }
         onClose={() => setDetailVisible(false)}
@@ -1648,6 +1883,53 @@ export default function VaultScreen() {
                       <Text style={styles.meta}>No card image is attached yet. Pineapple still keeps the masked card record and expiry locally.</Text>
                     ) : null}
                     <Text style={styles.meta}>Full card numbers stay hidden until you deliberately reveal them. Security codes are not shown in this view.</Text>
+                    {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
+                  </>
+                ) : isFormalDocumentType(selectedDocument.documentType) ? (
+                  <>
+                    <FormalDocumentRecord
+                      document={selectedDocument}
+                      traveller={selectedTraveller}
+                      open={formalDocumentOpen}
+                      interactive
+                      onOpenSource={() => selectedDocument.localFileUri && Linking.openURL(selectedDocument.localFileUri)}
+                    />
+                    <AppButton
+                      label={formalDocumentOpen ? 'Close document' : 'Open document'}
+                      tone="secondary"
+                      onPress={() => setFormalDocumentOpen((value) => !value)}
+                    />
+                    <View style={styles.buttonRow}>
+                      <CopyDataButton
+                        label="Copy document data"
+                        payload={buildFormalDocumentCopyPayload(selectedDocument, selectedTraveller)}
+                      />
+                      <AppButton
+                        label="Extract from scan"
+                        tone="secondary"
+                        onPress={handleSelectedFormalDocumentOcr}
+                        disabled={!canRunFormalDocumentOcr(selectedDocument)}
+                        loading={formalDocumentOcrLoading}
+                      />
+                      <AppButton
+                        label="Edit extracted fields"
+                        tone="secondary"
+                        onPress={() => {
+                          setDraft(withSpecializedDocumentData(selectedDocument));
+                          setDetailVisible(false);
+                          setEditorVisible(true);
+                        }}
+                      />
+                      <AppButton
+                        label={selectedDocument.mimeType === 'application/pdf' ? 'View original PDF' : 'View original scan'}
+                        tone="secondary"
+                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        disabled={!selectedDocument.localFileUri}
+                      />
+                    </View>
+                    {!selectedDocument.localFileUri ? (
+                      <Text style={styles.meta}>No original file is attached yet. You can still keep extracted document details and renewal tracking locally.</Text>
+                    ) : null}
                     {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
                   </>
                 ) : (

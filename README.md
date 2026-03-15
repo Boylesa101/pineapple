@@ -18,6 +18,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Driving licences now render with their own UK photocard object and fuller official record view, including front/back scan support and Android OCR from front scans
 - GHIC / EHIC cards now render with a dedicated health-card object that prioritises quick expiry, issuer, emergency, and card-number access
 - Payment cards now render with their own secure premium-card object, masked number defaults, explicit reveal/hide action, and non-sensitive copy behaviour
+- Insurance records, confirmations, letters, passes, and similar paperwork now render with a dedicated formal-document folder that opens into metadata plus source-preview layout
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
@@ -135,6 +136,13 @@ npx expo export --platform web
 - The closed state always masks the card number except the last 4 digits
 - The open state behaves like a secure stored-record drawer with explicit reveal/hide control for the full number
 - Pineapple does not show the security code by default in the payment-card detail view, and copy actions only include non-sensitive masked data
+
+### Formal Documents
+
+- Insurance records, policy documents, passes, confirmations, certificates, letters, and similar paperwork use a dedicated formal-document folder instead of the generic document card
+- The closed state behaves like an official record cover, while the open state pairs extracted metadata with the original image or PDF preview
+- Formal-document OCR is available in the Android native build for local images and PDFs, with extracted fields kept editable before save
+- When Pineapple detects multiple candidate dates or reference codes, it flags the formal document for manual review in the Vault flow
 
 ### Local data model
 

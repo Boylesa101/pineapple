@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.12 - 2026-03-15
+
+- Added a dedicated formal-document Vault experience for insurance records, certificates, confirmations, letters, passes, and similar paperwork with an official folder-style closed state
+- Added a document-focused open view that pairs extracted metadata with the original image/PDF preview, plus copy, edit, and source-opening actions
+- Added on-device OCR parsing for formal paperwork metadata, including review warnings when multiple candidate dates or reference codes are detected
+- Added safe local persistence, migration coverage, and regression tests for formal-document records so older installs continue upgrading without data loss
+
 ## 1.4.11 - 2026-03-15
 
 - Extended on-device OCR for passports, driving licences, and health cards so attached PDFs can be read across multiple pages instead of only the first page

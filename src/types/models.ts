@@ -99,6 +99,7 @@ export interface Document {
   drivingLicenceData?: DrivingLicenceData | null;
   healthCardData?: HealthCardData | null;
   paymentCardData?: PaymentCardData | null;
+  formalDocumentData?: FormalDocumentData | null;
   sensitive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -134,6 +135,15 @@ export interface PaymentCardData {
   bank: string;
   billingDetails: string;
   cvv: string;
+}
+
+export interface FormalDocumentData {
+  title: string;
+  issuer: string;
+  referenceCode: string;
+  location: string;
+  status: string;
+  summary: string;
 }
 
 export interface PackingItem {

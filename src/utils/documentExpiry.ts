@@ -6,12 +6,14 @@ import type {
   DocumentDraft,
   DrivingLicenceData,
   HealthCardData,
+  FormalDocumentData,
   PaymentCardData,
   DocumentType,
   ExpiryReminderLeadTime,
   ExpiryReminderSchedule,
 } from '@/types/models';
 import { normalizeDrivingLicenceData } from './drivingLicence';
+import { normalizeFormalDocumentData } from './formalDocument';
 import { normalizeHealthCardData } from './healthCard';
 import { normalizePaymentCardData } from './paymentCard';
 import { normalizePassportData } from './passport';
@@ -197,6 +199,7 @@ export function normalizeDocumentRecord(document: Omit<Document, 'expiredStatus'
     drivingLicenceData: normalizeDrivingLicenceData(document.drivingLicenceData as DrivingLicenceData | null | undefined),
     healthCardData: normalizeHealthCardData(document.healthCardData as HealthCardData | null | undefined),
     paymentCardData: normalizePaymentCardData(document.paymentCardData as PaymentCardData | null | undefined),
+    formalDocumentData: normalizeFormalDocumentData(document.formalDocumentData as FormalDocumentData | null | undefined),
     expiredStatus: expiryInfo.isExpired,
     expiringSoonStatus: expiryInfo.isExpiring,
   };
@@ -223,6 +226,7 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     drivingLicenceData: null,
     healthCardData: null,
     paymentCardData: null,
+    formalDocumentData: null,
     sensitive: true,
     createdAt: '',
     updatedAt: '',
@@ -251,6 +255,7 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     drivingLicenceData: normalized.drivingLicenceData,
     healthCardData: normalized.healthCardData,
     paymentCardData: normalized.paymentCardData,
+    formalDocumentData: normalized.formalDocumentData,
     sensitive: normalized.sensitive,
   };
 }
