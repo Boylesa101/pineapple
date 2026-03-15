@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.8 - 2026-03-15
+
+- Added real on-device passport OCR using ML Kit in the Vault passport flow, including MRZ parsing and editable field prefill
+- Added explicit `Extract from scan` actions for passport images in the editor and passport detail view, while keeping save confirmation manual
+- Added regression tests for MRZ parsing, fallback labelled-text parsing, OCR merge behaviour, and image-scan eligibility checks
+- Documented the current OCR scope: Android native build only, image scans only, with manual editing still available for PDFs and unsupported runtimes
+
 ## 1.4.7 - 2026-03-15
 
 - Added a passport-specific Vault experience with a physical closed cover, an interactive passport spread, editable extracted passport fields, MRZ-style presentation, copy action, scan entry point, expiry badge, and verification badge

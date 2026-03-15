@@ -14,6 +14,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Traveller management with passport, GHIC / EHIC, and medical notes
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
 - Passport documents now render with a dedicated physical passport cover and identity spread experience instead of a generic document card
+- Passport image scans can now prefill passport fields with on-device OCR and MRZ parsing in the Android build, while keeping the extracted fields editable before save
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
@@ -51,6 +52,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - PDF generation via `expo-print`
 - Local sharing via `expo-sharing`
 - Local notifications via `expo-notifications`
+- Passport OCR via `@infinitered/react-native-mlkit-text-recognition`
 - Backup encryption via PBKDF2-derived AES with HMAC integrity using `crypto-js`
 - State management via `zustand`
 
@@ -99,6 +101,13 @@ npm run typecheck
 npx expo export --platform ios --platform android
 npx expo export --platform web
 ```
+
+### Passport OCR
+
+- Passport OCR is available in the Android native build of Pineapple
+- It currently works with local image scans stored on the device
+- PDF passport files still need manual review and field entry
+- Pineapple always lets the user review and edit extracted passport fields before saving
 
 ### Local data model
 

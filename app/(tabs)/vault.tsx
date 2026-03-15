@@ -23,6 +23,7 @@ import { PassportDocument } from '@/components/passport/PassportDocument';
 import { VerificationBadge } from '@/components/passport/VerificationBadge';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, spacing } from '@/constants/theme';
+import { recognizePassportScan } from '@/services/passportOcr';
 import { useAppStore } from '@/store/useAppStore';
 import type { DocumentDraft, DocumentType, ExpiryReminderLeadTime } from '@/types/models';
 import { formatShortDate } from '@/utils/date';
@@ -37,6 +38,7 @@ import { findPotentialDocumentDuplicate } from '@/utils/documentDuplicates';
 import { copyIntoAppStorage } from '@/utils/fileStorage';
 import { maskSensitive } from '@/utils/format';
 import { buildPassportCopyPayload, ensurePassportDraftData, getPassportVerificationStatus } from '@/utils/passport';
+import { applyPassportOcrToDraft, hasPassportImageForOcr } from '@/utils/passportOcr';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
 import { validateDocument } from '@/utils/validation';
 
@@ -92,6 +94,7 @@ export default function VaultScreen() {
   const [typeFilter, setTypeFilter] = useState<DocumentType | 'all'>('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('flat');
   const [passportOpen, setPassportOpen] = useState(false);
+  const [passportOcrLoading, setPassportOcrLoading] = useState(false);
   const openedEditIdRef = useRef<string | null>(null);
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
@@ -330,6 +333,71 @@ export default function VaultScreen() {
         onPress: () => deleteRecord('documents', documentId),
       },
     ]);
+  }
+
+  async function runPassportOcrOnDraft(sourceDraft: DocumentDraft, options?: { openEditor?: boolean }) {
+    const openEditor = options?.openEditor ?? false;
+    if (!hasPassportImageForOcr(sourceDraft)) {
+      Alert.alert(
+        'Image scan needed',
+        sourceDraft.localFileUri
+          ? 'Passport OCR currently works with image scans saved on this device. PDFs still need manual entry.'
+          : 'Attach a passport image first, then Pineapple can extract the MRZ and fill the passport fields for review.'
+      );
+      return;
+    }
+
+    try {
+      setPassportOcrLoading(true);
+      const extracted = await recognizePassportScan(sourceDraft.localFileUri);
+      const merged = applyPassportOcrToDraft(sourceDraft, extracted);
+      setDraft((current) => {
+        if (current?.id && sourceDraft.id && current.id !== sourceDraft.id) {
+          return current;
+        }
+        return merged;
+      });
+
+      if (openEditor) {
+        setDetailVisible(false);
+        setEditorVisible(true);
+      }
+
+      Alert.alert(
+        'Passport fields extracted',
+        extracted.source === 'mrz'
+          ? 'Pineapple read the passport MRZ and filled the passport fields. Review them before saving.'
+          : 'Pineapple filled the passport fields from the scan text. Review them before saving.'
+      );
+    } catch (error) {
+      Alert.alert(
+        'Passport OCR unavailable',
+        error instanceof Error
+          ? error.message
+          : 'Pineapple could not read that passport scan right now. You can still enter the passport fields manually.'
+      );
+    } finally {
+      setPassportOcrLoading(false);
+    }
+  }
+
+  async function handleDraftPassportOcr() {
+    if (!draft) {
+      return;
+    }
+
+    await runPassportOcrOnDraft(draft);
+  }
+
+  async function handleSelectedPassportOcr() {
+    if (!selectedDocument) {
+      return;
+    }
+
+    const traveller = bundle.travellers.find((item) => item.id === selectedDocument.travellerId) ?? null;
+    const editableDraft = ensurePassportDraftData(selectedDocument, traveller);
+    setDraft(editableDraft);
+    await runPassportOcrOnDraft(editableDraft, { openEditor: true });
   }
 
   return (
@@ -609,6 +677,20 @@ export default function VaultScreen() {
                     )}
                   />
                 </View>
+                <AppButton
+                  label="Extract from scan"
+                  tone="secondary"
+                  onPress={handleDraftPassportOcr}
+                  disabled={!hasPassportImageForOcr(draft)}
+                  loading={passportOcrLoading}
+                />
+                {!hasPassportImageForOcr(draft) ? (
+                  <Text style={styles.meta}>
+                    {draft.localFileUri
+                      ? 'Passport OCR currently works with local image scans. PDFs still need manual review.'
+                      : 'Attach a passport image to extract MRZ and identity fields automatically.'}
+                  </Text>
+                ) : null}
                 <AppTextField
                   label="Passport type"
                   value={draft.passportData.passportType}
@@ -783,6 +865,13 @@ export default function VaultScreen() {
                     <View style={styles.buttonRow}>
                       <CopyDataButton payload={buildPassportCopyPayload(selectedDocument, selectedTraveller)} />
                       <AppButton
+                        label="Extract from scan"
+                        tone="secondary"
+                        onPress={handleSelectedPassportOcr}
+                        disabled={!hasPassportImageForOcr(selectedDocument)}
+                        loading={passportOcrLoading}
+                      />
+                      <AppButton
                         label="Edit extracted fields"
                         tone="secondary"
                         onPress={() => {
@@ -800,6 +889,9 @@ export default function VaultScreen() {
                     </View>
                     {!selectedDocument.localFileUri ? (
                       <Text style={styles.meta}>No original scan is attached yet. You can still keep passport details and expiry tracking locally.</Text>
+                    ) : null}
+                    {selectedDocument.localFileUri && !hasPassportImageForOcr(selectedDocument) ? (
+                      <Text style={styles.meta}>Passport OCR currently works with image scans. PDFs can still be viewed and edited manually.</Text>
                     ) : null}
                     {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
                   </>
