@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.10 - 2026-03-15
+
+- Added on-device driving-licence OCR for local front-scan images and PDFs in the Android build, with editable extracted fields kept in the existing Vault flow
+- Added a dedicated GHIC / EHIC health-card document experience with a physical closed card, a quick-read open view, verification and expiry badges, copy actions, and editable extracted fields
+- Added safe local persistence and migration support for health-card data so older installs continue upgrading without losing existing document records
+- Added regression tests for driving-licence OCR parsing, health-card OCR parsing, health-card verification/copy behaviour, and health-card normalization
+
 ## 1.4.9 - 2026-03-15
 
 - Added passport OCR preprocessing for attached PDF scans by rendering the first page to an image before ML Kit extraction in the Android build

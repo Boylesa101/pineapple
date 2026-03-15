@@ -16,6 +16,7 @@ import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { DrivingLicenceDocument } from '@/components/driving-licence/DrivingLicenceDocument';
 import { EmptyState } from '@/components/EmptyState';
+import { HealthCardDocument } from '@/components/health-card/HealthCardDocument';
 import { InfoChip } from '@/components/InfoChip';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { PinPad } from '@/components/PinPad';
@@ -24,6 +25,8 @@ import { PassportDocument } from '@/components/passport/PassportDocument';
 import { VerificationBadge } from '@/components/passport/VerificationBadge';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, spacing } from '@/constants/theme';
+import { recognizeDrivingLicenceScan } from '@/services/drivingLicenceOcr';
+import { recognizeHealthCardScan } from '@/services/healthCardOcr';
 import { recognizePassportScan } from '@/services/passportOcr';
 import { useAppStore } from '@/store/useAppStore';
 import type { DocumentDraft, DocumentType, ExpiryReminderLeadTime } from '@/types/models';
@@ -41,8 +44,11 @@ import {
   ensureDrivingLicenceDraftData,
   getDrivingLicenceVerificationStatus,
 } from '@/utils/drivingLicence';
+import { applyDrivingLicenceOcrToDraft, canRunDrivingLicenceOcr } from '@/utils/drivingLicenceOcr';
 import { copyIntoAppStorage } from '@/utils/fileStorage';
 import { maskSensitive } from '@/utils/format';
+import { buildHealthCardCopyPayload, ensureHealthCardDraftData, getHealthCardVerificationStatus } from '@/utils/healthCard';
+import { applyHealthCardOcrToDraft, canRunHealthCardOcr } from '@/utils/healthCardOcr';
 import { buildPassportCopyPayload, ensurePassportDraftData, getPassportVerificationStatus } from '@/utils/passport';
 import { applyPassportOcrToDraft, hasPassportImageForOcr } from '@/utils/passportOcr';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
@@ -103,7 +109,10 @@ export default function VaultScreen() {
   const [groupMode, setGroupMode] = useState<GroupMode>('flat');
   const [passportOpen, setPassportOpen] = useState(false);
   const [drivingLicenceOpen, setDrivingLicenceOpen] = useState(false);
+  const [healthCardOpen, setHealthCardOpen] = useState(false);
   const [passportOcrLoading, setPassportOcrLoading] = useState(false);
+  const [drivingLicenceOcrLoading, setDrivingLicenceOcrLoading] = useState(false);
+  const [healthCardOcrLoading, setHealthCardOcrLoading] = useState(false);
   const openedEditIdRef = useRef<string | null>(null);
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
@@ -129,7 +138,7 @@ export default function VaultScreen() {
       setActiveTrip(document.tripId);
     }
     const traveller = data.travellers.find((item) => item.id === document.travellerId) ?? null;
-    setDraft(ensureDrivingLicenceDraftData(ensurePassportDraftData(document, traveller), traveller));
+    setDraft(ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(document, traveller), traveller), traveller));
     setEditorVisible(true);
   }, [data.documents, params.editDocumentId, selectedTripId, setActiveTrip]);
 
@@ -137,17 +146,19 @@ export default function VaultScreen() {
     if (!detailVisible) {
       setPassportOpen(false);
       setDrivingLicenceOpen(false);
+      setHealthCardOpen(false);
     }
   }, [detailVisible, selectedId]);
 
   useEffect(() => {
     setPassportOpen(false);
     setDrivingLicenceOpen(false);
+    setHealthCardOpen(false);
   }, [selectedId]);
 
   function withSpecializedDocumentData(source: DocumentDraft) {
     const traveller = bundle.travellers.find((item) => item.id === source.travellerId) ?? null;
-    return ensureDrivingLicenceDraftData(ensurePassportDraftData(source, traveller), traveller);
+    return ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(source, traveller), traveller), traveller);
   }
 
   const filteredDocuments = useMemo(() => {
@@ -454,6 +465,124 @@ export default function VaultScreen() {
     await runPassportOcrOnDraft(editableDraft, { openEditor: true });
   }
 
+  async function runDrivingLicenceOcrOnDraft(sourceDraft: DocumentDraft, options?: { openEditor?: boolean }) {
+    const openEditor = options?.openEditor ?? false;
+    if (!canRunDrivingLicenceOcr(sourceDraft)) {
+      Alert.alert(
+        'Scan needed',
+        sourceDraft.localFileUri
+          ? 'Driving licence OCR can read the front image or PDF in the Android build.'
+          : 'Attach the front driving licence scan first, then Pineapple can extract the holder record for review.'
+      );
+      return;
+    }
+
+    try {
+      setDrivingLicenceOcrLoading(true);
+      const extracted = await recognizeDrivingLicenceScan(sourceDraft.localFileUri, sourceDraft.mimeType);
+      const merged = applyDrivingLicenceOcrToDraft(sourceDraft, extracted);
+      setDraft((current) => {
+        if (current?.id && sourceDraft.id && current.id !== sourceDraft.id) {
+          return current;
+        }
+        return merged;
+      });
+
+      if (openEditor) {
+        setDetailVisible(false);
+        setEditorVisible(true);
+      }
+
+      Alert.alert('Licence fields extracted', 'Pineapple filled the driving licence fields from the front scan. Review them before saving.');
+    } catch (error) {
+      Alert.alert(
+        'Driving licence OCR unavailable',
+        error instanceof Error
+          ? error.message
+          : 'Pineapple could not read that driving licence scan right now. You can still enter the licence fields manually.'
+      );
+    } finally {
+      setDrivingLicenceOcrLoading(false);
+    }
+  }
+
+  async function handleDraftDrivingLicenceOcr() {
+    if (!draft) {
+      return;
+    }
+
+    await runDrivingLicenceOcrOnDraft(draft);
+  }
+
+  async function handleSelectedDrivingLicenceOcr() {
+    if (!selectedDocument) {
+      return;
+    }
+
+    const editableDraft = withSpecializedDocumentData(selectedDocument);
+    setDraft(editableDraft);
+    await runDrivingLicenceOcrOnDraft(editableDraft, { openEditor: true });
+  }
+
+  async function runHealthCardOcrOnDraft(sourceDraft: DocumentDraft, options?: { openEditor?: boolean }) {
+    const openEditor = options?.openEditor ?? false;
+    if (!canRunHealthCardOcr(sourceDraft)) {
+      Alert.alert(
+        'Scan needed',
+        sourceDraft.localFileUri
+          ? 'Health-card OCR can read local image scans and PDFs in the Android build.'
+          : 'Attach a GHIC or EHIC scan first, then Pineapple can extract the card fields for review.'
+      );
+      return;
+    }
+
+    try {
+      setHealthCardOcrLoading(true);
+      const extracted = await recognizeHealthCardScan(sourceDraft.localFileUri, sourceDraft.mimeType);
+      const merged = applyHealthCardOcrToDraft(sourceDraft, extracted);
+      setDraft((current) => {
+        if (current?.id && sourceDraft.id && current.id !== sourceDraft.id) {
+          return current;
+        }
+        return merged;
+      });
+
+      if (openEditor) {
+        setDetailVisible(false);
+        setEditorVisible(true);
+      }
+
+      Alert.alert('Health-card fields extracted', 'Pineapple filled the health-card fields from the scan. Review them before saving.');
+    } catch (error) {
+      Alert.alert(
+        'Health-card OCR unavailable',
+        error instanceof Error
+          ? error.message
+          : 'Pineapple could not read that health-card scan right now. You can still enter the card fields manually.'
+      );
+    } finally {
+      setHealthCardOcrLoading(false);
+    }
+  }
+
+  async function handleDraftHealthCardOcr() {
+    if (!draft) {
+      return;
+    }
+
+    await runHealthCardOcrOnDraft(draft);
+  }
+
+  async function handleSelectedHealthCardOcr() {
+    if (!selectedDocument) {
+      return;
+    }
+
+    const editableDraft = withSpecializedDocumentData(selectedDocument);
+    setDraft(editableDraft);
+    await runHealthCardOcrOnDraft(editableDraft, { openEditor: true });
+  }
+
   return (
     <AppScreen title="Vault" subtitle="Traveller-specific documents, grouped views, and clear expiry warnings.">
       <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
@@ -625,6 +754,49 @@ export default function VaultScreen() {
                 );
               }
 
+              if (document.documentType === 'ghic') {
+                return (
+                  <View key={document.id} style={styles.passportRow}>
+                    <HealthCardDocument
+                      document={document}
+                      traveller={traveller}
+                      onPress={() => {
+                        setSelectedId(document.id);
+                        setHealthCardOpen(false);
+                        setDetailVisible(true);
+                      }}
+                      compact
+                    />
+                    <View style={styles.passportMeta}>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.title}>GHIC / EHIC</Text>
+                        <VerificationBadge status={getHealthCardVerificationStatus(document, traveller)} />
+                      </View>
+                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+                      <Text style={styles.meta}>
+                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
+                      </Text>
+                      <Text style={styles.meta}>{numberLabel}</Text>
+                      {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
+                    </View>
+                    <View style={styles.iconColumn}>
+                      <Pressable
+                        onPress={() => {
+                          setDraft(withSpecializedDocumentData(document));
+                          setEditorVisible(true);
+                        }}
+                        style={styles.iconButton}
+                      >
+                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+                      </Pressable>
+                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
+                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              }
+
               return (
                 <Pressable
                   key={document.id}
@@ -741,12 +913,15 @@ export default function VaultScreen() {
                     }
 
                     const traveller = bundle.travellers.find((item) => item.id === (value === 'trip' ? null : value)) ?? null;
-                    return ensureDrivingLicenceDraftData(
-                      ensurePassportDraftData(
-                        {
-                          ...current,
-                          travellerId: value === 'trip' ? null : value,
-                        },
+                    return ensureHealthCardDraftData(
+                      ensureDrivingLicenceDraftData(
+                        ensurePassportDraftData(
+                          {
+                            ...current,
+                            travellerId: value === 'trip' ? null : value,
+                          },
+                          traveller
+                        ),
                         traveller
                       ),
                       traveller
@@ -893,6 +1068,20 @@ export default function VaultScreen() {
                     onPress={() => handleDraftScanPick('back', 'photos')}
                   />
                 </View>
+                <AppButton
+                  label="Extract from front scan"
+                  tone="secondary"
+                  onPress={handleDraftDrivingLicenceOcr}
+                  disabled={!canRunDrivingLicenceOcr(draft)}
+                  loading={drivingLicenceOcrLoading}
+                />
+                {!canRunDrivingLicenceOcr(draft) ? (
+                  <Text style={styles.meta}>
+                    {draft.localFileUri
+                      ? 'Driving licence OCR can read the front image or PDF in the Android build.'
+                      : 'Attach the front photocard image or PDF to extract holder details automatically.'}
+                  </Text>
+                ) : null}
                 <AppTextField
                   label="Address"
                   value={draft.drivingLicenceData.address}
@@ -947,6 +1136,80 @@ export default function VaultScreen() {
                       { label: 'Provisional', value: 'Provisional' },
                       { label: 'Expired', value: 'Expired' },
                       { label: 'Review', value: 'Needs review' },
+                    ]}
+                  />
+                </View>
+              </>
+            ) : null}
+            {draft.documentType === 'ghic' && draft.healthCardData ? (
+              <>
+                <View style={styles.detailHeader}>
+                  <Text style={styles.label}>Health card record</Text>
+                  <VerificationBadge
+                    status={getHealthCardVerificationStatus(
+                      { localFileUri: draft.localFileUri, healthCardData: draft.healthCardData },
+                      bundle.travellers.find((item) => item.id === draft.travellerId) ?? null
+                    )}
+                  />
+                </View>
+                <AppButton
+                  label="Extract from scan"
+                  tone="secondary"
+                  onPress={handleDraftHealthCardOcr}
+                  disabled={!canRunHealthCardOcr(draft)}
+                  loading={healthCardOcrLoading}
+                />
+                {!canRunHealthCardOcr(draft) ? (
+                  <Text style={styles.meta}>
+                    {draft.localFileUri
+                      ? 'Health-card OCR can read local image scans and PDFs in the Android build.'
+                      : 'Attach a GHIC or EHIC image or PDF to extract card fields automatically.'}
+                  </Text>
+                ) : null}
+                <AppTextField
+                  label="Issuer"
+                  value={draft.healthCardData.issuer}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.healthCardData ? { ...current, healthCardData: { ...current.healthCardData, issuer: value } } : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Country code"
+                  value={draft.healthCardData.countryCode}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.healthCardData
+                        ? { ...current, healthCardData: { ...current.healthCardData, countryCode: value.toUpperCase().slice(0, 3) } }
+                        : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Emergency line"
+                  value={draft.healthCardData.emergencyLine}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.healthCardData
+                        ? { ...current, healthCardData: { ...current.healthCardData, emergencyLine: value } }
+                        : current
+                    )
+                  }
+                />
+                <View style={styles.field}>
+                  <Text style={styles.label}>Status</Text>
+                  <ChoiceChips<string>
+                    value={draft.healthCardData.status || 'Active'}
+                    onChange={(value) =>
+                      setDraft((current) =>
+                        current?.healthCardData ? { ...current, healthCardData: { ...current.healthCardData, status: value } } : current
+                      )
+                    }
+                    options={[
+                      { label: 'Active', value: 'Active' },
+                      { label: 'Pending review', value: 'Pending review' },
+                      { label: 'Expired', value: 'Expired' },
                     ]}
                   />
                 </View>
@@ -1039,6 +1302,8 @@ export default function VaultScreen() {
             ? 'Passport detail'
             : selectedDocument?.documentType === 'driving_licence'
               ? 'Driving licence detail'
+              : selectedDocument?.documentType === 'ghic'
+                ? 'Health card detail'
               : 'Document detail'
         }
         onClose={() => setDetailVisible(false)}
@@ -1114,6 +1379,13 @@ export default function VaultScreen() {
                     <View style={styles.buttonRow}>
                       <CopyDataButton label="Copy licence data" payload={buildDrivingLicenceCopyPayload(selectedDocument, selectedTraveller)} />
                       <AppButton
+                        label="Extract from front scan"
+                        tone="secondary"
+                        onPress={handleSelectedDrivingLicenceOcr}
+                        disabled={!canRunDrivingLicenceOcr(selectedDocument)}
+                        loading={drivingLicenceOcrLoading}
+                      />
+                      <AppButton
                         label="Edit extracted fields"
                         tone="secondary"
                         onPress={() => {
@@ -1140,6 +1412,49 @@ export default function VaultScreen() {
                     ) : null}
                     {!selectedDocument.secondaryLocalFileUri ? (
                       <Text style={styles.meta}>No back scan is attached yet. Add the reverse side for categories and endorsements.</Text>
+                    ) : null}
+                    {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
+                  </>
+                ) : selectedDocument.documentType === 'ghic' ? (
+                  <>
+                    <HealthCardDocument
+                      document={selectedDocument}
+                      traveller={selectedTraveller}
+                      open={healthCardOpen}
+                      interactive
+                    />
+                    <AppButton
+                      label={healthCardOpen ? 'Close health card' : 'Open health card'}
+                      tone="secondary"
+                      onPress={() => setHealthCardOpen((value) => !value)}
+                    />
+                    <View style={styles.buttonRow}>
+                      <CopyDataButton label="Copy health card data" payload={buildHealthCardCopyPayload(selectedDocument, selectedTraveller)} />
+                      <AppButton
+                        label="Extract from scan"
+                        tone="secondary"
+                        onPress={handleSelectedHealthCardOcr}
+                        disabled={!canRunHealthCardOcr(selectedDocument)}
+                        loading={healthCardOcrLoading}
+                      />
+                      <AppButton
+                        label="Edit extracted fields"
+                        tone="secondary"
+                        onPress={() => {
+                          setDraft(withSpecializedDocumentData(selectedDocument));
+                          setDetailVisible(false);
+                          setEditorVisible(true);
+                        }}
+                      />
+                      <AppButton
+                        label={selectedDocument.mimeType === 'application/pdf' ? 'View original PDF' : 'View original scan'}
+                        tone="secondary"
+                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        disabled={!selectedDocument.localFileUri}
+                      />
+                    </View>
+                    {!selectedDocument.localFileUri ? (
+                      <Text style={styles.meta}>No original scan is attached yet. You can still keep health-card details and expiry tracking locally.</Text>
                     ) : null}
                     {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
                   </>

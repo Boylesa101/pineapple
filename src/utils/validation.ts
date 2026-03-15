@@ -48,6 +48,9 @@ export function validateDocument(input: DocumentDraft) {
   if (input.documentType === 'driving_licence' && input.drivingLicenceData?.dateOfBirth && !isValid(parseISO(input.drivingLicenceData.dateOfBirth))) {
     errors.push('Driving licence date of birth is invalid.');
   }
+  if (input.documentType === 'ghic' && input.healthCardData?.countryCode && input.healthCardData.countryCode.length < 2) {
+    errors.push('Health card country code is invalid.');
+  }
   return errors;
 }
 

@@ -96,6 +96,7 @@ export interface Document {
   secondaryPreviewUri?: string | null;
   secondaryMimeType?: string | null;
   drivingLicenceData?: DrivingLicenceData | null;
+  healthCardData?: HealthCardData | null;
   sensitive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -116,6 +117,13 @@ export interface DrivingLicenceData {
   dateOfBirth: string | null;
   categories: string;
   issuingAuthority: string;
+  status: string;
+}
+
+export interface HealthCardData {
+  issuer: string;
+  countryCode: string;
+  emergencyLine: string;
   status: string;
 }
 

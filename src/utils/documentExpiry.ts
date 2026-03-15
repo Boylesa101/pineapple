@@ -5,11 +5,13 @@ import type {
   Document,
   DocumentDraft,
   DrivingLicenceData,
+  HealthCardData,
   DocumentType,
   ExpiryReminderLeadTime,
   ExpiryReminderSchedule,
 } from '@/types/models';
 import { normalizeDrivingLicenceData } from './drivingLicence';
+import { normalizeHealthCardData } from './healthCard';
 import { normalizePassportData } from './passport';
 
 export type DocumentExpiryBucket =
@@ -191,6 +193,7 @@ export function normalizeDocumentRecord(document: Omit<Document, 'expiredStatus'
     secondaryPreviewUri: document.secondaryPreviewUri ?? null,
     secondaryMimeType: document.secondaryMimeType ?? null,
     drivingLicenceData: normalizeDrivingLicenceData(document.drivingLicenceData as DrivingLicenceData | null | undefined),
+    healthCardData: normalizeHealthCardData(document.healthCardData as HealthCardData | null | undefined),
     expiredStatus: expiryInfo.isExpired,
     expiringSoonStatus: expiryInfo.isExpiring,
   };
@@ -215,6 +218,7 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     secondaryPreviewUri: null,
     secondaryMimeType: null,
     drivingLicenceData: null,
+    healthCardData: null,
     sensitive: true,
     createdAt: '',
     updatedAt: '',
@@ -241,6 +245,7 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     secondaryPreviewUri: normalized.secondaryPreviewUri,
     secondaryMimeType: normalized.secondaryMimeType,
     drivingLicenceData: normalized.drivingLicenceData,
+    healthCardData: normalized.healthCardData,
     sensitive: normalized.sensitive,
   };
 }

@@ -15,7 +15,8 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
 - Passport documents now render with a dedicated physical passport cover and identity spread experience instead of a generic document card
 - Passport image scans and passport PDFs can now prefill passport fields with on-device OCR and MRZ parsing in the Android build, while keeping the extracted fields editable before save
-- Driving licences now render with their own UK photocard object and fuller official record view, including front/back scan support
+- Driving licences now render with their own UK photocard object and fuller official record view, including front/back scan support and Android OCR from front scans
+- GHIC / EHIC cards now render with a dedicated health-card object that prioritises quick expiry, issuer, emergency, and card-number access
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
@@ -115,6 +116,13 @@ npx expo export --platform web
 - Driving licences use a dedicated photocard-style component instead of the generic document card
 - The closed state behaves like a compact licence card and the open state reveals a fuller official record layout
 - Pineapple can keep front and reverse scans separately so the photocard and endorsements stay together offline
+- Driving-licence OCR is available in the Android native build for local front images and PDFs, with extracted fields kept editable before save
+
+### Health Cards
+
+- GHIC / EHIC cards use a dedicated health-card component instead of the generic document card
+- The closed state behaves like a real travel health card and the open state prioritises holder, issuer, emergency line, and expiry details
+- Health-card OCR is available in the Android native build for local images and PDFs, with extracted fields always reviewable and editable before save
 
 ### Local data model
 
