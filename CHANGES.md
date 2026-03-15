@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.14 - 2026-03-15
+
+- Added a docs-specific first-time setup flow in Vault for empty trips, with secure local guidance, quick traveller-name capture, and strong first-document actions
+- Added tailored prompts for passport or driving-licence first, then health card, insurance/formal docs, and other travel records
+- Kept returning Vault flows unchanged once at least one document exists, while improving the no-results empty state for filtered views
+- Added regression coverage for the new document-vault setup-state logic
+
 ## 1.4.13 - 2026-03-15
 
 - Added a shared document-support layer for scan viewing, copy actions, verification badges, expiry badges, and extracted-field editing across Passport, Driving Licence, Health Card, Payment Card, and Formal Documents

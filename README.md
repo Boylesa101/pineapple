@@ -20,6 +20,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Payment cards now render with their own secure premium-card object, masked number defaults, explicit reveal/hide action, and non-sensitive copy behaviour
 - Insurance records, confirmations, letters, passes, and similar paperwork now render with a dedicated formal-document folder that opens into metadata plus source-preview layout
 - All major document types now share the same support layer for source viewing, copy actions, verification status, expiry badges, and extracted-field editing
+- The Vault now includes a first-time document setup flow for empty trips, including traveller-name capture, secure setup guidance, and one-tap first-document prompts
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
@@ -150,6 +151,12 @@ npx expo export --platform web
 - Pineapple now uses a shared full-screen document source viewer for local scans and PDFs across Passport, Driving Licence, Health Card, Payment Card, and Formal Documents
 - Copy actions, verification badges, expiry badges, and extracted-field editor shells are now reused across the main document experiences instead of being reimplemented per document type
 - Missing files and metadata-only records now surface clearer, consistent viewer messaging in the Vault detail flow
+
+### Vault onboarding
+
+- When a trip has no documents yet, the Vault now switches into a first-time setup flow instead of showing an empty list
+- Pineapple prompts for a traveller name first when needed, links into PIN security if it is not configured, and then guides the user toward adding a passport or driving licence first
+- Secondary prompts encourage adding a health card, insurance/formal records, and other supporting travel paperwork without overwhelming the user
 
 ### Local data model
 

@@ -18,6 +18,7 @@ import { CopyDataButton } from '@/components/document-support/CopyDataButton';
 import { DocumentScanViewerModal } from '@/components/document-support/DocumentScanViewerModal';
 import { ExtractedFieldEditor } from '@/components/document-support/ExtractedFieldEditor';
 import { VerificationBadge } from '@/components/document-support/VerificationBadge';
+import { DocumentVaultEmptyState } from '@/components/document-support/DocumentVaultEmptyState';
 import { DrivingLicenceDocument } from '@/components/driving-licence/DrivingLicenceDocument';
 import { EmptyState } from '@/components/EmptyState';
 import { FormalDocumentRecord } from '@/components/formal-document/FormalDocumentRecord';
@@ -29,6 +30,7 @@ import { PinPad } from '@/components/PinPad';
 import { PassportDocument } from '@/components/passport/PassportDocument';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, spacing } from '@/constants/theme';
+import { travellerAvatarColors } from '@/data/travellerOptions';
 import { recognizeDrivingLicenceScan } from '@/services/drivingLicenceOcr';
 import { recognizeFormalDocumentScan } from '@/services/formalDocumentOcr';
 import { recognizeHealthCardScan } from '@/services/healthCardOcr';
@@ -70,6 +72,7 @@ import {
 import { buildPassportCopyPayload, ensurePassportDraftData, getPassportVerificationStatus } from '@/utils/passport';
 import { applyPassportOcrToDraft, hasPassportImageForOcr } from '@/utils/passportOcr';
 import { getDocumentSourceCtaLabel, isDocumentPdfSource } from '@/utils/documentViewer';
+import { getDocumentVaultSetupState } from '@/utils/documentVaultSetup';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
 import { validateDocument } from '@/utils/validation';
 
@@ -116,6 +119,7 @@ export default function VaultScreen() {
     data,
     activeTripId,
     setActiveTrip,
+    saveTraveller,
     saveDocument,
     deleteRecord,
     security,
@@ -140,6 +144,8 @@ export default function VaultScreen() {
   const [paymentCardOpen, setPaymentCardOpen] = useState(false);
   const [formalDocumentOpen, setFormalDocumentOpen] = useState(false);
   const [scanViewer, setScanViewer] = useState<ScanViewerState | null>(null);
+  const [setupTravellerName, setSetupTravellerName] = useState('');
+  const [savingSetupTraveller, setSavingSetupTraveller] = useState(false);
   const [passportOcrLoading, setPassportOcrLoading] = useState(false);
   const [drivingLicenceOcrLoading, setDrivingLicenceOcrLoading] = useState(false);
   const [healthCardOcrLoading, setHealthCardOcrLoading] = useState(false);
@@ -153,6 +159,12 @@ export default function VaultScreen() {
     : null;
   const isVaultUnlocked = !!vaultUnlockedUntil && vaultUnlockedUntil > Date.now();
   const expiryWarnings = getDocumentExpiryWarnings(bundle.documents, bundle.travellers);
+  const setupState = getDocumentVaultSetupState({
+    documents: bundle.documents,
+    travellers: bundle.travellers,
+    security,
+  });
+  const primaryTraveller = bundle.travellers[0] ?? null;
 
   useEffect(() => {
     if (!params.editDocumentId || openedEditIdRef.current === params.editDocumentId) {
@@ -262,6 +274,25 @@ export default function VaultScreen() {
     return 'Document detail';
   }
 
+  function buildStarterDocumentDraft(documentType: DocumentType, partial?: { localFileUri?: string; previewUri?: string | null; mimeType?: string | null }) {
+    if (!selectedTripId) {
+      return null;
+    }
+
+    return withSpecializedDocumentData({
+      ...buildDocumentDraftDefaults({
+        tripId: selectedTripId,
+        localFileUri: partial?.localFileUri ?? '',
+        previewUri: partial?.previewUri ?? null,
+        mimeType: partial?.mimeType ?? null,
+      }),
+      documentType,
+      travellerId: primaryTraveller?.id ?? null,
+      holderName: primaryTraveller?.fullName ?? '',
+      expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
+    });
+  }
+
   const filteredDocuments = useMemo(() => {
     return bundle.documents.filter((document) => {
       if (primaryFilter === 'traveller' && travellerFilter !== 'all') {
@@ -362,22 +393,18 @@ export default function VaultScreen() {
     }
   }
 
-  async function handleSourcePick(source: DocumentAssetSource) {
+  async function handleSourcePick(source: DocumentAssetSource, documentType: DocumentType = 'custom') {
     if (!selectedTripId) return;
     const asset = await pickManagedDocumentAsset(source);
     if (!asset) {
       return;
     }
 
-    setDraft({
-      ...buildDocumentDraftDefaults({
-        tripId: selectedTripId,
-        localFileUri: asset.localFileUri,
-        previewUri: asset.previewUri,
-        mimeType: asset.mimeType,
-      }),
-      expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
-    });
+    const nextDraft = buildStarterDocumentDraft(documentType, asset);
+    if (!nextDraft) {
+      return;
+    }
+    setDraft(nextDraft);
     setEditorVisible(true);
   }
 
@@ -407,18 +434,10 @@ export default function VaultScreen() {
     });
   }
 
-  function openManualDocument() {
-    if (!selectedTripId) return;
-
-    setDraft({
-      ...buildDocumentDraftDefaults({
-        tripId: selectedTripId,
-        localFileUri: '',
-        previewUri: null,
-        mimeType: null,
-      }),
-      expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
-    });
+  function openManualDocument(documentType: DocumentType = 'custom') {
+    const nextDraft = buildStarterDocumentDraft(documentType);
+    if (!nextDraft) return;
+    setDraft(nextDraft);
     setEditorVisible(true);
   }
 
@@ -500,6 +519,38 @@ export default function VaultScreen() {
         onPress: () => deleteRecord('documents', documentId),
       },
     ]);
+  }
+
+  async function handleSaveSetupTraveller() {
+    if (!selectedTripId) {
+      return;
+    }
+
+    const fullName = setupTravellerName.trim();
+    if (!fullName) {
+      Alert.alert('Name needed', 'Add your name first so Pineapple can link your documents to the right traveller profile.');
+      return;
+    }
+
+    try {
+      setSavingSetupTraveller(true);
+      await saveTraveller({
+        tripId: selectedTripId,
+        fullName,
+        dateOfBirth: null,
+        passportNationality: '',
+        passportNumber: '',
+        ghicNumber: '',
+        medicalNote: '',
+        notes: '',
+        avatarColor: travellerAvatarColors[0],
+        relationshipType: 'adult',
+      });
+      setSetupTravellerName('');
+      Alert.alert('Name saved', 'You can now add documents with your traveller profile preselected.');
+    } finally {
+      setSavingSetupTraveller(false);
+    }
   }
 
   async function runPassportOcrOnDraft(sourceDraft: DocumentDraft, options?: { openEditor?: boolean }) {
@@ -795,50 +846,68 @@ export default function VaultScreen() {
         />
       </AppCard>
 
-      <AppCard title="Filters">
-        <ChoiceChips<PrimaryFilter>
-          value={primaryFilter}
-          onChange={setPrimaryFilter}
-          options={[
-            { label: 'All', value: 'all' },
-            { label: 'Traveller', value: 'traveller' },
-            { label: 'Document type', value: 'type' },
-          ]}
+      {setupState.isFirstTime ? (
+        <DocumentVaultEmptyState
+          travellerName={setupTravellerName}
+          onTravellerNameChange={setSetupTravellerName}
+          onSaveTravellerName={handleSaveSetupTraveller}
+          savingTraveller={savingSetupTraveller}
+          showTravellerPrompt={setupState.needsTravellerName}
+          pinConfigured={security.pinConfigured}
+          onOpenSecurity={() => router.push('/setup-pin')}
+          onAddPassport={() => openManualDocument('passport')}
+          onAddDrivingLicence={() => openManualDocument('driving_licence')}
+          onImport={() => handleSourcePick('files', setupState.hasIdentityDocument ? 'custom' : 'passport')}
+          onAddHealthCard={() => openManualDocument('ghic')}
+          onAddInsurance={() => openManualDocument('insurance')}
+          onAddOther={() => openManualDocument('custom')}
         />
-        {primaryFilter === 'traveller' ? (
-          <ChoiceChips<string>
-            value={travellerFilter}
-            onChange={setTravellerFilter}
-            options={[
-              { label: 'All travellers', value: 'all' },
-              { label: 'Trip-wide', value: 'trip' },
-              ...bundle.travellers.map((traveller) => ({ label: traveller.fullName, value: traveller.id })),
-            ]}
-          />
-        ) : null}
-        {primaryFilter === 'type' ? (
-          <ChoiceChips<string>
-            value={typeFilter}
-            onChange={(value) => setTypeFilter(value as DocumentType | 'all')}
-            options={[
-              { label: 'All types', value: 'all' },
-              ...Object.entries(documentLabels).map(([value, label]) => ({ value, label })),
-            ]}
-          />
-        ) : null}
-        <Text style={styles.label}>Grouped view</Text>
-        <ChoiceChips<GroupMode>
-          value={groupMode}
-          onChange={setGroupMode}
-          options={[
-            { label: 'Flat', value: 'flat' },
-            { label: 'By traveller', value: 'traveller' },
-            { label: 'By type', value: 'type' },
-          ]}
-        />
-      </AppCard>
+      ) : (
+        <>
+          <AppCard title="Filters">
+            <ChoiceChips<PrimaryFilter>
+              value={primaryFilter}
+              onChange={setPrimaryFilter}
+              options={[
+                { label: 'All', value: 'all' },
+                { label: 'Traveller', value: 'traveller' },
+                { label: 'Document type', value: 'type' },
+              ]}
+            />
+            {primaryFilter === 'traveller' ? (
+              <ChoiceChips<string>
+                value={travellerFilter}
+                onChange={setTravellerFilter}
+                options={[
+                  { label: 'All travellers', value: 'all' },
+                  { label: 'Trip-wide', value: 'trip' },
+                  ...bundle.travellers.map((traveller) => ({ label: traveller.fullName, value: traveller.id })),
+                ]}
+              />
+            ) : null}
+            {primaryFilter === 'type' ? (
+              <ChoiceChips<string>
+                value={typeFilter}
+                onChange={(value) => setTypeFilter(value as DocumentType | 'all')}
+                options={[
+                  { label: 'All types', value: 'all' },
+                  ...Object.entries(documentLabels).map(([value, label]) => ({ value, label })),
+                ]}
+              />
+            ) : null}
+            <Text style={styles.label}>Grouped view</Text>
+            <ChoiceChips<GroupMode>
+              value={groupMode}
+              onChange={setGroupMode}
+              options={[
+                { label: 'Flat', value: 'flat' },
+                { label: 'By traveller', value: 'traveller' },
+                { label: 'By type', value: 'type' },
+              ]}
+            />
+          </AppCard>
 
-      {groupedDocuments.length ? (
+          {groupedDocuments.length ? (
         groupedDocuments.map((group) => (
           <AppCard key={group.title} title={group.title}>
             {group.documents.map((document) => {
@@ -1123,10 +1192,12 @@ export default function VaultScreen() {
       ) : (
         <AppCard>
           <EmptyState
-            title="Vault is empty"
-            description="Add passports, boarding passes, insurance policies, visas, hotel bookings, or any custom PDF."
+            title="No documents match this view"
+            description="Try clearing a filter or add another travel document."
           />
         </AppCard>
+          )}
+        </>
       )}
 
       <AppModal
