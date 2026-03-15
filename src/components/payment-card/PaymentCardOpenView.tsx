@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
-import { ExpiryBadge } from '@/components/passport/ExpiryBadge';
-import { VerificationBadge } from '@/components/passport/VerificationBadge';
+import { DocumentMetaRow } from '@/components/document-support/DocumentMetaRow';
+import { ExpiryBadge } from '@/components/document-support/ExpiryBadge';
+import { VerificationBadge } from '@/components/document-support/VerificationBadge';
 import { SensitiveFieldReveal } from '@/components/payment-card/SensitiveFieldReveal';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { Document, Traveller, VerificationStatus } from '@/types/models';
@@ -15,15 +16,6 @@ type Props = {
   expiryBadge: { label: string; tone: 'default' | 'blue' | 'gold' | 'coral' | 'success' | 'danger' };
   verificationStatus: VerificationStatus;
 };
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value || 'Not set'}</Text>
-    </View>
-  );
-}
 
 export function PaymentCardOpenView({ document, traveller, expiryBadge, verificationStatus }: Props) {
   const { width } = useWindowDimensions();
@@ -48,17 +40,17 @@ export function PaymentCardOpenView({ document, traveller, expiryBadge, verifica
           <ExpiryBadge label={expiryBadge.label} tone={expiryBadge.tone} />
           <Text style={styles.privateNote}>CVV stays hidden by default</Text>
         </View>
-        <DetailRow label="Card holder" value={document.holderName || traveller?.fullName || ''} />
-        <DetailRow label="Card type" value={record.cardType} />
-        <DetailRow label="Bank" value={record.bank} />
-        <DetailRow label="Expiry" value={formatShortDate(document.expiryDate)} />
+        <DocumentMetaRow label="Card holder" value={document.holderName || traveller?.fullName || ''} borderColor="#E9DCCB" />
+        <DocumentMetaRow label="Card type" value={record.cardType} borderColor="#E9DCCB" />
+        <DocumentMetaRow label="Bank" value={record.bank} borderColor="#E9DCCB" />
+        <DocumentMetaRow label="Expiry" value={formatShortDate(document.expiryDate)} borderColor="#E9DCCB" />
       </View>
 
       <View style={[styles.panel, styles.infoPanel, horizontal ? styles.panelHalf : null]}>
         <Text style={styles.panelTitle}>Secure record</Text>
-        <DetailRow label="Masked number" value={maskPaymentCardNumber(document.documentNumber)} />
-        <DetailRow label="Billing details" value={record.billingDetails} />
-        <DetailRow label="Travel note" value={document.notes} />
+        <DocumentMetaRow label="Masked number" value={maskPaymentCardNumber(document.documentNumber)} borderColor="#E9DCCB" />
+        <DocumentMetaRow label="Billing details" value={record.billingDetails} borderColor="#E9DCCB" />
+        <DocumentMetaRow label="Travel note" value={document.notes} borderColor="#E9DCCB" />
         <View style={styles.footerBlock}>
           <Text style={styles.footerLabel}>Sensitive fields</Text>
           <Text style={styles.footerValue}>
@@ -120,25 +112,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-  },
-  detailRow: {
-    gap: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9DCCB',
-    paddingBottom: spacing.xs,
-  },
-  detailLabel: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  detailValue: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    lineHeight: 20,
   },
   footerBlock: {
     marginTop: spacing.sm,

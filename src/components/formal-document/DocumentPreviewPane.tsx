@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { colors, radii, spacing } from '@/constants/theme';
+import { getDocumentSourceCtaLabel, getDocumentSourceEmptyText, getDocumentSourcePreviewUri, isDocumentPdfSource } from '@/utils/documentViewer';
 
 type Props = {
   previewUri: string | null;
@@ -12,22 +13,23 @@ type Props = {
 };
 
 export function DocumentPreviewPane({ previewUri, localFileUri, mimeType, onOpen }: Props) {
-  const isPdf = mimeType === 'application/pdf' || localFileUri.toLowerCase().endsWith('.pdf');
+  const isPdf = isDocumentPdfSource(mimeType, localFileUri);
+  const imageUri = getDocumentSourcePreviewUri(previewUri, localFileUri, mimeType);
 
   return (
     <View style={styles.panel}>
       <Text style={styles.label}>Original</Text>
-      {previewUri && !isPdf ? (
-        <Image source={previewUri} style={styles.preview} contentFit="contain" />
+      {imageUri ? (
+        <Image source={imageUri} style={styles.preview} contentFit="contain" />
       ) : (
         <View style={[styles.preview, styles.placeholder]}>
           <MaterialIcons name={isPdf ? 'picture-as-pdf' : 'description'} size={38} color={colors.textMuted} />
-          <Text style={styles.placeholderText}>{isPdf ? 'PDF stored locally' : localFileUri ? 'Source file stored locally' : 'No source file attached'}</Text>
+          <Text style={styles.placeholderText}>{getDocumentSourceEmptyText({ hasFile: Boolean(localFileUri), isPdf })}</Text>
         </View>
       )}
       <Pressable onPress={onOpen} style={styles.button} disabled={!localFileUri}>
         <MaterialIcons name="open-in-new" size={18} color={colors.oceanBlue} />
-        <Text style={styles.buttonText}>{isPdf ? 'Open PDF' : 'Open source file'}</Text>
+        <Text style={styles.buttonText}>{getDocumentSourceCtaLabel(isPdf)}</Text>
       </Pressable>
     </View>
   );

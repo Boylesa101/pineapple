@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.13 - 2026-03-15
+
+- Added a shared document-support layer for scan viewing, copy actions, verification badges, expiry badges, and extracted-field editing across Passport, Driving Licence, Health Card, Payment Card, and Formal Documents
+- Added a reusable full-screen source viewer flow for local images and PDFs, with clearer fallback messaging when no file is attached
+- Reduced duplicate metadata-row rendering across the document open views and aligned Vault detail actions around the shared viewer and edit flow
+- Added regression tests for the shared verification/document-viewer helpers and kept the document-specific layouts intact
+
 ## 1.4.12 - 2026-03-15
 
 - Added a dedicated formal-document Vault experience for insurance records, certificates, confirmations, letters, passes, and similar paperwork with an official folder-style closed state

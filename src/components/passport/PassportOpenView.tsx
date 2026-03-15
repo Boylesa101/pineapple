@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
-import { ExpiryBadge } from '@/components/passport/ExpiryBadge';
-import { VerificationBadge } from '@/components/passport/VerificationBadge';
+import { DocumentMetaRow } from '@/components/document-support/DocumentMetaRow';
+import { ExpiryBadge } from '@/components/document-support/ExpiryBadge';
+import { VerificationBadge } from '@/components/document-support/VerificationBadge';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { Document, PassportVerificationStatus, Traveller } from '@/types/models';
 import { formatShortDate } from '@/utils/date';
@@ -14,15 +15,6 @@ type Props = {
   expiryBadge: { label: string; tone: 'default' | 'blue' | 'gold' | 'coral' | 'success' | 'danger' };
   verificationStatus: PassportVerificationStatus;
 };
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value || 'Not set'}</Text>
-    </View>
-  );
-}
 
 export function PassportOpenView({ document, traveller, expiryBadge, verificationStatus }: Props) {
   const { width } = useWindowDimensions();
@@ -49,9 +41,9 @@ export function PassportOpenView({ document, traveller, expiryBadge, verificatio
         <View style={styles.inlineChips}>
           <ExpiryBadge label={expiryBadge.label} tone={expiryBadge.tone} />
         </View>
-        <DetailRow label="Type" value={passport.passportType} />
-        <DetailRow label="Country code" value={passport.countryCode} />
-        <DetailRow label="Passport number" value={document.documentNumber} />
+        <DocumentMetaRow label="Type" value={passport.passportType} borderColor="#E8DAC1" />
+        <DocumentMetaRow label="Country code" value={passport.countryCode} borderColor="#E8DAC1" />
+        <DocumentMetaRow label="Passport number" value={document.documentNumber} borderColor="#E8DAC1" />
         <View style={styles.signatureBlock}>
           <Text style={styles.signatureLabel}>Signature / stamp</Text>
           <View style={styles.signatureArea}>
@@ -62,13 +54,13 @@ export function PassportOpenView({ document, traveller, expiryBadge, verificatio
 
       <View style={[styles.page, styles.rightPage, horizontal ? styles.pageHalf : null]}>
         <Text style={styles.pageTitle}>Identity</Text>
-        <DetailRow label="Surname" value={passport.surname} />
-        <DetailRow label="Given names" value={passport.givenNames} />
-        <DetailRow label="Nationality" value={passport.nationality} />
-        <DetailRow label="Date of birth" value={formatShortDate(passport.dateOfBirth)} />
-        <DetailRow label="Place of birth" value={passport.placeOfBirth} />
-        <DetailRow label="Date of issue" value={formatShortDate(document.issueDate)} />
-        <DetailRow label="Expiry date" value={formatShortDate(document.expiryDate)} />
+        <DocumentMetaRow label="Surname" value={passport.surname} borderColor="#E8DAC1" />
+        <DocumentMetaRow label="Given names" value={passport.givenNames} borderColor="#E8DAC1" />
+        <DocumentMetaRow label="Nationality" value={passport.nationality} borderColor="#E8DAC1" />
+        <DocumentMetaRow label="Date of birth" value={formatShortDate(passport.dateOfBirth)} borderColor="#E8DAC1" />
+        <DocumentMetaRow label="Place of birth" value={passport.placeOfBirth} borderColor="#E8DAC1" />
+        <DocumentMetaRow label="Date of issue" value={formatShortDate(document.issueDate)} borderColor="#E8DAC1" />
+        <DocumentMetaRow label="Expiry date" value={formatShortDate(document.expiryDate)} borderColor="#E8DAC1" />
         <View style={styles.mrzBlock}>
           <Text style={styles.mrzLine}>{mrzOne}</Text>
           <Text style={styles.mrzLine}>{mrzTwo}</Text>
@@ -145,24 +137,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-  },
-  detailRow: {
-    gap: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8DAC1',
-    paddingBottom: spacing.xs,
-  },
-  detailLabel: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  detailValue: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
   },
   signatureBlock: {
     gap: spacing.xs,

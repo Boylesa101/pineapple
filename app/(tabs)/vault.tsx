@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as DocumentPicker from 'expo-document-picker';
@@ -14,6 +14,10 @@ import { AppTextField } from '@/components/AppTextField';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
+import { CopyDataButton } from '@/components/document-support/CopyDataButton';
+import { DocumentScanViewerModal } from '@/components/document-support/DocumentScanViewerModal';
+import { ExtractedFieldEditor } from '@/components/document-support/ExtractedFieldEditor';
+import { VerificationBadge } from '@/components/document-support/VerificationBadge';
 import { DrivingLicenceDocument } from '@/components/driving-licence/DrivingLicenceDocument';
 import { EmptyState } from '@/components/EmptyState';
 import { FormalDocumentRecord } from '@/components/formal-document/FormalDocumentRecord';
@@ -22,9 +26,7 @@ import { InfoChip } from '@/components/InfoChip';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { PaymentCardDocument } from '@/components/payment-card/PaymentCardDocument';
 import { PinPad } from '@/components/PinPad';
-import { CopyDataButton } from '@/components/passport/CopyDataButton';
 import { PassportDocument } from '@/components/passport/PassportDocument';
-import { VerificationBadge } from '@/components/passport/VerificationBadge';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, spacing } from '@/constants/theme';
 import { recognizeDrivingLicenceScan } from '@/services/drivingLicenceOcr';
@@ -67,6 +69,7 @@ import {
 } from '@/utils/paymentCard';
 import { buildPassportCopyPayload, ensurePassportDraftData, getPassportVerificationStatus } from '@/utils/passport';
 import { applyPassportOcrToDraft, hasPassportImageForOcr } from '@/utils/passportOcr';
+import { getDocumentSourceCtaLabel, isDocumentPdfSource } from '@/utils/documentViewer';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
 import { validateDocument } from '@/utils/validation';
 
@@ -98,6 +101,13 @@ type PrimaryFilter = 'all' | 'traveller' | 'type';
 type GroupMode = 'flat' | 'traveller' | 'type';
 type DocumentAssetSource = 'files' | 'photos';
 type DocumentScanSide = 'front' | 'back';
+type ScanViewerState = {
+  title: string;
+  localFileUri: string | null;
+  previewUri?: string | null;
+  mimeType?: string | null;
+  emptyText?: string;
+};
 
 export default function VaultScreen() {
   const router = useRouter();
@@ -129,6 +139,7 @@ export default function VaultScreen() {
   const [healthCardOpen, setHealthCardOpen] = useState(false);
   const [paymentCardOpen, setPaymentCardOpen] = useState(false);
   const [formalDocumentOpen, setFormalDocumentOpen] = useState(false);
+  const [scanViewer, setScanViewer] = useState<ScanViewerState | null>(null);
   const [passportOcrLoading, setPassportOcrLoading] = useState(false);
   const [drivingLicenceOcrLoading, setDrivingLicenceOcrLoading] = useState(false);
   const [healthCardOcrLoading, setHealthCardOcrLoading] = useState(false);
@@ -197,6 +208,58 @@ export default function VaultScreen() {
       ),
       traveller
     );
+  }
+
+  function openScanViewer(viewer: ScanViewerState) {
+    setScanViewer(viewer);
+  }
+
+  function openPrimarySource(document: {
+    localFileUri: string;
+    previewUri: string | null;
+    mimeType: string | null;
+    documentType: DocumentType;
+  }) {
+    openScanViewer({
+      title: isDocumentPdfSource(document.mimeType, document.localFileUri)
+        ? `${documentLabels[document.documentType]} PDF`
+        : `${documentLabels[document.documentType]} scan`,
+      localFileUri: document.localFileUri,
+      previewUri: document.previewUri,
+      mimeType: document.mimeType,
+    });
+  }
+
+  function openSecondarySource(document: {
+    secondaryLocalFileUri?: string | null;
+    secondaryPreviewUri?: string | null;
+    secondaryMimeType?: string | null;
+  }) {
+    openScanViewer({
+      title: isDocumentPdfSource(document.secondaryMimeType, document.secondaryLocalFileUri) ? 'Back PDF' : 'Back scan',
+      localFileUri: document.secondaryLocalFileUri ?? null,
+      previewUri: document.secondaryPreviewUri ?? null,
+      mimeType: document.secondaryMimeType ?? null,
+      emptyText: 'No back scan attached yet.',
+    });
+  }
+
+  function openExtractedFieldEditor(sourceDocument: DocumentDraft) {
+    setDraft(withSpecializedDocumentData(sourceDocument));
+    setDetailVisible(false);
+    setEditorVisible(true);
+  }
+
+  function getDocumentDetailTitle(document: (typeof selectedDocument)) {
+    if (!document) {
+      return 'Document detail';
+    }
+    if (document.documentType === 'passport') return 'Passport detail';
+    if (document.documentType === 'driving_licence') return 'Driving licence detail';
+    if (document.documentType === 'ghic') return 'Health card detail';
+    if (document.documentType === 'payment_card') return 'Payment card detail';
+    if (isFormalDocumentType(document.documentType)) return 'Formal document detail';
+    return 'Document detail';
   }
 
   const filteredDocuments = useMemo(() => {
@@ -970,7 +1033,7 @@ export default function VaultScreen() {
                         setDetailVisible(true);
                       }}
                       compact
-                      onOpenSource={() => document.localFileUri && Linking.openURL(document.localFileUri)}
+                      onOpenSource={() => openPrimarySource(document)}
                     />
                     <View style={styles.passportMeta}>
                       <View style={styles.titleRow}>
@@ -1161,30 +1224,24 @@ export default function VaultScreen() {
               keyboardType={draft.documentType === 'payment_card' ? 'numeric' : 'default'}
             />
             {draft.documentType === 'passport' && draft.passportData ? (
-              <>
-                <View style={styles.detailHeader}>
-                  <Text style={styles.label}>Passport extracted fields</Text>
-                  <VerificationBadge
-                    status={getPassportVerificationStatus(
-                      { localFileUri: draft.localFileUri, passportData: draft.passportData },
-                      bundle.travellers.find((item) => item.id === draft.travellerId) ?? null
-                    )}
-                  />
-                </View>
-                <AppButton
-                  label="Extract from scan"
-                  tone="secondary"
-                  onPress={handleDraftPassportOcr}
-                  disabled={!hasPassportImageForOcr(draft)}
-                  loading={passportOcrLoading}
-                />
-                {!hasPassportImageForOcr(draft) ? (
-                  <Text style={styles.meta}>
-                    {draft.localFileUri
+              <ExtractedFieldEditor
+                title="Passport extracted fields"
+                verificationStatus={getPassportVerificationStatus(
+                  { localFileUri: draft.localFileUri, passportData: draft.passportData },
+                  bundle.travellers.find((item) => item.id === draft.travellerId) ?? null
+                )}
+                actionLabel="Extract from scan"
+                onAction={handleDraftPassportOcr}
+                actionDisabled={!hasPassportImageForOcr(draft)}
+                actionLoading={passportOcrLoading}
+                helperText={
+                  !hasPassportImageForOcr(draft)
+                    ? draft.localFileUri
                       ? 'Passport OCR can read local image scans and PDFs in the Android build.'
-                      : 'Attach a passport image or PDF to extract MRZ and identity fields automatically.'}
-                  </Text>
-                ) : null}
+                      : 'Attach a passport image or PDF to extract MRZ and identity fields automatically.'
+                    : null
+                }
+              >
                 <AppTextField
                   label="Passport type"
                   value={draft.passportData.passportType}
@@ -1255,24 +1312,32 @@ export default function VaultScreen() {
                     )
                   }
                 />
-              </>
+              </ExtractedFieldEditor>
             ) : null}
             {draft.documentType === 'driving_licence' && draft.drivingLicenceData ? (
-              <>
-                <View style={styles.detailHeader}>
-                  <Text style={styles.label}>Driving licence record</Text>
-                  <VerificationBadge
-                    status={getDrivingLicenceVerificationStatus(
-                      {
-                        localFileUri: draft.localFileUri,
-                        secondaryLocalFileUri: draft.secondaryLocalFileUri,
-                        drivingLicenceData: draft.drivingLicenceData,
-                      },
-                      bundle.travellers.find((item) => item.id === draft.travellerId) ?? null
-                    )}
-                  />
-                </View>
-                <Text style={styles.meta}>Use the front scan for the photocard and the back scan for categories or endorsements.</Text>
+              <ExtractedFieldEditor
+                title="Driving licence record"
+                verificationStatus={getDrivingLicenceVerificationStatus(
+                  {
+                    localFileUri: draft.localFileUri,
+                    secondaryLocalFileUri: draft.secondaryLocalFileUri,
+                    drivingLicenceData: draft.drivingLicenceData,
+                  },
+                  bundle.travellers.find((item) => item.id === draft.travellerId) ?? null
+                )}
+                description="Use the front scan for the photocard and the back scan for categories or endorsements."
+                actionLabel="Extract from front scan"
+                onAction={handleDraftDrivingLicenceOcr}
+                actionDisabled={!canRunDrivingLicenceOcr(draft)}
+                actionLoading={drivingLicenceOcrLoading}
+                helperText={
+                  !canRunDrivingLicenceOcr(draft)
+                    ? draft.localFileUri
+                      ? 'Driving licence OCR can read the front image or PDF in the Android build.'
+                      : 'Attach the front photocard image or PDF to extract holder details automatically.'
+                    : null
+                }
+              >
                 <View style={styles.buttonRow}>
                   <AppButton label={draft.localFileUri ? 'Replace front from files' : 'Add front from files'} tone="secondary" onPress={() => handleDraftScanPick('front', 'files')} />
                   <AppButton label={draft.localFileUri ? 'Replace front from photos' : 'Add front from photos'} tone="secondary" onPress={() => handleDraftScanPick('front', 'photos')} />
@@ -1289,20 +1354,6 @@ export default function VaultScreen() {
                     onPress={() => handleDraftScanPick('back', 'photos')}
                   />
                 </View>
-                <AppButton
-                  label="Extract from front scan"
-                  tone="secondary"
-                  onPress={handleDraftDrivingLicenceOcr}
-                  disabled={!canRunDrivingLicenceOcr(draft)}
-                  loading={drivingLicenceOcrLoading}
-                />
-                {!canRunDrivingLicenceOcr(draft) ? (
-                  <Text style={styles.meta}>
-                    {draft.localFileUri
-                      ? 'Driving licence OCR can read the front image or PDF in the Android build.'
-                      : 'Attach the front photocard image or PDF to extract holder details automatically.'}
-                  </Text>
-                ) : null}
                 <AppTextField
                   label="Address"
                   value={draft.drivingLicenceData.address}
@@ -1360,33 +1411,27 @@ export default function VaultScreen() {
                     ]}
                   />
                 </View>
-              </>
+              </ExtractedFieldEditor>
             ) : null}
             {draft.documentType === 'ghic' && draft.healthCardData ? (
-              <>
-                <View style={styles.detailHeader}>
-                  <Text style={styles.label}>Health card record</Text>
-                  <VerificationBadge
-                    status={getHealthCardVerificationStatus(
-                      { localFileUri: draft.localFileUri, healthCardData: draft.healthCardData },
-                      bundle.travellers.find((item) => item.id === draft.travellerId) ?? null
-                    )}
-                  />
-                </View>
-                <AppButton
-                  label="Extract from scan"
-                  tone="secondary"
-                  onPress={handleDraftHealthCardOcr}
-                  disabled={!canRunHealthCardOcr(draft)}
-                  loading={healthCardOcrLoading}
-                />
-                {!canRunHealthCardOcr(draft) ? (
-                  <Text style={styles.meta}>
-                    {draft.localFileUri
+              <ExtractedFieldEditor
+                title="Health card record"
+                verificationStatus={getHealthCardVerificationStatus(
+                  { localFileUri: draft.localFileUri, healthCardData: draft.healthCardData },
+                  bundle.travellers.find((item) => item.id === draft.travellerId) ?? null
+                )}
+                actionLabel="Extract from scan"
+                onAction={handleDraftHealthCardOcr}
+                actionDisabled={!canRunHealthCardOcr(draft)}
+                actionLoading={healthCardOcrLoading}
+                helperText={
+                  !canRunHealthCardOcr(draft)
+                    ? draft.localFileUri
                       ? 'Health-card OCR can read local image scans and PDFs in the Android build.'
-                      : 'Attach a GHIC or EHIC image or PDF to extract card fields automatically.'}
-                  </Text>
-                ) : null}
+                      : 'Attach a GHIC or EHIC image or PDF to extract card fields automatically.'
+                    : null
+                }
+              >
                 <AppTextField
                   label="Issuer"
                   value={draft.healthCardData.issuer}
@@ -1434,36 +1479,30 @@ export default function VaultScreen() {
                     ]}
                   />
                 </View>
-              </>
+              </ExtractedFieldEditor>
             ) : null}
             {isFormalDocumentType(draft.documentType) && draft.formalDocumentData ? (
-              <>
-                <View style={styles.detailHeader}>
-                  <Text style={styles.label}>Document record</Text>
-                  <VerificationBadge
-                    status={getFormalDocumentVerificationStatus({
-                      localFileUri: draft.localFileUri,
-                      mimeType: draft.mimeType,
-                      formalDocumentData: draft.formalDocumentData,
-                      documentNumber: draft.documentNumber,
-                      notes: draft.notes,
-                    })}
-                  />
-                </View>
-                <AppButton
-                  label="Extract from scan"
-                  tone="secondary"
-                  onPress={handleDraftFormalDocumentOcr}
-                  disabled={!canRunFormalDocumentOcr(draft)}
-                  loading={formalDocumentOcrLoading}
-                />
-                {!canRunFormalDocumentOcr(draft) ? (
-                  <Text style={styles.meta}>
-                    {draft.localFileUri
+              <ExtractedFieldEditor
+                title="Document record"
+                verificationStatus={getFormalDocumentVerificationStatus({
+                  localFileUri: draft.localFileUri,
+                  mimeType: draft.mimeType,
+                  formalDocumentData: draft.formalDocumentData,
+                  documentNumber: draft.documentNumber,
+                  notes: draft.notes,
+                })}
+                actionLabel="Extract from scan"
+                onAction={handleDraftFormalDocumentOcr}
+                actionDisabled={!canRunFormalDocumentOcr(draft)}
+                actionLoading={formalDocumentOcrLoading}
+                helperText={
+                  !canRunFormalDocumentOcr(draft)
+                    ? draft.localFileUri
                       ? 'Formal-document OCR can read local image scans and PDFs in the Android build.'
-                      : 'Attach a document image or PDF to extract metadata automatically.'}
-                  </Text>
-                ) : null}
+                      : 'Attach a document image or PDF to extract metadata automatically.'
+                    : null
+                }
+              >
                 <AppTextField
                   label="Document title"
                   value={draft.formalDocumentData.title}
@@ -1532,20 +1571,18 @@ export default function VaultScreen() {
                   }
                   multiline
                 />
-              </>
+              </ExtractedFieldEditor>
             ) : null}
             {draft.documentType === 'payment_card' && draft.paymentCardData ? (
-              <>
-                <View style={styles.detailHeader}>
-                  <Text style={styles.label}>Payment card record</Text>
-                  <VerificationBadge
-                    status={getPaymentCardVerificationStatus({
-                      localFileUri: draft.localFileUri,
-                      paymentCardData: draft.paymentCardData,
-                      documentNumber: draft.documentNumber,
-                    })}
-                  />
-                </View>
+              <ExtractedFieldEditor
+                title="Payment card record"
+                verificationStatus={getPaymentCardVerificationStatus({
+                  localFileUri: draft.localFileUri,
+                  paymentCardData: draft.paymentCardData,
+                  documentNumber: draft.documentNumber,
+                })}
+                description="Sensitive card values stay masked in the viewer. CVV is stored privately and never shown by default."
+              >
                 <AppTextField
                   label="Card type"
                   value={draft.paymentCardData.cardType}
@@ -1588,7 +1625,7 @@ export default function VaultScreen() {
                   secureTextEntry
                   helper="Stored locally for your own reference. Pineapple never shows it by default in the card view."
                 />
-              </>
+              </ExtractedFieldEditor>
             ) : null}
             <DateTimeField
               label="Issue date"
@@ -1680,19 +1717,7 @@ export default function VaultScreen() {
 
       <AppModal
         visible={detailVisible}
-        title={
-          selectedDocument?.documentType === 'passport'
-            ? 'Passport detail'
-            : selectedDocument?.documentType === 'driving_licence'
-              ? 'Driving licence detail'
-              : selectedDocument?.documentType === 'ghic'
-                ? 'Health card detail'
-                : selectedDocument?.documentType === 'payment_card'
-                  ? 'Payment card detail'
-                  : selectedDocument && isFormalDocumentType(selectedDocument.documentType)
-                    ? 'Formal document detail'
-              : 'Document detail'
-        }
+        title={getDocumentDetailTitle(selectedDocument)}
         onClose={() => setDetailVisible(false)}
       >
         {selectedDocument ? (
@@ -1729,16 +1754,12 @@ export default function VaultScreen() {
                       <AppButton
                         label="Edit extracted fields"
                         tone="secondary"
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(selectedDocument));
-                          setDetailVisible(false);
-                          setEditorVisible(true);
-                        }}
+                        onPress={() => openExtractedFieldEditor(selectedDocument)}
                       />
                       <AppButton
-                        label={selectedDocument.mimeType === 'application/pdf' ? 'View original PDF' : 'View original scan'}
+                        label={getDocumentSourceCtaLabel(isDocumentPdfSource(selectedDocument.mimeType, selectedDocument.localFileUri))}
                         tone="secondary"
-                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        onPress={() => openPrimarySource(selectedDocument)}
                         disabled={!selectedDocument.localFileUri}
                       />
                     </View>
@@ -1775,22 +1796,20 @@ export default function VaultScreen() {
                       <AppButton
                         label="Edit extracted fields"
                         tone="secondary"
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(selectedDocument));
-                          setDetailVisible(false);
-                          setEditorVisible(true);
-                        }}
+                        onPress={() => openExtractedFieldEditor(selectedDocument)}
                       />
                       <AppButton
-                        label={selectedDocument.mimeType === 'application/pdf' ? 'View front PDF' : 'View front scan'}
+                        label={getDocumentSourceCtaLabel(isDocumentPdfSource(selectedDocument.mimeType, selectedDocument.localFileUri))}
                         tone="secondary"
-                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        onPress={() => openPrimarySource(selectedDocument)}
                         disabled={!selectedDocument.localFileUri}
                       />
                       <AppButton
-                        label={selectedDocument.secondaryMimeType === 'application/pdf' ? 'View back PDF' : 'View back scan'}
+                        label={getDocumentSourceCtaLabel(
+                          isDocumentPdfSource(selectedDocument.secondaryMimeType, selectedDocument.secondaryLocalFileUri)
+                        )}
                         tone="secondary"
-                        onPress={() => selectedDocument.secondaryLocalFileUri && Linking.openURL(selectedDocument.secondaryLocalFileUri)}
+                        onPress={() => openSecondarySource(selectedDocument)}
                         disabled={!selectedDocument.secondaryLocalFileUri}
                       />
                     </View>
@@ -1827,16 +1846,12 @@ export default function VaultScreen() {
                       <AppButton
                         label="Edit extracted fields"
                         tone="secondary"
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(selectedDocument));
-                          setDetailVisible(false);
-                          setEditorVisible(true);
-                        }}
+                        onPress={() => openExtractedFieldEditor(selectedDocument)}
                       />
                       <AppButton
-                        label={selectedDocument.mimeType === 'application/pdf' ? 'View original PDF' : 'View original scan'}
+                        label={getDocumentSourceCtaLabel(isDocumentPdfSource(selectedDocument.mimeType, selectedDocument.localFileUri))}
                         tone="secondary"
-                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        onPress={() => openPrimarySource(selectedDocument)}
                         disabled={!selectedDocument.localFileUri}
                       />
                     </View>
@@ -1866,16 +1881,12 @@ export default function VaultScreen() {
                       <AppButton
                         label="Edit stored fields"
                         tone="secondary"
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(selectedDocument));
-                          setDetailVisible(false);
-                          setEditorVisible(true);
-                        }}
+                        onPress={() => openExtractedFieldEditor(selectedDocument)}
                       />
                       <AppButton
-                        label={selectedDocument.mimeType === 'application/pdf' ? 'View stored PDF' : 'View stored image'}
+                        label={getDocumentSourceCtaLabel(isDocumentPdfSource(selectedDocument.mimeType, selectedDocument.localFileUri))}
                         tone="secondary"
-                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        onPress={() => openPrimarySource(selectedDocument)}
                         disabled={!selectedDocument.localFileUri}
                       />
                     </View>
@@ -1892,7 +1903,7 @@ export default function VaultScreen() {
                       traveller={selectedTraveller}
                       open={formalDocumentOpen}
                       interactive
-                      onOpenSource={() => selectedDocument.localFileUri && Linking.openURL(selectedDocument.localFileUri)}
+                      onOpenSource={() => openPrimarySource(selectedDocument)}
                     />
                     <AppButton
                       label={formalDocumentOpen ? 'Close document' : 'Open document'}
@@ -1914,16 +1925,12 @@ export default function VaultScreen() {
                       <AppButton
                         label="Edit extracted fields"
                         tone="secondary"
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(selectedDocument));
-                          setDetailVisible(false);
-                          setEditorVisible(true);
-                        }}
+                        onPress={() => openExtractedFieldEditor(selectedDocument)}
                       />
                       <AppButton
-                        label={selectedDocument.mimeType === 'application/pdf' ? 'View original PDF' : 'View original scan'}
+                        label={getDocumentSourceCtaLabel(isDocumentPdfSource(selectedDocument.mimeType, selectedDocument.localFileUri))}
                         tone="secondary"
-                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        onPress={() => openPrimarySource(selectedDocument)}
                         disabled={!selectedDocument.localFileUri}
                       />
                     </View>
@@ -1958,11 +1965,11 @@ export default function VaultScreen() {
                     {selectedDocument.previewUri ? (
                       <Image source={selectedDocument.previewUri} style={styles.preview} contentFit="contain" />
                     ) : null}
-                    {selectedDocument.mimeType === 'application/pdf' && selectedDocument.localFileUri ? (
+                    {selectedDocument.localFileUri ? (
                       <AppButton
-                        label="Open PDF locally"
+                        label={getDocumentSourceCtaLabel(isDocumentPdfSource(selectedDocument.mimeType, selectedDocument.localFileUri))}
                         tone="secondary"
-                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        onPress={() => openPrimarySource(selectedDocument)}
                       />
                     ) : null}
                     {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
@@ -1973,6 +1980,16 @@ export default function VaultScreen() {
           </>
         ) : null}
       </AppModal>
+
+      <DocumentScanViewerModal
+        visible={Boolean(scanViewer)}
+        title={scanViewer?.title || 'Document source'}
+        onClose={() => setScanViewer(null)}
+        localFileUri={scanViewer?.localFileUri ?? null}
+        previewUri={scanViewer?.previewUri ?? null}
+        mimeType={scanViewer?.mimeType ?? null}
+        emptyText={scanViewer?.emptyText}
+      />
     </AppScreen>
   );
 }

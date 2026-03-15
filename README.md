@@ -19,6 +19,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - GHIC / EHIC cards now render with a dedicated health-card object that prioritises quick expiry, issuer, emergency, and card-number access
 - Payment cards now render with their own secure premium-card object, masked number defaults, explicit reveal/hide action, and non-sensitive copy behaviour
 - Insurance records, confirmations, letters, passes, and similar paperwork now render with a dedicated formal-document folder that opens into metadata plus source-preview layout
+- All major document types now share the same support layer for source viewing, copy actions, verification status, expiry badges, and extracted-field editing
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
@@ -143,6 +144,12 @@ npx expo export --platform web
 - The closed state behaves like an official record cover, while the open state pairs extracted metadata with the original image or PDF preview
 - Formal-document OCR is available in the Android native build for local images and PDFs, with extracted fields kept editable before save
 - When Pineapple detects multiple candidate dates or reference codes, it flags the formal document for manual review in the Vault flow
+
+### Shared document systems
+
+- Pineapple now uses a shared full-screen document source viewer for local scans and PDFs across Passport, Driving Licence, Health Card, Payment Card, and Formal Documents
+- Copy actions, verification badges, expiry badges, and extracted-field editor shells are now reused across the main document experiences instead of being reimplemented per document type
+- Missing files and metadata-only records now surface clearer, consistent viewer messaging in the Vault detail flow
 
 ### Local data model
 

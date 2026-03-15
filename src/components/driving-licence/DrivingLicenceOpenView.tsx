@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
-import { ExpiryBadge } from '@/components/passport/ExpiryBadge';
-import { VerificationBadge } from '@/components/passport/VerificationBadge';
+import { DocumentMetaRow } from '@/components/document-support/DocumentMetaRow';
+import { ExpiryBadge } from '@/components/document-support/ExpiryBadge';
+import { VerificationBadge } from '@/components/document-support/VerificationBadge';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { Document, Traveller, VerificationStatus } from '@/types/models';
 import { formatShortDate } from '@/utils/date';
@@ -14,15 +15,6 @@ type Props = {
   expiryBadge: { label: string; tone: 'default' | 'blue' | 'gold' | 'coral' | 'success' | 'danger' };
   verificationStatus: VerificationStatus;
 };
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value || 'Not set'}</Text>
-    </View>
-  );
-}
 
 export function DrivingLicenceOpenView({ document, traveller, expiryBadge, verificationStatus }: Props) {
   const { width } = useWindowDimensions();
@@ -49,19 +41,19 @@ export function DrivingLicenceOpenView({ document, traveller, expiryBadge, verif
           <ExpiryBadge label={expiryBadge.label} tone={expiryBadge.tone} />
           <Text style={styles.scanStatus}>{document.secondaryLocalFileUri ? 'Front and back scans saved' : 'Front scan only'}</Text>
         </View>
-        <DetailRow label="Full name" value={document.holderName || traveller?.fullName || ''} />
-        <DetailRow label="Licence number" value={document.documentNumber} />
-        <DetailRow label="Date of birth" value={formatShortDate(record.dateOfBirth)} />
-        <DetailRow label="Issuing authority" value={record.issuingAuthority} />
+        <DocumentMetaRow label="Full name" value={document.holderName || traveller?.fullName || ''} borderColor="#E9DBE0" />
+        <DocumentMetaRow label="Licence number" value={document.documentNumber} borderColor="#E9DBE0" />
+        <DocumentMetaRow label="Date of birth" value={formatShortDate(record.dateOfBirth)} borderColor="#E9DBE0" />
+        <DocumentMetaRow label="Issuing authority" value={record.issuingAuthority} borderColor="#E9DBE0" />
       </View>
 
       <View style={[styles.panel, styles.infoPanel, horizontal ? styles.panelHalf : null]}>
         <Text style={styles.panelTitle}>Official record</Text>
-        <DetailRow label="Address" value={record.address} />
-        <DetailRow label="Date of issue" value={formatShortDate(document.issueDate)} />
-        <DetailRow label="Expiry date" value={formatShortDate(document.expiryDate)} />
-        <DetailRow label="Categories" value={record.categories} />
-        <DetailRow label="Status" value={record.status} />
+        <DocumentMetaRow label="Address" value={record.address} borderColor="#E9DBE0" />
+        <DocumentMetaRow label="Date of issue" value={formatShortDate(document.issueDate)} borderColor="#E9DBE0" />
+        <DocumentMetaRow label="Expiry date" value={formatShortDate(document.expiryDate)} borderColor="#E9DBE0" />
+        <DocumentMetaRow label="Categories" value={record.categories} borderColor="#E9DBE0" />
+        <DocumentMetaRow label="Status" value={record.status} borderColor="#E9DBE0" />
         <View style={styles.footerBlock}>
           <Text style={styles.footerLabel}>Scan record</Text>
           <Text style={styles.footerValue}>
@@ -147,25 +139,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-  },
-  detailRow: {
-    gap: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9DBE0',
-    paddingBottom: spacing.xs,
-  },
-  detailLabel: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  detailValue: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    lineHeight: 20,
   },
   footerBlock: {
     marginTop: spacing.sm,

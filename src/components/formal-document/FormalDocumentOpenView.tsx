@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { DocumentPreviewPane } from '@/components/formal-document/DocumentPreviewPane';
-import { ExpiryBadge } from '@/components/passport/ExpiryBadge';
-import { VerificationBadge } from '@/components/passport/VerificationBadge';
+import { DocumentMetaRow } from '@/components/document-support/DocumentMetaRow';
+import { ExpiryBadge } from '@/components/document-support/ExpiryBadge';
+import { VerificationBadge } from '@/components/document-support/VerificationBadge';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { Document, Traveller, VerificationStatus } from '@/types/models';
 import { formatShortDate } from '@/utils/date';
@@ -15,15 +16,6 @@ type Props = {
   verificationStatus: VerificationStatus;
   onOpenSource: () => void;
 };
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value || 'Not set'}</Text>
-    </View>
-  );
-}
 
 export function FormalDocumentOpenView({ document, traveller, expiryBadge, verificationStatus, onOpenSource }: Props) {
   const { width } = useWindowDimensions();
@@ -41,13 +33,13 @@ export function FormalDocumentOpenView({ document, traveller, expiryBadge, verif
           <ExpiryBadge label={expiryBadge.label} tone={expiryBadge.tone} />
           <Text style={styles.subtle}>{record.status || 'Stored'}</Text>
         </View>
-        <DetailRow label="Holder" value={document.holderName || traveller?.fullName || ''} />
-        <DetailRow label="Issuer" value={record.issuer} />
-        <DetailRow label="Reference" value={record.referenceCode || document.documentNumber} />
-        <DetailRow label="Issue date" value={formatShortDate(document.issueDate)} />
-        <DetailRow label="Expiry / renewal" value={formatShortDate(document.expiryDate)} />
-        <DetailRow label="Location" value={record.location} />
-        <DetailRow label="Summary" value={record.summary || document.notes} />
+        <DocumentMetaRow label="Holder" value={document.holderName || traveller?.fullName || ''} borderColor="#E9DDCF" />
+        <DocumentMetaRow label="Issuer" value={record.issuer} borderColor="#E9DDCF" />
+        <DocumentMetaRow label="Reference" value={record.referenceCode || document.documentNumber} borderColor="#E9DDCF" />
+        <DocumentMetaRow label="Issue date" value={formatShortDate(document.issueDate)} borderColor="#E9DDCF" />
+        <DocumentMetaRow label="Expiry / renewal" value={formatShortDate(document.expiryDate)} borderColor="#E9DDCF" />
+        <DocumentMetaRow label="Location" value={record.location} borderColor="#E9DDCF" />
+        <DocumentMetaRow label="Summary" value={record.summary || document.notes} borderColor="#E9DDCF" />
       </View>
 
       <View style={[styles.panel, styles.previewPanel, horizontal ? styles.panelHalf : null]}>
@@ -113,24 +105,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-  },
-  detailRow: {
-    gap: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9DDCF',
-    paddingBottom: spacing.xs,
-  },
-  detailLabel: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  detailValue: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    lineHeight: 20,
   },
 });

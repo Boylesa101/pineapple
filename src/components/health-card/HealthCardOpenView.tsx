@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 
-import { ExpiryBadge } from '@/components/passport/ExpiryBadge';
-import { VerificationBadge } from '@/components/passport/VerificationBadge';
+import { DocumentMetaRow } from '@/components/document-support/DocumentMetaRow';
+import { ExpiryBadge } from '@/components/document-support/ExpiryBadge';
+import { VerificationBadge } from '@/components/document-support/VerificationBadge';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { Document, Traveller, VerificationStatus } from '@/types/models';
 import { formatShortDate } from '@/utils/date';
@@ -14,15 +15,6 @@ type Props = {
   expiryBadge: { label: string; tone: 'default' | 'blue' | 'gold' | 'coral' | 'success' | 'danger' };
   verificationStatus: VerificationStatus;
 };
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value || 'Not set'}</Text>
-    </View>
-  );
-}
 
 export function HealthCardOpenView({ document, traveller, expiryBadge, verificationStatus }: Props) {
   const { width } = useWindowDimensions();
@@ -62,14 +54,14 @@ export function HealthCardOpenView({ document, traveller, expiryBadge, verificat
 
       <View style={[styles.panel, styles.infoPanel, horizontal ? styles.panelHalf : null]}>
         <Text style={styles.panelTitle}>Travel health details</Text>
-        <DetailRow label="Holder name" value={document.holderName || traveller?.fullName || ''} />
-        <DetailRow label="Card number" value={document.documentNumber} />
-        <DetailRow label="Issuer" value={record.issuer} />
-        <DetailRow label="Issue date" value={formatShortDate(document.issueDate)} />
-        <DetailRow label="Expiry date" value={formatShortDate(document.expiryDate)} />
-        <DetailRow label="Country code" value={record.countryCode} />
-        <DetailRow label="Emergency line" value={record.emergencyLine} />
-        <DetailRow label="Status" value={record.status} />
+        <DocumentMetaRow label="Holder name" value={document.holderName || traveller?.fullName || ''} borderColor="#DCEBF3" />
+        <DocumentMetaRow label="Card number" value={document.documentNumber} borderColor="#DCEBF3" />
+        <DocumentMetaRow label="Issuer" value={record.issuer} borderColor="#DCEBF3" />
+        <DocumentMetaRow label="Issue date" value={formatShortDate(document.issueDate)} borderColor="#DCEBF3" />
+        <DocumentMetaRow label="Expiry date" value={formatShortDate(document.expiryDate)} borderColor="#DCEBF3" />
+        <DocumentMetaRow label="Country code" value={record.countryCode} borderColor="#DCEBF3" />
+        <DocumentMetaRow label="Emergency line" value={record.emergencyLine} borderColor="#DCEBF3" />
+        <DocumentMetaRow label="Status" value={record.status} borderColor="#DCEBF3" />
       </View>
     </View>
   );
@@ -182,24 +174,5 @@ const styles = StyleSheet.create({
     color: '#C7EDFF',
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
-  },
-  detailRow: {
-    gap: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: '#DCEBF3',
-    paddingBottom: spacing.xs,
-  },
-  detailLabel: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  detailValue: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    lineHeight: 20,
   },
 });
