@@ -2,6 +2,22 @@
 
 Pineapple is a local-first holiday planner and secure travel organiser built with Expo, React Native, and TypeScript. It runs fully offline after installation and keeps structured trip data in SQLite, sensitive security settings in secure device storage, and attached files in app-managed on-device storage.
 
+### Android test and release builds
+
+- For a sideloadable test APK on a spare Android device, run `npm run apk:debug`
+- The generated debug APK will be at `android/app/build/outputs/apk/debug/app-debug.apk`
+- The APK scripts clean stale generated native caches first, disable Gradle daemon reuse for the build command, and target `arm64-v8a` so they stay focused on real modern Android phones instead of emulator architectures
+- For a local release-style APK build, run `npm run apk:release`
+- The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
+- Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
+- When you are ready for Google Play, provide these environment variables before building:
+  - `PINEAPPLE_UPLOAD_STORE_FILE`
+  - `PINEAPPLE_UPLOAD_STORE_PASSWORD`
+  - `PINEAPPLE_UPLOAD_KEY_ALIAS`
+  - `PINEAPPLE_UPLOAD_KEY_PASSWORD`
+- Then build the Play Store bundle with `npm run aab:release`
+- The generated Android App Bundle will be at `android/app/build/outputs/bundle/release/app-release.aab`
+
 ### Core features
 
 - PIN setup and lock flow with 4-digit or 6-digit PIN support

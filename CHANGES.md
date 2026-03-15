@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.15 - 2026-03-15
+
+- Added a full filesystem backup copy of the project at `/home/andrew/back up pineapple` before starting APK release-flow setup work
+- Added Android build scripts for debug APK, release APK, and Play Store AAB generation
+- Tuned the APK scripts for ARM device builds, stale native-cache cleanup, and no-daemon execution so sideload testing on a spare phone avoids emulator-only native build failures and produces smaller installable APKs
+- Added optional upload-keystore support via `PINEAPPLE_UPLOAD_*` environment variables while keeping local release APKs installable for testing when no keystore is configured yet
+- Documented the APK/AAB output paths and the testing-to-Play-Store build flow in the README
+
 ## 1.4.14 - 2026-03-15
 
 - Added a docs-specific first-time setup flow in Vault for empty trips, with secure local guidance, quick traveller-name capture, and strong first-document actions

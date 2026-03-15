@@ -1,12 +1,15 @@
 {
   "name": "pineapple",
-  "version": "1.4.14",
+  "version": "1.4.15",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "apk:debug": "rm -rf android/app/.cxx android/app/build/generated/autolinking node_modules/react-native-reanimated/android/.cxx node_modules/react-native-worklets/android/.cxx node_modules/react-native-screens/android/.cxx node_modules/react-native-gesture-handler/android/.cxx node_modules/expo-modules-core/android/.cxx && cd android && JAVA_HOME=/snap/android-studio/current/jbr ./gradlew --no-daemon assembleDebug -PreactNativeArchitectures=arm64-v8a",
+    "apk:release": "rm -rf android/app/.cxx android/app/build/generated/autolinking node_modules/react-native-reanimated/android/.cxx node_modules/react-native-worklets/android/.cxx node_modules/react-native-screens/android/.cxx node_modules/react-native-gesture-handler/android/.cxx node_modules/expo-modules-core/android/.cxx && cd android && JAVA_HOME=/snap/android-studio/current/jbr ./gradlew --no-daemon assembleRelease -PreactNativeArchitectures=arm64-v8a",
+    "aab:release": "cd android && ./gradlew bundleRelease",
     "test": "node --import tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "generate:brand": "node scripts/generate-brand-assets.mjs"
