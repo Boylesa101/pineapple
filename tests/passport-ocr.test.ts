@@ -66,6 +66,6 @@ test('passport OCR only enables for local image scans', () => {
   assert.equal(hasPassportImageForOcr(passportDraft), true);
   assert.equal(
     hasPassportImageForOcr({ ...passportDraft, mimeType: 'application/pdf', previewUri: null, localFileUri: 'file:///passport.pdf' }),
-    false
+    true
   );
 });

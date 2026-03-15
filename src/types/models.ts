@@ -42,7 +42,8 @@ export type SyncStatus = 'local_only' | 'ready' | 'pending_export' | 'pending_im
 export type ConflictStatus = 'open' | 'resolved_keep_local' | 'resolved_use_incoming';
 export type PrivacyMaskingMode = 'always' | 'travel_mode';
 export type PinLength = 4 | 6;
-export type PassportVerificationStatus = 'verified' | 'review' | 'unverified';
+export type VerificationStatus = 'verified' | 'review' | 'unverified';
+export type PassportVerificationStatus = VerificationStatus;
 
 export interface Trip {
   id: string;
@@ -91,6 +92,10 @@ export interface Document {
   previewUri: string | null;
   mimeType: string | null;
   passportData?: PassportData | null;
+  secondaryLocalFileUri?: string | null;
+  secondaryPreviewUri?: string | null;
+  secondaryMimeType?: string | null;
+  drivingLicenceData?: DrivingLicenceData | null;
   sensitive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -104,6 +109,14 @@ export interface PassportData {
   nationality: string;
   dateOfBirth: string | null;
   placeOfBirth: string;
+}
+
+export interface DrivingLicenceData {
+  address: string;
+  dateOfBirth: string | null;
+  categories: string;
+  issuingAuthority: string;
+  status: string;
 }
 
 export interface PackingItem {

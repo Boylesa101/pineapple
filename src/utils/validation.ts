@@ -45,6 +45,9 @@ export function validateDocument(input: DocumentDraft) {
   if (input.documentType === 'passport' && input.passportData?.dateOfBirth && !isValid(parseISO(input.passportData.dateOfBirth))) {
     errors.push('Passport date of birth is invalid.');
   }
+  if (input.documentType === 'driving_licence' && input.drivingLicenceData?.dateOfBirth && !isValid(parseISO(input.drivingLicenceData.dateOfBirth))) {
+    errors.push('Driving licence date of birth is invalid.');
+  }
   return errors;
 }
 

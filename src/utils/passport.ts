@@ -1,4 +1,5 @@
 import type { Document, DocumentDraft, PassportData, PassportVerificationStatus, Traveller } from '@/types/models';
+import { getVerificationLabel } from '@/utils/verification';
 
 function normalizeLetters(value: string) {
   return value
@@ -118,9 +119,7 @@ export function getPassportVerificationStatus(document: Pick<Document, 'localFil
 }
 
 export function getPassportVerificationLabel(status: PassportVerificationStatus) {
-  if (status === 'verified') return 'Verified';
-  if (status === 'review') return 'Needs review';
-  return 'Not verified';
+  return getVerificationLabel(status);
 }
 
 export function buildPassportMrz(document: Pick<Document, 'documentNumber' | 'expiryDate' | 'passportData'>, traveller?: Traveller | null) {

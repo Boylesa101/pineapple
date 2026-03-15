@@ -4,10 +4,12 @@ import type {
   AppPreferences,
   Document,
   DocumentDraft,
+  DrivingLicenceData,
   DocumentType,
   ExpiryReminderLeadTime,
   ExpiryReminderSchedule,
 } from '@/types/models';
+import { normalizeDrivingLicenceData } from './drivingLicence';
 import { normalizePassportData } from './passport';
 
 export type DocumentExpiryBucket =
@@ -185,6 +187,10 @@ export function normalizeDocumentRecord(document: Omit<Document, 'expiredStatus'
     expiryReminderEnabled: document.expiryReminderEnabled ?? documentTypeSupportsExpiryWarnings(document.documentType),
     expiryReminderSchedule: normalizeExpiryReminderSchedule(document.expiryReminderSchedule),
     passportData: normalizePassportData(document.passportData),
+    secondaryLocalFileUri: document.secondaryLocalFileUri ?? null,
+    secondaryPreviewUri: document.secondaryPreviewUri ?? null,
+    secondaryMimeType: document.secondaryMimeType ?? null,
+    drivingLicenceData: normalizeDrivingLicenceData(document.drivingLicenceData as DrivingLicenceData | null | undefined),
     expiredStatus: expiryInfo.isExpired,
     expiringSoonStatus: expiryInfo.isExpiring,
   };
@@ -205,6 +211,10 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     previewUri: partial.previewUri,
     mimeType: partial.mimeType,
     passportData: null,
+    secondaryLocalFileUri: null,
+    secondaryPreviewUri: null,
+    secondaryMimeType: null,
+    drivingLicenceData: null,
     sensitive: true,
     createdAt: '',
     updatedAt: '',
@@ -227,6 +237,10 @@ export function buildDocumentDraftDefaults(partial: Pick<DocumentDraft, 'tripId'
     previewUri: normalized.previewUri,
     mimeType: normalized.mimeType,
     passportData: normalized.passportData,
+    secondaryLocalFileUri: normalized.secondaryLocalFileUri,
+    secondaryPreviewUri: normalized.secondaryPreviewUri,
+    secondaryMimeType: normalized.secondaryMimeType,
+    drivingLicenceData: normalized.drivingLicenceData,
     sensitive: normalized.sensitive,
   };
 }

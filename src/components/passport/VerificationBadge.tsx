@@ -1,9 +1,9 @@
 import { InfoChip } from '@/components/InfoChip';
-import type { PassportVerificationStatus } from '@/types/models';
-import { getPassportVerificationLabel } from '@/utils/passport';
+import type { VerificationStatus } from '@/types/models';
+import { getVerificationLabel } from '@/utils/verification';
 
 type Props = {
-  status: PassportVerificationStatus;
+  status: VerificationStatus;
 };
 
 const toneMap = {
@@ -13,5 +13,5 @@ const toneMap = {
 } as const;
 
 export function VerificationBadge({ status }: Props) {
-  return <InfoChip label={getPassportVerificationLabel(status)} tone={toneMap[status]} />;
+  return <InfoChip label={getVerificationLabel(status)} tone={toneMap[status]} />;
 }

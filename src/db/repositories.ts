@@ -7,6 +7,7 @@ import {
   normalizeDocumentRecord,
   serializeExpiryReminderSchedule,
 } from '@/utils/documentExpiry';
+import { normalizeDrivingLicenceData } from '@/utils/drivingLicence';
 import { deleteLocalFile } from '@/utils/fileStorage';
 import { normalizePassportData } from '@/utils/passport';
 import type {
@@ -44,12 +45,38 @@ function parsePassportData(value: unknown) {
   }
 }
 
-async function cleanupDocumentFiles(document: { localFileUri: string; previewUri: string | null } | null | undefined) {
+function parseDrivingLicenceData(value: unknown) {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    return normalizeDrivingLicenceData(JSON.parse(value));
+  } catch {
+    return null;
+  }
+}
+
+async function cleanupDocumentFiles(
+  document:
+    | {
+        localFileUri: string;
+        previewUri: string | null;
+        secondaryLocalFileUri?: string | null;
+        secondaryPreviewUri?: string | null;
+      }
+    | null
+    | undefined
+) {
   if (!document) {
     return;
   }
 
-  const uris = new Set([document.localFileUri, document.previewUri].filter((value): value is string => Boolean(value)));
+  const uris = new Set(
+    [document.localFileUri, document.previewUri, document.secondaryLocalFileUri, document.secondaryPreviewUri].filter(
+      (value): value is string => Boolean(value)
+    )
+  );
   for (const uri of uris) {
     await deleteLocalFile(uri);
   }
@@ -58,8 +85,13 @@ async function cleanupDocumentFiles(document: { localFileUri: string; previewUri
 async function cleanupTripFiles(tripId: string) {
   const db = await getDatabase();
   const trip = await db.getFirstAsync<{ coverImageUri: string | null }>('SELECT coverImageUri FROM trips WHERE id = ?', tripId);
-  const documents = await db.getAllAsync<{ localFileUri: string; previewUri: string | null }>(
-    'SELECT localFileUri, previewUri FROM documents WHERE tripId = ?',
+  const documents = await db.getAllAsync<{
+    localFileUri: string;
+    previewUri: string | null;
+    secondaryLocalFileUri: string | null;
+    secondaryPreviewUri: string | null;
+  }>(
+    'SELECT localFileUri, previewUri, secondaryLocalFileUri, secondaryPreviewUri FROM documents WHERE tripId = ?',
     tripId
   );
 
@@ -168,6 +200,10 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         expiryReminderEnabled: toBool(document.expiryReminderEnabled ?? 1),
         expiryReminderSchedule: document.expiryReminderSchedule,
         passportData: parsePassportData(document.passportData),
+        secondaryLocalFileUri: document.secondaryLocalFileUri ?? null,
+        secondaryPreviewUri: document.secondaryPreviewUri ?? null,
+        secondaryMimeType: document.secondaryMimeType ?? null,
+        drivingLicenceData: parseDrivingLicenceData(document.drivingLicenceData),
       })
     ),
     packingItems: packingItemsRaw.map((item) => ({
@@ -301,15 +337,20 @@ export async function upsertDocument(input: DocumentDraft) {
   const id = input.id ?? createId('document');
   const normalized = normalizeDocumentRecord(input as any);
   const existing = input.id
-    ? await db.getFirstAsync<{ localFileUri: string; previewUri: string | null }>(
-        'SELECT localFileUri, previewUri FROM documents WHERE id = ?',
+    ? await db.getFirstAsync<{
+        localFileUri: string;
+        previewUri: string | null;
+        secondaryLocalFileUri: string | null;
+        secondaryPreviewUri: string | null;
+      }>(
+        'SELECT localFileUri, previewUri, secondaryLocalFileUri, secondaryPreviewUri FROM documents WHERE id = ?',
         input.id
       )
     : null;
 
   await db.runAsync(
-    `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, expiryReminderEnabled, expiryReminderSchedule, notes, localFileUri, previewUri, mimeType, passportData, sensitive, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, expiryReminderEnabled, expiryReminderSchedule, notes, localFileUri, previewUri, mimeType, passportData, secondaryLocalFileUri, secondaryPreviewUri, secondaryMimeType, drivingLicenceData, sensitive, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        travellerId = excluded.travellerId,
@@ -325,6 +366,10 @@ export async function upsertDocument(input: DocumentDraft) {
        previewUri = excluded.previewUri,
        mimeType = excluded.mimeType,
        passportData = excluded.passportData,
+       secondaryLocalFileUri = excluded.secondaryLocalFileUri,
+       secondaryPreviewUri = excluded.secondaryPreviewUri,
+       secondaryMimeType = excluded.secondaryMimeType,
+       drivingLicenceData = excluded.drivingLicenceData,
        sensitive = excluded.sensitive,
        updatedAt = excluded.updatedAt`,
     id,
@@ -342,6 +387,10 @@ export async function upsertDocument(input: DocumentDraft) {
     normalized.previewUri,
     normalized.mimeType,
     normalized.passportData ? JSON.stringify(normalized.passportData) : null,
+    normalized.secondaryLocalFileUri,
+    normalized.secondaryPreviewUri,
+    normalized.secondaryMimeType,
+    normalized.drivingLicenceData ? JSON.stringify(normalized.drivingLicenceData) : null,
     normalized.sensitive ? 1 : 0,
     timestamp,
     timestamp
@@ -349,10 +398,19 @@ export async function upsertDocument(input: DocumentDraft) {
 
   if (
     existing &&
-    (existing.localFileUri !== normalized.localFileUri || existing.previewUri !== normalized.previewUri)
+    (
+      existing.localFileUri !== normalized.localFileUri ||
+      existing.previewUri !== normalized.previewUri ||
+      existing.secondaryLocalFileUri !== normalized.secondaryLocalFileUri ||
+      existing.secondaryPreviewUri !== normalized.secondaryPreviewUri
+    )
   ) {
-    const nextUris = new Set([normalized.localFileUri, normalized.previewUri].filter((value): value is string => Boolean(value)));
-    for (const uri of [existing.localFileUri, existing.previewUri].filter((value): value is string => Boolean(value))) {
+    const nextUris = new Set(
+      [normalized.localFileUri, normalized.previewUri, normalized.secondaryLocalFileUri, normalized.secondaryPreviewUri].filter(
+        (value): value is string => Boolean(value)
+      )
+    );
+    for (const uri of [existing.localFileUri, existing.previewUri, existing.secondaryLocalFileUri, existing.secondaryPreviewUri].filter((value): value is string => Boolean(value))) {
       if (!nextUris.has(uri)) {
         await deleteLocalFile(uri);
       }
@@ -733,8 +791,13 @@ export async function upsertSyncConflict(input: SyncConflictDraft) {
 export async function deleteById(table: string, id: string) {
   const db = await getDatabase();
   if (table === 'documents') {
-    const document = await db.getFirstAsync<{ localFileUri: string; previewUri: string | null }>(
-      'SELECT localFileUri, previewUri FROM documents WHERE id = ?',
+    const document = await db.getFirstAsync<{
+      localFileUri: string;
+      previewUri: string | null;
+      secondaryLocalFileUri: string | null;
+      secondaryPreviewUri: string | null;
+    }>(
+      'SELECT localFileUri, previewUri, secondaryLocalFileUri, secondaryPreviewUri FROM documents WHERE id = ?',
       id
     );
     await cleanupDocumentFiles(document);
@@ -751,7 +814,12 @@ export async function clearAllData() {
   const db = await getDatabase();
   const [trips, documents] = await Promise.all([
     db.getAllAsync<{ coverImageUri: string | null }>('SELECT coverImageUri FROM trips'),
-    db.getAllAsync<{ localFileUri: string; previewUri: string | null }>('SELECT localFileUri, previewUri FROM documents'),
+    db.getAllAsync<{
+      localFileUri: string;
+      previewUri: string | null;
+      secondaryLocalFileUri: string | null;
+      secondaryPreviewUri: string | null;
+    }>('SELECT localFileUri, previewUri, secondaryLocalFileUri, secondaryPreviewUri FROM documents'),
   ]);
 
   for (const trip of trips) {

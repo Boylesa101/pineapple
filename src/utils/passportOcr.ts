@@ -222,9 +222,12 @@ export function hasPassportImageForOcr(document: Pick<DocumentDraft, 'localFileU
   if (document.mimeType?.startsWith('image/')) {
     return true;
   }
+  if (document.mimeType === 'application/pdf') {
+    return true;
+  }
 
   const candidate = document.previewUri ?? document.localFileUri;
-  return /\.(png|jpe?g|webp|heic|heif)$/i.test(candidate);
+  return /\.(pdf|png|jpe?g|webp|heic|heif)$/i.test(candidate);
 }
 
 export function applyPassportOcrToDraft(draft: DocumentDraft, result: PassportOcrResult) {

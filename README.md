@@ -14,7 +14,8 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Traveller management with passport, GHIC / EHIC, and medical notes
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
 - Passport documents now render with a dedicated physical passport cover and identity spread experience instead of a generic document card
-- Passport image scans can now prefill passport fields with on-device OCR and MRZ parsing in the Android build, while keeping the extracted fields editable before save
+- Passport image scans and passport PDFs can now prefill passport fields with on-device OCR and MRZ parsing in the Android build, while keeping the extracted fields editable before save
+- Driving licences now render with their own UK photocard object and fuller official record view, including front/back scan support
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
@@ -53,6 +54,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Local sharing via `expo-sharing`
 - Local notifications via `expo-notifications`
 - Passport OCR via `@infinitered/react-native-mlkit-text-recognition`
+- PDF page rendering for OCR via `react-native-pdf-page-image`
 - Backup encryption via PBKDF2-derived AES with HMAC integrity using `crypto-js`
 - State management via `zustand`
 
@@ -105,9 +107,14 @@ npx expo export --platform web
 ### Passport OCR
 
 - Passport OCR is available in the Android native build of Pineapple
-- It currently works with local image scans stored on the device
-- PDF passport files still need manual review and field entry
+- It works with local image scans and attached passport PDFs stored on the device
 - Pineapple always lets the user review and edit extracted passport fields before saving
+
+### Driving Licence
+
+- Driving licences use a dedicated photocard-style component instead of the generic document card
+- The closed state behaves like a compact licence card and the open state reveals a fuller official record layout
+- Pineapple can keep front and reverse scans separately so the photocard and endorsements stay together offline
 
 ### Local data model
 

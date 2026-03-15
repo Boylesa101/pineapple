@@ -14,6 +14,7 @@ import { AppTextField } from '@/components/AppTextField';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
+import { DrivingLicenceDocument } from '@/components/driving-licence/DrivingLicenceDocument';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
@@ -35,6 +36,11 @@ import {
   normalizeExpiryReminderSchedule,
 } from '@/utils/documentExpiry';
 import { findPotentialDocumentDuplicate } from '@/utils/documentDuplicates';
+import {
+  buildDrivingLicenceCopyPayload,
+  ensureDrivingLicenceDraftData,
+  getDrivingLicenceVerificationStatus,
+} from '@/utils/drivingLicence';
 import { copyIntoAppStorage } from '@/utils/fileStorage';
 import { maskSensitive } from '@/utils/format';
 import { buildPassportCopyPayload, ensurePassportDraftData, getPassportVerificationStatus } from '@/utils/passport';
@@ -67,6 +73,8 @@ const scheduleOptions: Array<{ label: string; value: ExpiryReminderLeadTime }> =
 
 type PrimaryFilter = 'all' | 'traveller' | 'type';
 type GroupMode = 'flat' | 'traveller' | 'type';
+type DocumentAssetSource = 'files' | 'photos';
+type DocumentScanSide = 'front' | 'back';
 
 export default function VaultScreen() {
   const router = useRouter();
@@ -94,6 +102,7 @@ export default function VaultScreen() {
   const [typeFilter, setTypeFilter] = useState<DocumentType | 'all'>('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('flat');
   const [passportOpen, setPassportOpen] = useState(false);
+  const [drivingLicenceOpen, setDrivingLicenceOpen] = useState(false);
   const [passportOcrLoading, setPassportOcrLoading] = useState(false);
   const openedEditIdRef = useRef<string | null>(null);
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
@@ -119,15 +128,27 @@ export default function VaultScreen() {
     if (document.tripId !== selectedTripId) {
       setActiveTrip(document.tripId);
     }
-    setDraft(document);
+    const traveller = data.travellers.find((item) => item.id === document.travellerId) ?? null;
+    setDraft(ensureDrivingLicenceDraftData(ensurePassportDraftData(document, traveller), traveller));
     setEditorVisible(true);
   }, [data.documents, params.editDocumentId, selectedTripId, setActiveTrip]);
 
   useEffect(() => {
     if (!detailVisible) {
       setPassportOpen(false);
+      setDrivingLicenceOpen(false);
     }
   }, [detailVisible, selectedId]);
+
+  useEffect(() => {
+    setPassportOpen(false);
+    setDrivingLicenceOpen(false);
+  }, [selectedId]);
+
+  function withSpecializedDocumentData(source: DocumentDraft) {
+    const traveller = bundle.travellers.find((item) => item.id === source.travellerId) ?? null;
+    return ensureDrivingLicenceDraftData(ensurePassportDraftData(source, traveller), traveller);
+  }
 
   const filteredDocuments = useMemo(() => {
     return bundle.documents.filter((document) => {
@@ -180,28 +201,21 @@ export default function VaultScreen() {
     );
   }
 
-  async function handleSourcePick(source: 'files' | 'photos') {
-    if (!selectedTripId) return;
+  async function pickManagedDocumentAsset(source: DocumentAssetSource) {
     try {
       if (source === 'files') {
         const result = await DocumentPicker.getDocumentAsync({
           type: ['application/pdf', 'image/*'],
           copyToCacheDirectory: true,
         });
-        if (result.canceled || !result.assets[0]) return;
+        if (result.canceled || !result.assets[0]) return null;
         const asset = result.assets[0];
         const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
-        setDraft({
-          ...buildDocumentDraftDefaults({
-            tripId: selectedTripId,
-            localFileUri,
-            previewUri: asset.mimeType?.startsWith('image') ? localFileUri : null,
-            mimeType: asset.mimeType ?? null,
-          }),
-          expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
-        });
-        setEditorVisible(true);
-        return;
+        return {
+          localFileUri,
+          previewUri: asset.mimeType?.startsWith('image') ? localFileUri : null,
+          mimeType: asset.mimeType ?? null,
+        };
       }
 
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -210,26 +224,21 @@ export default function VaultScreen() {
           'Photos permission needed',
           'Allow photo library access if you want Pineapple to import document images from your device.'
         );
-        return;
+        return null;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.8,
       });
-      if (result.canceled || !result.assets[0]) return;
+      if (result.canceled || !result.assets[0]) return null;
       const asset = result.assets[0];
       const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
-      setDraft({
-        ...buildDocumentDraftDefaults({
-          tripId: selectedTripId,
-          localFileUri,
-          previewUri: localFileUri,
-          mimeType: asset.mimeType ?? null,
-        }),
-        expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
-      });
-      setEditorVisible(true);
+      return {
+        localFileUri,
+        previewUri: localFileUri,
+        mimeType: asset.mimeType ?? null,
+      };
     } catch {
       Alert.alert(
         source === 'files' ? 'Import unavailable' : 'Photo import unavailable',
@@ -237,7 +246,53 @@ export default function VaultScreen() {
           ? 'Pineapple could not import that file. Try another PDF or image saved on this device.'
           : 'Pineapple could not import that image right now. Try a different photo.'
       );
+      return null;
     }
+  }
+
+  async function handleSourcePick(source: DocumentAssetSource) {
+    if (!selectedTripId) return;
+    const asset = await pickManagedDocumentAsset(source);
+    if (!asset) {
+      return;
+    }
+
+    setDraft({
+      ...buildDocumentDraftDefaults({
+        tripId: selectedTripId,
+        localFileUri: asset.localFileUri,
+        previewUri: asset.previewUri,
+        mimeType: asset.mimeType,
+      }),
+      expiryReminderSchedule: data.appPreferences.expiryReminderSchedule,
+    });
+    setEditorVisible(true);
+  }
+
+  async function handleDraftScanPick(side: DocumentScanSide, source: DocumentAssetSource) {
+    if (!draft) {
+      return;
+    }
+
+    const asset = await pickManagedDocumentAsset(source);
+    if (!asset) {
+      return;
+    }
+
+    setDraft((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return side === 'front'
+        ? { ...current, localFileUri: asset.localFileUri, previewUri: asset.previewUri, mimeType: asset.mimeType }
+        : {
+            ...current,
+            secondaryLocalFileUri: asset.localFileUri,
+            secondaryPreviewUri: asset.previewUri,
+            secondaryMimeType: asset.mimeType,
+          };
+    });
   }
 
   function openManualDocument() {
@@ -341,15 +396,15 @@ export default function VaultScreen() {
       Alert.alert(
         'Image scan needed',
         sourceDraft.localFileUri
-          ? 'Passport OCR currently works with image scans saved on this device. PDFs still need manual entry.'
-          : 'Attach a passport image first, then Pineapple can extract the MRZ and fill the passport fields for review.'
+          ? 'Passport OCR can read local image scans and PDFs in the Android build.'
+          : 'Attach a passport image or PDF first, then Pineapple can extract the MRZ and fill the passport fields for review.'
       );
       return;
     }
 
     try {
       setPassportOcrLoading(true);
-      const extracted = await recognizePassportScan(sourceDraft.localFileUri);
+      const extracted = await recognizePassportScan(sourceDraft.localFileUri, sourceDraft.mimeType);
       const merged = applyPassportOcrToDraft(sourceDraft, extracted);
       setDraft((current) => {
         if (current?.id && sourceDraft.id && current.id !== sourceDraft.id) {
@@ -394,8 +449,7 @@ export default function VaultScreen() {
       return;
     }
 
-    const traveller = bundle.travellers.find((item) => item.id === selectedDocument.travellerId) ?? null;
-    const editableDraft = ensurePassportDraftData(selectedDocument, traveller);
+    const editableDraft = withSpecializedDocumentData(selectedDocument);
     setDraft(editableDraft);
     await runPassportOcrOnDraft(editableDraft, { openEditor: true });
   }
@@ -511,7 +565,52 @@ export default function VaultScreen() {
                     <View style={styles.iconColumn}>
                       <Pressable
                         onPress={() => {
-                          setDraft(document);
+                          setDraft(withSpecializedDocumentData(document));
+                          setEditorVisible(true);
+                        }}
+                        style={styles.iconButton}
+                      >
+                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+                      </Pressable>
+                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
+                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              }
+
+              if (document.documentType === 'driving_licence') {
+                return (
+                  <View key={document.id} style={styles.passportRow}>
+                    <DrivingLicenceDocument
+                      document={document}
+                      traveller={traveller}
+                      onPress={() => {
+                        setSelectedId(document.id);
+                        setDrivingLicenceOpen(false);
+                        setDetailVisible(true);
+                      }}
+                      compact
+                    />
+                    <View style={styles.passportMeta}>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.title}>Driving licence</Text>
+                        <VerificationBadge status={getDrivingLicenceVerificationStatus(document, traveller)} />
+                      </View>
+                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+                      <Text style={styles.meta}>
+                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
+                      </Text>
+                      <Text style={styles.meta}>{numberLabel}</Text>
+                      <Text style={styles.meta}>
+                        {document.secondaryLocalFileUri ? 'Front and back scans saved' : document.localFileUri ? 'Front scan only' : 'Metadata only • No scans attached'}
+                      </Text>
+                    </View>
+                    <View style={styles.iconColumn}>
+                      <Pressable
+                        onPress={() => {
+                          setDraft(withSpecializedDocumentData(document));
                           setEditorVisible(true);
                         }}
                         style={styles.iconButton}
@@ -565,7 +664,7 @@ export default function VaultScreen() {
                   <View style={styles.iconColumn}>
                     <Pressable
                       onPress={() => {
-                        setDraft(document);
+                        setDraft(withSpecializedDocumentData(document));
                         setEditorVisible(true);
                       }}
                       style={styles.iconButton}
@@ -617,16 +716,12 @@ export default function VaultScreen() {
                       return current;
                     }
 
-                    const traveller = bundle.travellers.find((item) => item.id === current.travellerId) ?? null;
-                    return ensurePassportDraftData(
-                      {
-                        ...current,
-                        documentType: value,
-                        expiryReminderEnabled: documentTypeSupportsExpiryWarnings(value) ? current.expiryReminderEnabled : false,
-                        expiryReminderSchedule: normalizeExpiryReminderSchedule(current.expiryReminderSchedule),
-                      },
-                      traveller
-                    );
+                    return withSpecializedDocumentData({
+                      ...current,
+                      documentType: value,
+                      expiryReminderEnabled: documentTypeSupportsExpiryWarnings(value) ? current.expiryReminderEnabled : false,
+                      expiryReminderSchedule: normalizeExpiryReminderSchedule(current.expiryReminderSchedule),
+                    });
                   })
                 }
                 options={Object.entries(documentLabels).map(([value, label]) => ({ value: value as DocumentType, label }))}
@@ -646,11 +741,14 @@ export default function VaultScreen() {
                     }
 
                     const traveller = bundle.travellers.find((item) => item.id === (value === 'trip' ? null : value)) ?? null;
-                    return ensurePassportDraftData(
-                      {
-                        ...current,
-                        travellerId: value === 'trip' ? null : value,
-                      },
+                    return ensureDrivingLicenceDraftData(
+                      ensurePassportDraftData(
+                        {
+                          ...current,
+                          travellerId: value === 'trip' ? null : value,
+                        },
+                        traveller
+                      ),
                       traveller
                     );
                   })
@@ -687,8 +785,8 @@ export default function VaultScreen() {
                 {!hasPassportImageForOcr(draft) ? (
                   <Text style={styles.meta}>
                     {draft.localFileUri
-                      ? 'Passport OCR currently works with local image scans. PDFs still need manual review.'
-                      : 'Attach a passport image to extract MRZ and identity fields automatically.'}
+                      ? 'Passport OCR can read local image scans and PDFs in the Android build.'
+                      : 'Attach a passport image or PDF to extract MRZ and identity fields automatically.'}
                   </Text>
                 ) : null}
                 <AppTextField
@@ -763,6 +861,97 @@ export default function VaultScreen() {
                 />
               </>
             ) : null}
+            {draft.documentType === 'driving_licence' && draft.drivingLicenceData ? (
+              <>
+                <View style={styles.detailHeader}>
+                  <Text style={styles.label}>Driving licence record</Text>
+                  <VerificationBadge
+                    status={getDrivingLicenceVerificationStatus(
+                      {
+                        localFileUri: draft.localFileUri,
+                        secondaryLocalFileUri: draft.secondaryLocalFileUri,
+                        drivingLicenceData: draft.drivingLicenceData,
+                      },
+                      bundle.travellers.find((item) => item.id === draft.travellerId) ?? null
+                    )}
+                  />
+                </View>
+                <Text style={styles.meta}>Use the front scan for the photocard and the back scan for categories or endorsements.</Text>
+                <View style={styles.buttonRow}>
+                  <AppButton label={draft.localFileUri ? 'Replace front from files' : 'Add front from files'} tone="secondary" onPress={() => handleDraftScanPick('front', 'files')} />
+                  <AppButton label={draft.localFileUri ? 'Replace front from photos' : 'Add front from photos'} tone="secondary" onPress={() => handleDraftScanPick('front', 'photos')} />
+                </View>
+                <View style={styles.buttonRow}>
+                  <AppButton
+                    label={draft.secondaryLocalFileUri ? 'Replace back from files' : 'Add back from files'}
+                    tone="secondary"
+                    onPress={() => handleDraftScanPick('back', 'files')}
+                  />
+                  <AppButton
+                    label={draft.secondaryLocalFileUri ? 'Replace back from photos' : 'Add back from photos'}
+                    tone="secondary"
+                    onPress={() => handleDraftScanPick('back', 'photos')}
+                  />
+                </View>
+                <AppTextField
+                  label="Address"
+                  value={draft.drivingLicenceData.address}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.drivingLicenceData ? { ...current, drivingLicenceData: { ...current.drivingLicenceData, address: value } } : current
+                    )
+                  }
+                  multiline
+                />
+                <DateTimeField
+                  label="Date of birth"
+                  mode="date"
+                  value={draft.drivingLicenceData.dateOfBirth}
+                  onChange={(value) =>
+                    setDraft((current) =>
+                      current?.drivingLicenceData ? { ...current, drivingLicenceData: { ...current.drivingLicenceData, dateOfBirth: value } } : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Categories"
+                  value={draft.drivingLicenceData.categories}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.drivingLicenceData ? { ...current, drivingLicenceData: { ...current.drivingLicenceData, categories: value } } : current
+                    )
+                  }
+                />
+                <AppTextField
+                  label="Issuing authority"
+                  value={draft.drivingLicenceData.issuingAuthority}
+                  onChangeText={(value) =>
+                    setDraft((current) =>
+                      current?.drivingLicenceData
+                        ? { ...current, drivingLicenceData: { ...current.drivingLicenceData, issuingAuthority: value } }
+                        : current
+                    )
+                  }
+                />
+                <View style={styles.field}>
+                  <Text style={styles.label}>Status</Text>
+                  <ChoiceChips<string>
+                    value={draft.drivingLicenceData.status || 'Valid'}
+                    onChange={(value) =>
+                      setDraft((current) =>
+                        current?.drivingLicenceData ? { ...current, drivingLicenceData: { ...current.drivingLicenceData, status: value } } : current
+                      )
+                    }
+                    options={[
+                      { label: 'Valid', value: 'Valid' },
+                      { label: 'Provisional', value: 'Provisional' },
+                      { label: 'Expired', value: 'Expired' },
+                      { label: 'Review', value: 'Needs review' },
+                    ]}
+                  />
+                </View>
+              </>
+            ) : null}
             <DateTimeField
               label="Issue date"
               mode="date"
@@ -804,9 +993,13 @@ export default function VaultScreen() {
               <Text style={styles.meta}>Reminders stay on this device only and never include document numbers or images.</Text>
             </View>
             <Text style={styles.meta}>
-              {draft.localFileUri
-                ? 'This document includes a local file stored on the device.'
-                : 'This is a metadata-only document entry. You can still track numbers, dates, and reminders without attaching a file.'}
+              {draft.documentType === 'driving_licence'
+                ? draft.localFileUri || draft.secondaryLocalFileUri
+                  ? `This driving licence keeps ${draft.localFileUri ? 'the front' : 'no front'}${draft.secondaryLocalFileUri ? ' and the reverse' : ''} scan locally on the device.`
+                  : 'This is a metadata-only driving licence entry. You can still track numbers, dates, and reminders without attaching scans yet.'
+                : draft.localFileUri
+                  ? 'This document includes a local file stored on the device.'
+                  : 'This is a metadata-only document entry. You can still track numbers, dates, and reminders without attaching a file.'}
             </Text>
             <View style={styles.field}>
               <Text style={styles.label}>Sensitivity</Text>
@@ -839,7 +1032,17 @@ export default function VaultScreen() {
         ) : null}
       </AppModal>
 
-      <AppModal visible={detailVisible} title={selectedDocument?.documentType === 'passport' ? 'Passport detail' : 'Document detail'} onClose={() => setDetailVisible(false)}>
+      <AppModal
+        visible={detailVisible}
+        title={
+          selectedDocument?.documentType === 'passport'
+            ? 'Passport detail'
+            : selectedDocument?.documentType === 'driving_licence'
+              ? 'Driving licence detail'
+              : 'Document detail'
+        }
+        onClose={() => setDetailVisible(false)}
+      >
         {selectedDocument ? (
           <>
             {selectedDocument.sensitive && !isVaultUnlocked ? (
@@ -875,7 +1078,7 @@ export default function VaultScreen() {
                         label="Edit extracted fields"
                         tone="secondary"
                         onPress={() => {
-                          setDraft(selectedDocument);
+                          setDraft(withSpecializedDocumentData(selectedDocument));
                           setDetailVisible(false);
                           setEditorVisible(true);
                         }}
@@ -891,7 +1094,52 @@ export default function VaultScreen() {
                       <Text style={styles.meta}>No original scan is attached yet. You can still keep passport details and expiry tracking locally.</Text>
                     ) : null}
                     {selectedDocument.localFileUri && !hasPassportImageForOcr(selectedDocument) ? (
-                      <Text style={styles.meta}>Passport OCR currently works with image scans. PDFs can still be viewed and edited manually.</Text>
+                      <Text style={styles.meta}>Passport OCR can read local image scans and PDFs in the Android build.</Text>
+                    ) : null}
+                    {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
+                  </>
+                ) : selectedDocument.documentType === 'driving_licence' ? (
+                  <>
+                    <DrivingLicenceDocument
+                      document={selectedDocument}
+                      traveller={selectedTraveller}
+                      open={drivingLicenceOpen}
+                      interactive
+                    />
+                    <AppButton
+                      label={drivingLicenceOpen ? 'Close licence' : 'Open licence'}
+                      tone="secondary"
+                      onPress={() => setDrivingLicenceOpen((value) => !value)}
+                    />
+                    <View style={styles.buttonRow}>
+                      <CopyDataButton label="Copy licence data" payload={buildDrivingLicenceCopyPayload(selectedDocument, selectedTraveller)} />
+                      <AppButton
+                        label="Edit extracted fields"
+                        tone="secondary"
+                        onPress={() => {
+                          setDraft(withSpecializedDocumentData(selectedDocument));
+                          setDetailVisible(false);
+                          setEditorVisible(true);
+                        }}
+                      />
+                      <AppButton
+                        label={selectedDocument.mimeType === 'application/pdf' ? 'View front PDF' : 'View front scan'}
+                        tone="secondary"
+                        onPress={() => Linking.openURL(selectedDocument.localFileUri)}
+                        disabled={!selectedDocument.localFileUri}
+                      />
+                      <AppButton
+                        label={selectedDocument.secondaryMimeType === 'application/pdf' ? 'View back PDF' : 'View back scan'}
+                        tone="secondary"
+                        onPress={() => selectedDocument.secondaryLocalFileUri && Linking.openURL(selectedDocument.secondaryLocalFileUri)}
+                        disabled={!selectedDocument.secondaryLocalFileUri}
+                      />
+                    </View>
+                    {!selectedDocument.localFileUri ? (
+                      <Text style={styles.meta}>No front scan is attached yet. You can still keep the driving licence record and expiry tracking locally.</Text>
+                    ) : null}
+                    {!selectedDocument.secondaryLocalFileUri ? (
+                      <Text style={styles.meta}>No back scan is attached yet. Add the reverse side for categories and endorsements.</Text>
                     ) : null}
                     {selectedDocument.notes ? <Text style={styles.meta}>{selectedDocument.notes}</Text> : null}
                   </>

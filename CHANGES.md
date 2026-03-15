@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.9 - 2026-03-15
+
+- Added passport OCR preprocessing for attached PDF scans by rendering the first page to an image before ML Kit extraction in the Android build
+- Added a dedicated UK driving-licence Vault experience with a physical photocard closed state, a fuller official record open state, verification and expiry badges, and copy/edit actions
+- Added safe local storage and migration support for driving-licence extracted fields plus front and back scan files
+- Added regression tests for driving-licence verification/copy behaviour and expanded passport OCR scan eligibility coverage
+
 ## 1.4.8 - 2026-03-15
 
 - Added real on-device passport OCR using ML Kit in the Vault passport flow, including MRZ parsing and editable field prefill

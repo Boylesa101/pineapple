@@ -48,7 +48,9 @@ export async function collectBackupAttachments(snapshot: AppDataSnapshot) {
     .map((trip) => trip.coverImageUri)
     .filter((value): value is string => Boolean(value));
   const documentUris = snapshot.documents.flatMap((document) =>
-    [document.localFileUri, document.previewUri].filter((value): value is string => Boolean(value))
+    [document.localFileUri, document.previewUri, document.secondaryLocalFileUri, document.secondaryPreviewUri].filter(
+      (value): value is string => Boolean(value)
+    )
   );
 
   for (const uri of [...tripUris, ...documentUris]) {
@@ -205,6 +207,12 @@ export async function restoreEncryptedBackup({
       ...document,
       localFileUri: mapAttachmentUri(payload.attachments, document.localFileUri, rewrittenUris),
       previewUri: document.previewUri ? mapAttachmentUri(payload.attachments, document.previewUri, rewrittenUris) : null,
+      secondaryLocalFileUri: document.secondaryLocalFileUri
+        ? mapAttachmentUri(payload.attachments, document.secondaryLocalFileUri, rewrittenUris)
+        : null,
+      secondaryPreviewUri: document.secondaryPreviewUri
+        ? mapAttachmentUri(payload.attachments, document.secondaryPreviewUri, rewrittenUris)
+        : null,
     })),
   };
 
