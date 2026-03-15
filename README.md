@@ -4,10 +4,12 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 
 ### Android test and release builds
 
+- Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
 - For a sideloadable test APK on a spare Android device, run `npm run apk:debug`
-- The generated debug APK will be at `android/app/build/outputs/apk/debug/app-debug.apk`
+- Pineapple copies the finished debug APK to `build/apk/pineapple-debug.apk` so you have a stable path even when Gradle uses intermediate output folders internally
 - The APK scripts clean stale generated native caches first, disable Gradle daemon reuse for the build command, and target `arm64-v8a` so they stay focused on real modern Android phones instead of emulator architectures
 - For a local release-style APK build, run `npm run apk:release`
+- Pineapple copies the finished release APK to `build/apk/pineapple-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
 - Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
 - When you are ready for Google Play, provide these environment variables before building:
@@ -17,6 +19,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
   - `PINEAPPLE_UPLOAD_KEY_PASSWORD`
 - Then build the Play Store bundle with `npm run aab:release`
 - The generated Android App Bundle will be at `android/app/build/outputs/bundle/release/app-release.aab`
+- Expo SDK 55’s native toolchain expects Node `>= 20.19.4`; this machine is currently on `20.19.0`, so update Node before relying on local native build verification
 
 ### Core features
 

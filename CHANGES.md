@@ -1,10 +1,17 @@
 # Changelog
 
+## 1.4.16 - 2026-03-15
+
+- Moved Pineapple back to Expo SDK 55 with the matching React Native 0.83, React 19.2, Expo Router 55, and supporting native module versions
+- Re-enabled the Android New Architecture setting required by Expo SDK 55 and removed the deprecated edge-to-edge compatibility property from `gradle.properties`
+- Updated version metadata for the SDK 55 return and documented the current Node `20.19.4+` requirement for local native build verification
+
 ## 1.4.15 - 2026-03-15
 
 - Added a full filesystem backup copy of the project at `/home/andrew/back up pineapple` before starting APK release-flow setup work
 - Added Android build scripts for debug APK, release APK, and Play Store AAB generation
 - Tuned the APK scripts for ARM device builds, stale native-cache cleanup, and no-daemon execution so sideload testing on a spare phone avoids emulator-only native build failures and produces smaller installable APKs
+- Added a stable copied APK output at `build/apk/` so testing does not depend on Gradle's internal debug/release folder layout
 - Added optional upload-keystore support via `PINEAPPLE_UPLOAD_*` environment variables while keeping local release APKs installable for testing when no keystore is configured yet
 - Documented the APK/AAB output paths and the testing-to-Play-Store build flow in the README
 
