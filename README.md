@@ -20,6 +20,19 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - The generated Android App Bundle will be at `android/app/build/outputs/bundle/release/app-release.aab`
 - Expo SDK 55’s native toolchain expects Node `>= 20.19.4`; this machine is currently on `20.19.0`, so update Node before relying on local native build verification
 
+### Cloudflare test download page
+
+- Cloudflare Pages project: `pinapple-dev`
+- Public test page: `https://pinapple-dev.pages.dev`
+- Preview deployment example: `https://ac48ec69.pinapple-dev.pages.dev`
+- APK download is hosted from Cloudflare R2 because the release APK is too large to bundle directly into a Pages deployment
+- Current stable APK link used by the page: `https://pub-e921959b6412492f9b7d39739cf8f48c.r2.dev/downloads/pineapple-latest.apk`
+- The static page source lives in `cloudflare/pinapple-dev/`
+- To refresh the hosted APK later:
+  - upload the new APK to the same R2 bucket key `downloads/pineapple-latest.apk`
+  - update the version text in `cloudflare/pinapple-dev/index.html`
+  - redeploy with `npx wrangler@4 pages deploy cloudflare/pinapple-dev --project-name pinapple-dev`
+
 ### Core features
 
 - PIN setup and lock flow with a minimum 4-digit PIN, explicit Enter/Cancel actions, and optional biometric unlock

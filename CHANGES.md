@@ -1,5 +1,11 @@
 # Changelog
 
+## Distribution update - 2026-03-16
+
+- Added a live Cloudflare Pages test-download site at `https://pinapple-dev.pages.dev`
+- Added Cloudflare R2 hosting for the latest installable Android test APK so testers can download the current Pineapple phone build directly without using GitHub artifacts
+- Added the static page source under `cloudflare/pinapple-dev/` and documented the update flow in the README
+
 ## 1.4.16 - 2026-03-15
 
 - Moved Pineapple back to Expo SDK 55 with the matching React Native 0.83, React 19.2, Expo Router 55, and supporting native module versions
