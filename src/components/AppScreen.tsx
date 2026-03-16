@@ -1,5 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '@/constants/theme';
@@ -11,6 +11,7 @@ type Props = PropsWithChildren<{
   footer?: ReactNode;
   backgroundColor?: string;
   hideBackgroundDecor?: boolean;
+  contentStyle?: StyleProp<ViewStyle>;
 }>;
 
 export function AppScreen({
@@ -21,9 +22,10 @@ export function AppScreen({
   footer,
   backgroundColor,
   hideBackgroundDecor = false,
+  contentStyle,
 }: Props) {
   const content = (
-    <View style={styles.content}>
+    <View style={[styles.content, !scroll ? styles.contentFill : null, contentStyle]}>
       {(title || subtitle) && (
         <View style={styles.header}>
           {title ? <Text style={styles.title}>{title}</Text> : null}
@@ -38,7 +40,13 @@ export function AppScreen({
     <SafeAreaView style={[styles.safeArea, backgroundColor ? { backgroundColor } : null]} edges={['top', 'bottom']}>
       {!hideBackgroundDecor ? <View style={styles.backgroundBlobOne} /> : null}
       {!hideBackgroundDecor ? <View style={styles.backgroundBlobTwo} /> : null}
-      {scroll ? <ScrollView contentContainerStyle={styles.scroll}>{content}</ScrollView> : content}
+      {scroll ? (
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
+          {content}
+        </ScrollView>
+      ) : (
+        content
+      )}
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </SafeAreaView>
   );
@@ -52,9 +60,15 @@ const styles = StyleSheet.create({
   scroll: {
     paddingBottom: 120,
   },
+  scrollView: {
+    flex: 1,
+  },
   content: {
     padding: spacing.lg,
     gap: spacing.md,
+  },
+  contentFill: {
+    flex: 1,
   },
   header: {
     gap: spacing.xs,

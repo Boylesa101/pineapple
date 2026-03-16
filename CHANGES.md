@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.18 - 2026-03-16
+
+- Round 2 testing fixes: removed the extra JS startup loading layer so Pineapple now stays on the native splash until the first real screen is ready, instead of flashing a second splash-style screen
+- Fixed the Android startup theme/background handoff so the app launches cleanly into the intended Pineapple blue instead of briefly showing the old sand splash colors
+- Fixed the welcome screen centering by giving non-scroll screens a full-height layout container and rebalancing the welcome composition so the icon and `Let's go` button sit in the true visual center
+- Fixed PIN setup and unlock centering by rebuilding the auth screens around symmetrical top, center, and bottom rails so the keypad remains centered across common Android screen sizes
+- Kept the Round 1 PIN, Enter, Cancel, and biometric flows intact while tightening the underlying layout containers
+
 ## Distribution update - 2026-03-16
 
 - Added a live Cloudflare Pages test-download site at `https://pinapple-dev.pages.dev`

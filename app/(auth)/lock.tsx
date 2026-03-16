@@ -74,15 +74,15 @@ export default function LockScreen() {
   }
 
   return (
-    <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor>
+    <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor contentStyle={styles.content}>
       <View style={styles.screen}>
-        <View style={styles.top}>
+        <View style={styles.topRail}>
           <PineappleMark size={76} />
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>Enter your PIN, or use biometrics if it is enabled on this device.</Text>
         </View>
 
-        <View style={styles.center}>
+        <View style={styles.centerRail}>
           <Text style={styles.stepLabel}>Enter your PIN</Text>
           {blockedSeconds > 0 ? <Text style={styles.blockedText}>Locked for {blockedSeconds}s after repeated failed attempts.</Text> : null}
           <PinPad
@@ -94,7 +94,7 @@ export default function LockScreen() {
           />
         </View>
 
-        <View style={styles.footer}>
+        <View style={styles.bottomRail}>
           {security.biometricEnabled ? (
             <Pressable onPress={handleBiometricUnlock} style={styles.biometricButton} disabled={submitting}>
               <View style={styles.biometricIconWrap}>
@@ -137,13 +137,19 @@ export default function LockScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  content: {
     flex: 1,
   },
-  top: {
+  screen: {
+    flex: 1,
+    width: '100%',
+  },
+  topRail: {
+    minHeight: 180,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
-    paddingTop: spacing.xl,
+    width: '100%',
   },
   title: {
     color: colors.white,
@@ -159,11 +165,12 @@ const styles = StyleSheet.create({
     maxWidth: 320,
     textAlign: 'center',
   },
-  center: {
+  centerRail: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.md,
+    width: '100%',
   },
   stepLabel: {
     color: colors.white,
@@ -177,10 +184,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  footer: {
+  bottomRail: {
+    minHeight: 180,
     gap: spacing.lg,
-    paddingBottom: spacing.md,
-    paddingTop: spacing.md,
+    justifyContent: 'center',
+    width: '100%',
   },
   biometricButton: {
     alignItems: 'center',

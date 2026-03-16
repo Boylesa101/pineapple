@@ -34,34 +34,56 @@ export default function IndexScreen() {
   }, [hasCompletedOnboarding, isUnlocked, pinConfigured, tripCount]);
 
   return (
-    <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor>
+    <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor contentStyle={styles.content}>
       <View style={styles.screen}>
-        <Text style={styles.header}>Pineapple</Text>
-        <View style={styles.hero}>
-          <PineappleMark size={220} />
+        <View style={styles.topRail}>
+          <Text style={styles.header}>Pineapple</Text>
         </View>
-        <Text style={styles.greeting}>{greeting}</Text>
-        <AppButton
-          label="Let's go"
-          tone="secondary"
-          size="large"
-          style={styles.cta}
-          labelStyle={styles.ctaLabel}
-          onPress={() => router.replace(nextRoute)}
-        />
+        <View style={styles.centerRail}>
+          <View style={styles.hero}>
+            <PineappleMark size={220} />
+          </View>
+          <Text style={styles.greeting}>{greeting}</Text>
+          <AppButton
+            label="Let's go"
+            tone="secondary"
+            size="large"
+            style={styles.cta}
+            labelStyle={styles.ctaLabel}
+            onPress={() => router.replace(nextRoute)}
+          />
+        </View>
+        <View style={styles.bottomRail} />
       </View>
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  content: {
+    flex: 1,
+  },
   screen: {
     flex: 1,
+    width: '100%',
+    alignItems: 'center',
+  },
+  topRail: {
+    minHeight: 96,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerRail: {
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xl,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxl,
+  },
+  bottomRail: {
+    minHeight: 96,
+    width: '100%',
   },
   header: {
     color: colors.white,
@@ -70,7 +92,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   hero: {
-    minHeight: 260,
+    minHeight: 248,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
@@ -84,8 +106,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cta: {
-    minWidth: 220,
+    minWidth: 264,
     borderColor: colors.white,
+    alignSelf: 'center',
   },
   ctaLabel: {
     color: colors.authBlue,

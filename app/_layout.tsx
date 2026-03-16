@@ -6,6 +6,7 @@ import { Stack, usePathname, useRootNavigationState, useRouter, useSegments } fr
 import { SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
+import * as SystemUI from 'expo-system-ui';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -23,16 +24,6 @@ import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
-
-function LoadingView() {
-  return (
-    <View style={styles.loading}>
-      <PineappleMark size={88} />
-      <Text style={styles.loadingTitle}>Pineapple</Text>
-      <Text style={styles.loadingSubtitle}>Loading your offline travel organiser</Text>
-    </View>
-  );
-}
 
 function BootErrorView({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -131,6 +122,10 @@ export default function RootLayout() {
   const segments = useSegments();
 
   useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.authBlue).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
     bootstrap().catch(() => undefined);
   }, [bootstrap]);
 
@@ -145,10 +140,10 @@ export default function RootLayout() {
   }, [enforceInactivityLock]);
 
   useEffect(() => {
-    if (fontsLoaded && isBootstrapped) {
+    if (fontsLoaded && (isBootstrapped || bootError)) {
       SplashScreen.hideAsync().catch(() => undefined);
     }
-  }, [fontsLoaded, isBootstrapped]);
+  }, [bootError, fontsLoaded, isBootstrapped]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
@@ -162,7 +157,7 @@ export default function RootLayout() {
     if (fontsLoaded && bootError) {
       return <BootErrorView message={bootError} onRetry={() => bootstrap().catch(() => undefined)} />;
     }
-    return <LoadingView />;
+    return null;
   }
 
   return (
@@ -170,7 +165,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style="dark" />
         <RouteGuard />
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.authBlue } }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
@@ -194,6 +189,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.authBlue,
   },
   loading: {
     flex: 1,

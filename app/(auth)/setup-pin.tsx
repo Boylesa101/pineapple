@@ -88,9 +88,9 @@ export default function SetupPinScreen() {
   }
 
   return (
-    <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor>
+    <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor contentStyle={styles.content}>
       <View style={styles.screen}>
-        <View style={styles.top}>
+        <View style={styles.topRail}>
           <PineappleMark size={76} />
           <Text style={styles.title}>Let&apos;s get set up</Text>
           <Text style={styles.subtitle}>
@@ -100,7 +100,7 @@ export default function SetupPinScreen() {
           </Text>
         </View>
 
-        <View style={styles.center}>
+        <View style={styles.centerRail}>
           <Text style={styles.stepLabel}>{step === 'create' ? 'Create your PIN' : 'Confirm your PIN'}</Text>
           <PinPad
             value={currentValue}
@@ -111,7 +111,7 @@ export default function SetupPinScreen() {
           />
         </View>
 
-        <View style={styles.footer}>
+        <View style={styles.bottomRail}>
           {biometricsAvailable ? (
             <Pressable
               onPress={() => setBiometricsPreferred((value) => !value)}
@@ -155,13 +155,19 @@ export default function SetupPinScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  content: {
     flex: 1,
   },
-  top: {
+  screen: {
+    flex: 1,
+    width: '100%',
+  },
+  topRail: {
+    minHeight: 180,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
-    paddingTop: spacing.xl,
+    width: '100%',
   },
   title: {
     color: colors.white,
@@ -177,11 +183,12 @@ const styles = StyleSheet.create({
     maxWidth: 320,
     textAlign: 'center',
   },
-  center: {
+  centerRail: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.md,
+    width: '100%',
   },
   stepLabel: {
     color: colors.white,
@@ -189,10 +196,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     textAlign: 'center',
   },
-  footer: {
+  bottomRail: {
+    minHeight: 180,
     gap: spacing.lg,
-    paddingBottom: spacing.md,
-    paddingTop: spacing.md,
+    justifyContent: 'center',
+    width: '100%',
   },
   biometricButton: {
     alignItems: 'center',
