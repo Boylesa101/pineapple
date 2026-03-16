@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0 - 2026-03-16
+
+- UI redesign to match approved mockup: rebuilt the main shell around a blue-and-white card layout with new shared headers, hero cards, action tiles, stat rows, and a floating-safe bottom navigation for `Home`, `Account`, `Vault`, `Trips`, and `SOS`
+- Added dedicated native `Account` and `SOS` screens so the main app now matches the approved shell more closely while keeping existing Pineapple trip, traveller, and emergency functionality connected
+- Updated the shared visual layer in `AppScreen`, `AppCard`, and `AppButton`, and added reusable UI primitives for the new mockup-inspired layout system
+- OCR-first document import flow: replaced the old add-document ordering with `Scan document`, `Add photo for OCR`, then `Enter manually`, and applied that order in both Vault onboarding and later Vault use
+- Added live camera scan capture for document intake and made OCR-supported document types open directly into editable review after scan/photo/PDF import
+- Android bottom navigation safe-area fix: replaced the old tab bar with a safe-area-aware custom bottom nav so icons and labels stay visible above Pixel-style 3-button system navigation
+- Kept the Round 4 auth route fix intact so successful PIN or biometric unlock still lands in the main app shell instead of looping between auth and setup routes
+
 ## 1.4.20 - 2026-03-16
 
 - Round 4 testing fixes: identified the main auth failure as a route-guard loop that redirected unlocked no-trip users from `/create-first-trip` to `/home` and then immediately back again

@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { PineappleMark } from '@/brand/PineappleMark';
 import { colors, radii, spacing } from '@/constants/theme';
+import type { DocumentType } from '@/types/models';
 
 import { DocumentSetupFlow } from './DocumentSetupFlow';
 
@@ -13,9 +14,11 @@ type Props = {
   showTravellerPrompt: boolean;
   pinConfigured: boolean;
   onOpenSecurity: () => void;
-  onAddPassport: () => void;
-  onAddDrivingLicence: () => void;
-  onImport: () => void;
+  selectedIdentityType: DocumentType;
+  onIdentityTypeChange: (value: DocumentType) => void;
+  onScanIdentity: () => void;
+  onImportIdentityForOcr: () => void;
+  onEnterIdentityManually: () => void;
   onAddHealthCard: () => void;
   onAddInsurance: () => void;
   onAddOther: () => void;

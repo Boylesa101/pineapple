@@ -1,43 +1,55 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { AppButton } from '@/components/AppButton';
 import { colors, radii, spacing } from '@/constants/theme';
+import type { DocumentType } from '@/types/models';
+
+import { DocumentAddActionsCard } from './DocumentAddActionsCard';
 
 type Props = {
-  onAddPassport: () => void;
-  onAddDrivingLicence: () => void;
-  onImport: () => void;
+  selectedType: DocumentType;
+  onTypeChange: (value: DocumentType) => void;
+  onScan: () => void;
+  onImportForOcr: () => void;
+  onManual: () => void;
 };
 
-export function AddFirstDocumentPrompt({ onAddPassport, onAddDrivingLicence, onImport }: Props) {
+export function AddFirstDocumentPrompt({ selectedType, onTypeChange, onScan, onImportForOcr, onManual }: Props) {
   return (
-    <View style={styles.card}>
+    <View style={styles.wrapper}>
       <View style={styles.copy}>
         <Text style={styles.title}>Start with your key identity document</Text>
         <Text style={styles.description}>
           Add a passport or driving licence first so Pineapple can keep your main travel identity details ready offline.
         </Text>
       </View>
-      <View style={styles.actions}>
-        <AppButton label="Add passport" onPress={onAddPassport} />
-        <AppButton label="Add driving licence" tone="secondary" onPress={onAddDrivingLicence} />
-        <AppButton label="Import a scan or PDF" tone="ghost" onPress={onImport} />
-      </View>
+      <DocumentAddActionsCard
+        title="Choose document type"
+        description="Use OCR first for a faster setup. Pineapple will ask you to review the extracted fields before saving."
+        selectedType={selectedType}
+        onTypeChange={onTypeChange}
+        typeOptions={[
+          { label: 'Passport', value: 'passport' },
+          { label: 'Driving licence', value: 'driving_licence' },
+        ]}
+        onScan={onScan}
+        onImportForOcr={onImportForOcr}
+        onManual={onManual}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  wrapper: {
     gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: '#E4D7C5',
-    backgroundColor: '#FFF9F1',
   },
   copy: {
     gap: 4,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: '#D5E8F2',
+    backgroundColor: '#F4FBFF',
   },
   title: {
     color: colors.nightNavy,
@@ -49,8 +61,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     lineHeight: 18,
-  },
-  actions: {
-    gap: spacing.sm,
   },
 });

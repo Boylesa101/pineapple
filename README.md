@@ -39,7 +39,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Optional biometric unlock when the device supports it
 - Expo Go first-run testing now clears stale PIN state when no onboarding or trip data exists yet
 - Auto-lock after inactivity and best-effort privacy overlay for the app switcher
-- Bottom-tab shell for Home, Trips, Packing, Itinerary, and Vault
+- Mockup-matched blue/white shell with a safe-area-aware bottom nav for Home, Account, Vault, Trips, and SOS
 - Trip CRUD with optional local cover image
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
@@ -52,6 +52,8 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Insurance records, confirmations, letters, passes, and similar paperwork now render with a dedicated formal-document folder that opens into metadata plus source-preview layout
 - All major document types now share the same support layer for source viewing, copy actions, verification status, expiry badges, and extracted-field editing
 - The Vault now includes a first-time document setup flow for empty trips, including traveller-name capture, secure setup guidance, and one-tap first-document prompts
+- Document intake now leads with OCR-first actions in this order: `Scan document`, `Add photo for OCR`, then `Enter manually`
+- Live camera scan capture is now available for document intake, with OCR-supported types flowing straight into editable review when possible
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking

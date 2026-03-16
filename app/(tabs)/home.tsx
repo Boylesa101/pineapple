@@ -1,53 +1,33 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Image } from 'expo-image';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { AvatarBadge } from '@/components/AvatarBadge';
-import {
-  DashboardActionTile,
-  DashboardAlertCard,
-  DashboardHeader,
-  DashboardSectionHeader,
-  DashboardSummaryTile,
-} from '@/components/DashboardElements';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
-import { colors, radii, spacing } from '@/constants/theme';
+import { AppHeader } from '@/components/ui/AppHeader';
+import { HeroCard } from '@/components/ui/HeroCard';
+import { MiniActionCard } from '@/components/ui/MiniActionCard';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
-import { countdownLabel, daysUntil, formatDateTime, formatShortDate } from '@/utils/date';
+import { countdownLabel, formatDateTime, formatShortDate } from '@/utils/date';
 import { tripDateRange } from '@/utils/format';
 import {
   getDashboardAlerts,
   getDashboardTrip,
   getDocumentExpiryOverview,
   getNextEvent,
-  getNextFlight,
-  getNextHotel,
-  getPackingProgress,
   getTripBundle,
 } from '@/utils/selectors';
 
-function formatCountdown(startDate: string, status: string) {
-  const days = daysUntil(startDate);
-  if (status === 'active') return 'In progress';
-  if (days < 0) return 'Completed';
-  if (days === 0) return 'Starts today';
-  if (days === 1) return '1 day to go';
-  return `${days} days to go`;
-}
-
-function formatFlightSummary(value: ReturnType<typeof getNextFlight>) {
-  if (!value) return 'No upcoming travel saved';
-  return `${value.airline} ${value.flightNumber} ${countdownLabel(value.departureTime)} ${formatDateTime(value.departureTime).split(', ')[1]}`;
-}
-
-function formatHotelSummary(value: ReturnType<typeof getNextHotel>) {
-  if (!value) return 'No hotel added';
-  return `${value.hotelName} from ${formatShortDate(value.checkIn)}`;
+function firstNameFromBundle(bundle: ReturnType<typeof getTripBundle>) {
+  const name = bundle.travellers[0]?.fullName || '';
+  return name.split(' ')[0] || 'Traveller';
 }
 
 export default function HomeScreen() {
@@ -55,31 +35,16 @@ export default function HomeScreen() {
   const { data, setActiveTrip } = useAppStore();
   const dashboardTrip = useMemo(() => getDashboardTrip(data), [data]);
   const bundle = useMemo(() => getTripBundle(data, dashboardTrip?.id), [data, dashboardTrip?.id]);
-  const alerts = useMemo(() => getDashboardAlerts(data, dashboardTrip?.id), [data, dashboardTrip?.id]);
-  const nextFlight = getNextFlight(data, dashboardTrip?.id);
-  const nextHotel = getNextHotel(data, dashboardTrip?.id);
-  const nextEvent = getNextEvent(data, dashboardTrip?.id);
-  const packing = getPackingProgress(data, dashboardTrip?.id);
+  const alerts = useMemo(() => getDashboardAlerts(data, dashboardTrip?.id).slice(0, 3), [data, dashboardTrip?.id]);
   const expiryOverview = getDocumentExpiryOverview(data, dashboardTrip?.id);
-  const itineraryPreview = useMemo(
-    () => [...bundle.itineraryEvents].sort((left, right) => left.dateTime.localeCompare(right.dateTime)).slice(0, 3),
-    [bundle.itineraryEvents]
-  );
+  const nextEvent = getNextEvent(data, dashboardTrip?.id);
+  const greetingName = dashboardTrip ? firstNameFromBundle(bundle) : 'there';
 
   function goToTrips() {
     router.push('/trips');
   }
 
-  function openTripScoped(path: '/vault' | '/packing' | '/itinerary') {
-    if (!dashboardTrip) {
-      goToTrips();
-      return;
-    }
-    setActiveTrip(dashboardTrip.id);
-    router.push(path);
-  }
-
-  function openTripDetail() {
+  function openTrip() {
     if (!dashboardTrip) {
       goToTrips();
       return;
@@ -97,337 +62,252 @@ export default function HomeScreen() {
     router.push({ pathname: '/trip/[tripId]/travel-mode', params: { tripId: dashboardTrip.id } });
   }
 
-  function openWarnings() {
-    router.push('/warnings');
+  function openVault() {
+    if (dashboardTrip) {
+      setActiveTrip(dashboardTrip.id);
+    }
+    router.push('/vault');
   }
 
-  const statusTone = dashboardTrip?.status === 'active' ? 'blue' : dashboardTrip?.status === 'completed' ? 'default' : 'gold';
-
   return (
-    <AppScreen scroll title={undefined} subtitle={undefined}>
-      <DashboardHeader title="Your next trip" onSettings={() => router.push('/settings')} />
-      <Text style={styles.promise}>Your travel documents, tickets, and key trip info in one place.</Text>
+    <AppScreen scroll contentStyle={styles.screen}>
+      <AppHeader
+        badgeLabel="P"
+        title="Pineapple"
+        subtitle="Travel organiser"
+        actionIcon="menu"
+        onActionPress={() => router.push('/settings')}
+      />
 
-      {!dashboardTrip ? (
-        <AppCard>
-          <EmptyState
-            title="No trip ready yet"
-            description="Create your first trip and Pineapple will turn it into a calm dashboard for travel details, documents, packing, and alerts."
-          />
-          <AppButton label="Create your first trip" onPress={goToTrips} />
-        </AppCard>
-      ) : (
-        <AppCard>
-          {dashboardTrip.coverImageUri ? (
-            <Image source={dashboardTrip.coverImageUri} style={styles.coverImage} contentFit="cover" />
-          ) : null}
-          <View style={styles.primaryHeader}>
-            <View style={styles.primaryCopy}>
-              <Text style={styles.eyebrow}>Primary trip</Text>
-              <Text style={styles.destination}>{dashboardTrip.destination}</Text>
-              <Text style={styles.tripDates}>{tripDateRange(dashboardTrip.startDate, dashboardTrip.endDate)}</Text>
-            </View>
-            <InfoChip label={dashboardTrip.status} tone={statusTone} />
-          </View>
-          <View style={styles.chipRow}>
-            <InfoChip label={formatCountdown(dashboardTrip.startDate, dashboardTrip.status)} tone="blue" />
-            <InfoChip label={`${bundle.travellers.length} traveller(s)`} tone="default" />
-          </View>
-          <AppButton label="Open trip" onPress={openTripDetail} />
-        </AppCard>
-      )}
+      <HeroCard
+        title={`Hello ${greetingName}`}
+        description="Your next trip is ready to manage. Keep documents, plans, bookings, travellers, and emergency travel tools in one place."
+        actions={
+          <>
+            <AppButton label="Start new trip" tone="secondary" onPress={goToTrips} />
+            <AppButton label="Add document" tone="outline" onPress={openVault} />
+          </>
+        }
+      />
 
       <View style={styles.section}>
-        <DashboardSectionHeader title="Quick actions" />
-        <View style={styles.actionsGrid}>
-          <DashboardActionTile icon="document-scanner" label="Scan Document" onPress={() => openTripScoped('/vault')} />
-          <DashboardActionTile icon="bolt" label="Travel Mode" onPress={openTravelMode} />
-          <DashboardActionTile icon="checkroom" label="Add Packing Item" onPress={() => openTripScoped('/packing')} />
-          <DashboardActionTile icon="event-note" label="Add Itinerary Event" onPress={() => openTripScoped('/itinerary')} />
-          <DashboardActionTile icon="luggage" label="Add Trip" onPress={goToTrips} />
-          <DashboardActionTile icon="lock" label="Open Document Vault" onPress={() => openTripScoped('/vault')} />
+        <SectionHeader title="Current trip" right="View all" />
+        {dashboardTrip ? (
+          <Pressable onPress={openTrip}>
+            <AppCard>
+              <View style={styles.tripCard}>
+                <View style={styles.tripMeta}>
+                  <Text style={styles.tripTitle}>{dashboardTrip.name}</Text>
+                  <Text style={styles.tripText}>{tripDateRange(dashboardTrip.startDate, dashboardTrip.endDate)}</Text>
+                  <Text style={styles.tripText}>
+                    {bundle.travellers.length} traveller{bundle.travellers.length === 1 ? '' : 's'} · {bundle.hotelStays.length ? 'hotel' : 'no hotel'}
+                    {bundle.travelSegments.length ? ', flights' : ''}
+                    {bundle.itineraryEvents.length ? ', itinerary saved' : ''}
+                  </Text>
+                  <InfoChip
+                    label={
+                      expiryOverview.expiringCount || expiryOverview.expiredCount
+                        ? `${expiryOverview.expiredCount + expiryOverview.expiringCount} docs need attention`
+                        : 'All key docs look current'
+                    }
+                    tone={expiryOverview.expiredCount ? 'coral' : expiryOverview.expiringCount ? 'gold' : 'blue'}
+                  />
+                </View>
+                <MaterialIcons name="flight-takeoff" size={34} color={colors.primaryBlue} />
+              </View>
+            </AppCard>
+          </Pressable>
+        ) : (
+          <AppCard>
+            <EmptyState
+              title="No trip yet"
+              description="Create your first trip to unlock the live dashboard, document vault, and emergency travel tools."
+            />
+            <AppButton label="Create your first trip" onPress={goToTrips} />
+          </AppCard>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeader title="Quick actions" />
+        <View style={styles.grid}>
+          <MiniActionCard
+            icon={<MaterialIcons name="folder" size={28} color={colors.primaryBlue} />}
+            title="Document Vault"
+            description="Store passports, cards, tickets, and scans."
+            onPress={openVault}
+          />
+          <MiniActionCard
+            icon={<MaterialIcons name="checklist" size={28} color={colors.primaryBlue} />}
+            title="Packing Lists"
+            description="Create and reuse travel packing templates."
+            onPress={() => router.push('/packing')}
+          />
+          <MiniActionCard
+            icon={<MaterialIcons name="bed" size={28} color={colors.primaryBlue} />}
+            title="Bookings"
+            description="Keep hotels, flights, and travel segments together."
+            onPress={openTrip}
+          />
+          <MiniActionCard
+            icon={<MaterialIcons name="sos" size={28} color={colors.dangerRed} />}
+            title="SOS"
+            description="Emergency embassy, hospital, police, and pharmacy tools."
+            onPress={() => router.push('/sos')}
+          />
         </View>
       </View>
 
-      {dashboardTrip ? (
-        <>
-          <View style={styles.section}>
-            <DashboardSectionHeader title="Progress summary" />
-            <View style={styles.summaryGrid}>
-              <DashboardSummaryTile
-                title="Packing progress"
-                value={
-                  packing.total
-                    ? `Packing ${packing.packed} of ${packing.total} items complete`
-                    : 'No packing items yet'
-                }
-                icon="checkroom"
-                tone="gold"
-              />
-              <DashboardSummaryTile
-                title="Next flight"
-                value={formatFlightSummary(nextFlight)}
-                icon="flight-takeoff"
-                tone="blue"
-              />
-              <DashboardSummaryTile
-                title="Hotel status"
-                value={formatHotelSummary(nextHotel)}
-                icon="hotel"
-                tone="default"
-              />
-              <DashboardSummaryTile
-                title="Documents"
-                value={`${bundle.documents.length} document(s) saved`}
-                icon="lock"
-                tone="coral"
-              />
-              <DashboardSummaryTile
-                title="Expiry status"
-                value={`${expiryOverview.expiredCount} expired • ${expiryOverview.expiringCount} soon`}
-                icon="warning-amber"
-                tone={expiryOverview.expiredCount ? 'coral' : 'gold'}
-                onPress={openWarnings}
-              />
-              <DashboardSummaryTile
-                title="Next itinerary"
-                value={nextEvent ? `${nextEvent.title} — ${formatDateTime(nextEvent.dateTime)}` : 'No itinerary items yet'}
-                icon="event"
-                tone="default"
-              />
-            </View>
-          </View>
-
+      <View style={styles.section}>
+        <SectionHeader title="Recent alerts" />
+        <AppCard>
           {alerts.length ? (
-            <View style={styles.section}>
-              <DashboardSectionHeader title="Alerts and warnings" />
-              <View style={styles.alertList}>
-                {alerts.map((alert) => (
-                  <DashboardAlertCard
-                    key={`${alert.title}-${alert.subtitle}`}
-                    title={alert.title}
-                    subtitle={alert.subtitle}
-                    tone={alert.tone}
-                  />
+            alerts.map((alert, index) => (
+              <View key={`${alert.title}-${index}`} style={[styles.listItem, index === alerts.length - 1 ? styles.listItemLast : null]}>
+                <View style={styles.listLeft}>
+                  <Text style={styles.listTitle}>{alert.title}</Text>
+                  <Text style={styles.listText}>{alert.subtitle}</Text>
+                </View>
+                <Text style={styles.listAction}>{alert.tone === 'coral' ? 'Review' : 'Open'}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noAlertText}>No current alerts. Pineapple will show expiry, insurance, and emergency gaps here.</Text>
+          )}
+        </AppCard>
+      </View>
+
+      {dashboardTrip ? (
+        <View style={styles.section}>
+          <SectionHeader title="Traveller summary" />
+          <AppCard>
+            <View style={styles.travellerRow}>
+              <View style={styles.avatarRow}>
+                {bundle.travellers.map((traveller) => (
+                  <AvatarBadge key={traveller.id} label={traveller.fullName} color={traveller.avatarColor} size={38} />
                 ))}
               </View>
+              <View style={styles.travellerCopy}>
+                <Text style={styles.rowTitle}>{bundle.travellers.length} traveller profiles ready</Text>
+                <Text style={styles.rowDescription}>
+                  {nextEvent ? `Next event: ${nextEvent.title} · ${formatDateTime(nextEvent.dateTime)}` : 'Add itinerary events to keep your trip timeline live.'}
+                </Text>
+                <Text style={styles.rowDescription}>
+                  {bundle.documents.length
+                    ? `${bundle.documents.length} document records stored · ${countdownLabel(dashboardTrip.startDate)}`
+                    : `No document records saved yet · ${formatShortDate(dashboardTrip.startDate)} departure`}
+                </Text>
+              </View>
             </View>
-          ) : null}
-
-          <Pressable onPress={openTravelMode} style={styles.travelModeCard}>
-            <View style={styles.travelModeCopy}>
-              <Text style={styles.travelModeTitle}>Travel Mode</Text>
-              <Text style={styles.travelModeSubtitle}>
-                Travel Mode — quick access to passport numbers, bookings and hotel details.
-              </Text>
+            <View style={styles.actionsRow}>
+              <AppButton label="Open trip" tone="outline" onPress={openTrip} />
+              <AppButton label="Travel Mode" tone="secondary" onPress={openTravelMode} />
             </View>
-            <View style={styles.travelModeBadge}>
-              <Text style={styles.travelModeBadgeText}>Open</Text>
-            </View>
-          </Pressable>
-
-          <View style={styles.section}>
-            <DashboardSectionHeader
-              title="Itinerary preview"
-              right={<AppButton label="Open" tone="secondary" onPress={() => openTripScoped('/itinerary')} />}
-            />
-            {itineraryPreview.length ? (
-              <AppCard>
-                {itineraryPreview.map((item) => (
-                  <View key={item.id} style={styles.previewRow}>
-                    <View style={styles.previewDot} />
-                    <View style={styles.previewCopy}>
-                      <Text style={styles.previewTitle}>{item.title}</Text>
-                      <Text style={styles.previewMeta}>
-                        {formatDateTime(item.dateTime)}
-                        {item.location ? ` • ${item.location}` : ''}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </AppCard>
-            ) : (
-              <AppCard>
-                <EmptyState
-                  title="No itinerary yet"
-                  description="Add flights, excursions, meals, and reminders so the next few events show up here automatically."
-                />
-                <AppButton label="Add an event" onPress={() => openTripScoped('/itinerary')} />
-              </AppCard>
-            )}
-          </View>
-
-          <View style={styles.section}>
-            <DashboardSectionHeader title="Traveller summary" />
-            <AppCard>
-              {bundle.travellers.length ? (
-                <>
-                  <Text style={styles.summaryLead}>{bundle.travellers.length} traveller(s) on this trip</Text>
-                  <View style={styles.travellerRow}>
-                    {bundle.travellers.map((traveller) => (
-                      <AvatarBadge
-                        key={traveller.id}
-                        label={traveller.fullName}
-                        color={traveller.avatarColor}
-                        size={40}
-                      />
-                    ))}
-                  </View>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.summaryLead}>No travellers added yet</Text>
-                  <Text style={styles.summaryMeta}>
-                    Add travellers to organise documents, packing assignments, and Travel Mode summaries.
-                  </Text>
-                  <AppButton label="Add travellers" onPress={openTripDetail} />
-                </>
-              )}
-            </AppCard>
-          </View>
-        </>
+          </AppCard>
+        </View>
       ) : null}
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    gap: spacing.lg,
+  },
   section: {
     gap: spacing.sm,
   },
-  promise: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  coverImage: {
-    width: '100%',
-    height: 170,
-    borderRadius: radii.md,
-  },
-  primaryHeader: {
+  tripCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  primaryCopy: {
+  tripMeta: {
     flex: 1,
-    gap: 4,
+    gap: 6,
   },
-  eyebrow: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
+  tripTitle: {
+    color: colors.primaryBlueDark,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
   },
-  destination: {
-    color: colors.nightNavy,
-    fontFamily: 'Poppins_700Bold',
-    fontSize: 28,
-    lineHeight: 34,
-  },
-  tripDates: {
-    color: colors.textMuted,
+  tripText: {
+    color: '#5C738A',
     fontFamily: 'Inter_400Regular',
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 19,
   },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  actionsGrid: {
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  alertList: {
-    gap: spacing.xs,
-  },
-  travelModeCard: {
-    backgroundColor: colors.nightNavy,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
+  listItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  travelModeCopy: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  travelModeTitle: {
-    color: colors.white,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 22,
-  },
-  travelModeSubtitle: {
-    color: '#D2DFEA',
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  travelModeBadge: {
-    backgroundColor: '#FFF1C6',
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  travelModeBadgeText: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-  },
-  previewRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF3F8',
   },
-  previewDot: {
-    marginTop: 7,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.pineappleGold,
+  listItemLast: {
+    borderBottomWidth: 0,
   },
-  previewCopy: {
+  listLeft: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
-  previewTitle: {
-    color: colors.nightNavy,
+  listTitle: {
+    color: colors.primaryBlueText,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
   },
-  previewMeta: {
-    color: colors.textMuted,
+  listText: {
+    color: '#6D8194',
     fontFamily: 'Inter_400Regular',
-    fontSize: 13,
+    fontSize: 12,
     lineHeight: 18,
   },
-  summaryLead: {
-    color: colors.nightNavy,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 17,
+  listAction: {
+    color: colors.primaryBlue,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
   },
-  summaryMeta: {
-    color: colors.textMuted,
+  noAlertText: {
+    color: '#6D8194',
     fontFamily: 'Inter_400Regular',
-    fontSize: 14,
+    fontSize: 13,
     lineHeight: 20,
   },
   travellerRow: {
     flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
     flexWrap: 'wrap',
+  },
+  travellerCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  rowTitle: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  },
+  rowDescription: {
+    color: '#6D8194',
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  actionsRow: {
+    marginTop: spacing.sm,
     gap: spacing.sm,
   },
 });

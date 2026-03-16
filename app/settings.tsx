@@ -12,6 +12,9 @@ import { ChoiceChips } from '@/components/ChoiceChips';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
+import { AppHeader } from '@/components/ui/AppHeader';
+import { HeroCard } from '@/components/ui/HeroCard';
+import { SectionHeader } from '@/components/ui/SectionHeader';
 import { colors, spacing } from '@/constants/theme';
 import {
   hasNotificationPermissions,
@@ -238,7 +241,20 @@ export default function SettingsScreen() {
   }
 
   return (
-    <AppScreen title="Settings" subtitle="Security, reminders, sync, privacy, backup, and recovery controls.">
+    <AppScreen scroll contentStyle={styles.screen}>
+      <AppHeader
+        badgeLabel="S"
+        title="Settings"
+        subtitle="App preferences and controls"
+      />
+
+      <HeroCard
+        title="Settings that travel with you"
+        description="Manage security, reminders, local backups, privacy masking, and manual-share sync without leaving your device."
+      />
+
+      <View style={styles.section}>
+        <SectionHeader title="Security & reminders" />
       <AppCard title="Security">
         <Text style={styles.label}>App lock timer</Text>
         <ChoiceChips
@@ -310,7 +326,10 @@ export default function SettingsScreen() {
           </Text>
         ) : null}
       </AppCard>
+      </View>
 
+      <View style={styles.section}>
+        <SectionHeader title="Sync, privacy, and transfer" />
       <AppCard title="Sync" subtitle="Optional manual-share sync. Pineapple still works fully in local-only mode.">
         <View style={styles.chipRow}>
           <InfoChip label={data.appPreferences.syncEnabled ? 'Sync enabled' : 'Local-only mode'} tone={data.appPreferences.syncEnabled ? 'blue' : 'default'} />
@@ -333,6 +352,15 @@ export default function SettingsScreen() {
           Last sync: {data.appPreferences.lastSyncAt ? new Date(data.appPreferences.lastSyncAt).toLocaleString() : 'Never'}
         </Text>
         <AppButton label="Import shared trip / sync file" tone="secondary" onPress={handleImportSharedTrip} />
+        <View style={styles.qrBox}>
+          <View style={styles.qrCopy}>
+            <Text style={styles.qrTitle}>Trip transfer</Text>
+            <Text style={styles.meta}>
+              Use local share packages to move trip data between devices. QR handoff can be layered on top of this safe local transfer flow later.
+            </Text>
+          </View>
+          <View style={styles.qrVisual} />
+        </View>
       </AppCard>
 
       <AppCard title="Privacy">
@@ -349,7 +377,10 @@ export default function SettingsScreen() {
           Document images remain most secure on Android. Web/PWA is intended for overview, packing, itinerary, emergency info, and printable summaries.
         </Text>
       </AppCard>
+      </View>
 
+      <View style={styles.section}>
+        <SectionHeader title="Data and recovery" />
       <AppCard title="Backup & Restore" subtitle="Create encrypted local backup files and restore them later on this device.">
         <Text style={styles.meta}>
           Pineapple exports password-protected {PINEAPPLE_BACKUP_EXTENSION} files with your structured trip data and available local attachments. Store backups securely.
@@ -368,7 +399,10 @@ export default function SettingsScreen() {
           <AppButton label="Restore backup" tone="secondary" onPress={openBackupImport} />
         </View>
       </AppCard>
+      </View>
 
+      <View style={styles.section}>
+        <SectionHeader title="Conflict review" />
       <AppCard title="Conflict review" subtitle="Pineapple never silently overwrites local trip changes.">
         {openConflicts.length ? (
           <View style={styles.conflictList}>
@@ -398,13 +432,17 @@ export default function SettingsScreen() {
           />
         )}
       </AppCard>
+      </View>
 
       {Platform.OS === 'web' ? (
-        <AppCard title="Web companion">
-          <Text style={styles.meta}>
-            This web build is intended for overview, packing, itinerary, emergency details, and printable summaries. Keep sensitive document images in the Android app whenever possible.
-          </Text>
-        </AppCard>
+        <View style={styles.section}>
+          <SectionHeader title="Web companion" />
+          <AppCard title="Web companion">
+            <Text style={styles.meta}>
+              This web build is intended for overview, packing, itinerary, emergency details, and printable summaries. Keep sensitive document images in the Android app whenever possible.
+            </Text>
+          </AppCard>
+        </View>
       ) : null}
 
       <AppModal
@@ -437,6 +475,12 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    gap: spacing.lg,
+  },
+  section: {
+    gap: spacing.sm,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -473,6 +517,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  qrBox: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#B7D1F4',
+    borderStyle: 'dashed',
+    borderRadius: 18,
+    backgroundColor: '#F7FBFF',
+    padding: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
+  },
+  qrCopy: {
+    flex: 1,
+    gap: 6,
+  },
+  qrTitle: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  },
+  qrVisual: {
+    width: 78,
+    height: 78,
+    borderRadius: 12,
+    backgroundColor: colors.primaryBlue,
+    opacity: 0.12,
   },
   conflictList: {
     gap: spacing.sm,

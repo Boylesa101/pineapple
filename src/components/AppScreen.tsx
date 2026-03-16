@@ -1,5 +1,6 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import { ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '@/constants/theme';
@@ -38,8 +39,14 @@ export function AppScreen({
 
   return (
     <SafeAreaView style={[styles.safeArea, backgroundColor ? { backgroundColor } : null]} edges={['top', 'bottom']}>
-      {!hideBackgroundDecor ? <View style={styles.backgroundBlobOne} /> : null}
-      {!hideBackgroundDecor ? <View style={styles.backgroundBlobTwo} /> : null}
+      {!hideBackgroundDecor ? (
+        <LinearGradient
+          colors={[colors.primaryBlueTint, colors.white, colors.white]}
+          locations={[0, 0.3, 1]}
+          style={StyleSheet.absoluteFillObject}
+        />
+      ) : null}
+      {!hideBackgroundDecor ? <View style={styles.topWash} /> : null}
       {scroll ? (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
           {content}
@@ -55,10 +62,10 @@ export function AppScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.warmSand,
+    backgroundColor: colors.primaryBlueTint,
   },
   scroll: {
-    paddingBottom: 120,
+    paddingBottom: 152,
   },
   scrollView: {
     flex: 1,
@@ -90,23 +97,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
   },
-  backgroundBlobOne: {
+  topWash: {
     position: 'absolute',
-    top: -60,
-    right: -50,
-    height: 180,
-    width: 180,
-    borderRadius: 180,
-    backgroundColor: '#FFE6BE',
-  },
-  backgroundBlobTwo: {
-    position: 'absolute',
-    top: 180,
-    left: -70,
-    height: 150,
-    width: 150,
-    borderRadius: 150,
-    backgroundColor: '#DFF3F8',
-    opacity: 0.7,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 220,
+    backgroundColor: '#EDF6FF',
   },
 });

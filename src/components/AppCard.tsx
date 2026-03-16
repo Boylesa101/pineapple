@@ -29,9 +29,9 @@ export function AppCard({ title, subtitle, right, children }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderRadius: radii.lg,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primaryBlueBorder,
     padding: spacing.md,
     gap: spacing.sm,
     ...shadows.card,
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   title: {
-    color: colors.nightNavy,
+    color: colors.primaryBlueText,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 17,
   },

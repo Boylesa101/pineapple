@@ -8,7 +8,7 @@ type Props = {
   label: string;
   onPress: () => void;
   icon?: ReactNode;
-  tone?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  tone?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
   size?: 'default' | 'large';
   disabled?: boolean;
   loading?: boolean;
@@ -40,7 +40,7 @@ export function AppButton({
         style,
       ]}
     >
-      {loading ? <ActivityIndicator color={tone === 'primary' ? colors.white : colors.nightNavy} /> : null}
+      {loading ? <ActivityIndicator color={tone === 'primary' || tone === 'danger' ? colors.white : colors.primaryBlue} /> : null}
       {!loading && icon ? <View>{icon}</View> : null}
       {!loading ? <Text style={[styles.label, labelStyles[tone], labelStyle]}>{label}</Text> : null}
     </Pressable>
@@ -49,18 +49,23 @@ export function AppButton({
 
 const toneStyles = StyleSheet.create({
   primary: {
-    backgroundColor: colors.nightNavy,
+    backgroundColor: colors.primaryBlue,
   },
   secondary: {
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#CFE2FF',
   },
   ghost: {
-    backgroundColor: '#F8F5EE',
+    backgroundColor: colors.primaryBlueSurface,
   },
   danger: {
-    backgroundColor: '#FDECEC',
+    backgroundColor: colors.dangerRed,
+  },
+  outline: {
+    backgroundColor: '#EEF5FF',
+    borderWidth: 1,
+    borderColor: '#CFE2FF',
   },
 });
 
@@ -69,20 +74,23 @@ const labelStyles = StyleSheet.create({
     color: colors.white,
   },
   secondary: {
-    color: colors.nightNavy,
+    color: colors.primaryBlue,
   },
   ghost: {
-    color: colors.nightNavy,
+    color: colors.primaryBlue,
   },
   danger: {
-    color: colors.danger,
+    color: colors.white,
+  },
+  outline: {
+    color: colors.primaryBlue,
   },
 });
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 50,
-    borderRadius: radii.pill,
+    minHeight: 52,
+    borderRadius: radii.mdSm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -91,7 +99,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
+    fontSize: 14,
   },
   pressed: {
     opacity: 0.9,
@@ -105,7 +113,7 @@ const styles = StyleSheet.create({
 const sizeStyles = StyleSheet.create({
   default: {},
   large: {
-    minHeight: 60,
+    minHeight: 58,
     paddingHorizontal: spacing.xl,
   },
 });

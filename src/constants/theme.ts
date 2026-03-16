@@ -1,4 +1,13 @@
 export const colors = {
+  primaryBlue: '#0D6EFD',
+  primaryBlueDark: '#0D3B66',
+  primaryBlueSoft: '#3F8CFF',
+  primaryBlueSurface: '#EAF3FF',
+  primaryBlueTint: '#EDF6FF',
+  primaryBlueBorder: '#DCE7F2',
+  primaryBlueText: '#16324F',
+  dangerRed: '#D9534F',
+  dangerRedSoft: '#FF7A70',
   pineappleGold: '#F4B400',
   leafGreen: '#4E9F6D',
   oceanBlue: '#2BA6CB',
@@ -32,6 +41,7 @@ export const spacing = {
 
 export const radii = {
   sm: 12,
+  mdSm: 14,
   md: 18,
   lg: 24,
   xl: 32,
@@ -45,5 +55,19 @@ export const shadows = {
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 20,
     elevation: 2,
+  },
+  nav: {
+    shadowColor: 'rgba(0, 0, 0, 0.14)',
+    shadowOpacity: 1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 30,
+    elevation: 8,
+  },
+  hero: {
+    shadowColor: 'rgba(13, 110, 253, 0.22)',
+    shadowOpacity: 1,
+    shadowOffset: { width: 0, height: 12 },
+    shadowRadius: 24,
+    elevation: 6,
   },
 };

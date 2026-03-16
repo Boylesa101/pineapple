@@ -1,6 +1,6 @@
 {
   "name": "pineapple",
-  "version": "1.4.20",
+  "version": "1.5.0",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
@@ -34,6 +34,7 @@
     "expo-font": "~55.0.4",
     "expo-image": "~55.0.6",
     "expo-image-picker": "~55.0.12",
+    "expo-linear-gradient": "~55.0.8",
     "expo-linking": "~55.0.7",
     "expo-local-authentication": "~55.0.8",
     "expo-notifications": "~55.0.12",

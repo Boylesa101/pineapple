@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { AppButton } from '@/components/AppButton';
 import { AppTextField } from '@/components/AppTextField';
 import { colors, radii, spacing } from '@/constants/theme';
+import type { DocumentType } from '@/types/models';
 
 import { AddFirstDocumentPrompt } from './AddFirstDocumentPrompt';
 import { SecureSetupPrompt } from './SecureSetupPrompt';
@@ -15,9 +16,11 @@ type Props = {
   showTravellerPrompt: boolean;
   pinConfigured: boolean;
   onOpenSecurity: () => void;
-  onAddPassport: () => void;
-  onAddDrivingLicence: () => void;
-  onImport: () => void;
+  selectedIdentityType: DocumentType;
+  onIdentityTypeChange: (value: DocumentType) => void;
+  onScanIdentity: () => void;
+  onImportIdentityForOcr: () => void;
+  onEnterIdentityManually: () => void;
   onAddHealthCard: () => void;
   onAddInsurance: () => void;
   onAddOther: () => void;
@@ -31,9 +34,11 @@ export function DocumentSetupFlow({
   showTravellerPrompt,
   pinConfigured,
   onOpenSecurity,
-  onAddPassport,
-  onAddDrivingLicence,
-  onImport,
+  selectedIdentityType,
+  onIdentityTypeChange,
+  onScanIdentity,
+  onImportIdentityForOcr,
+  onEnterIdentityManually,
   onAddHealthCard,
   onAddInsurance,
   onAddOther,
@@ -53,7 +58,13 @@ export function DocumentSetupFlow({
         </View>
       ) : null}
 
-      <AddFirstDocumentPrompt onAddPassport={onAddPassport} onAddDrivingLicence={onAddDrivingLicence} onImport={onImport} />
+      <AddFirstDocumentPrompt
+        selectedType={selectedIdentityType}
+        onTypeChange={onIdentityTypeChange}
+        onScan={onScanIdentity}
+        onImportForOcr={onImportIdentityForOcr}
+        onManual={onEnterIdentityManually}
+      />
 
       <View style={styles.card}>
         <Text style={styles.title}>Then build out your travel pack</Text>

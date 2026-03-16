@@ -15,6 +15,7 @@ import { AvatarBadge } from '@/components/AvatarBadge';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { CopyDataButton } from '@/components/document-support/CopyDataButton';
+import { DocumentAddActionsCard } from '@/components/document-support/DocumentAddActionsCard';
 import { DocumentScanViewerModal } from '@/components/document-support/DocumentScanViewerModal';
 import { ExtractedFieldEditor } from '@/components/document-support/ExtractedFieldEditor';
 import { VerificationBadge } from '@/components/document-support/VerificationBadge';
@@ -102,7 +103,7 @@ const scheduleOptions: Array<{ label: string; value: ExpiryReminderLeadTime }> =
 
 type PrimaryFilter = 'all' | 'traveller' | 'type';
 type GroupMode = 'flat' | 'traveller' | 'type';
-type DocumentAssetSource = 'files' | 'photos';
+type DocumentAssetSource = 'files' | 'photos' | 'camera';
 type DocumentScanSide = 'front' | 'back';
 type ScanViewerState = {
   title: string;
@@ -150,6 +151,7 @@ export default function VaultScreen() {
   const [drivingLicenceOcrLoading, setDrivingLicenceOcrLoading] = useState(false);
   const [healthCardOcrLoading, setHealthCardOcrLoading] = useState(false);
   const [formalDocumentOcrLoading, setFormalDocumentOcrLoading] = useState(false);
+  const [addDocumentType, setAddDocumentType] = useState<DocumentType>('passport');
   const openedEditIdRef = useRef<string | null>(null);
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
@@ -305,6 +307,18 @@ export default function VaultScreen() {
     });
   }, [bundle.documents, primaryFilter, travellerFilter, typeFilter]);
 
+  const addDocumentTypeOptions: Array<{ label: string; value: DocumentType }> = useMemo(
+    () => [
+      { label: 'Passport', value: 'passport' },
+      { label: 'Driving licence', value: 'driving_licence' },
+      { label: 'GHIC / EHIC', value: 'ghic' },
+      { label: 'Insurance', value: 'insurance' },
+      { label: 'Boarding pass', value: 'boarding_pass' },
+      { label: 'Other', value: 'custom' },
+    ],
+    []
+  );
+
   const groupedDocuments = useMemo(() => {
     if (groupMode === 'flat') {
       return [{ title: 'All documents', documents: filteredDocuments }];
@@ -346,6 +360,30 @@ export default function VaultScreen() {
 
   async function pickManagedDocumentAsset(source: DocumentAssetSource) {
     try {
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert(
+            'Camera permission needed',
+            'Allow camera access if you want Pineapple to scan a document and extract details right away.'
+          );
+          return null;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          quality: 0.8,
+        });
+        if (result.canceled || !result.assets[0]) return null;
+        const asset = result.assets[0];
+        const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
+        return {
+          localFileUri,
+          previewUri: localFileUri,
+          mimeType: asset.mimeType ?? null,
+        };
+      }
+
       if (source === 'files') {
         const result = await DocumentPicker.getDocumentAsync({
           type: ['application/pdf', 'image/*'],
@@ -384,10 +422,12 @@ export default function VaultScreen() {
       };
     } catch {
       Alert.alert(
-        source === 'files' ? 'Import unavailable' : 'Photo import unavailable',
+        source === 'files' ? 'Import unavailable' : source === 'camera' ? 'Scan unavailable' : 'Photo import unavailable',
         source === 'files'
           ? 'Pineapple could not import that file. Try another PDF or image saved on this device.'
-          : 'Pineapple could not import that image right now. Try a different photo.'
+          : source === 'camera'
+            ? 'Pineapple could not capture that scan right now. Try again or use an existing photo.'
+            : 'Pineapple could not import that image right now. Try a different photo.'
       );
       return null;
     }
@@ -406,6 +446,82 @@ export default function VaultScreen() {
     }
     setDraft(nextDraft);
     setEditorVisible(true);
+  }
+
+  async function runInitialOcrIfAvailable(nextDraft: DocumentDraft) {
+    if (nextDraft.documentType === 'passport') {
+      await runPassportOcrOnDraft(nextDraft);
+      return;
+    }
+    if (nextDraft.documentType === 'driving_licence') {
+      await runDrivingLicenceOcrOnDraft(nextDraft);
+      return;
+    }
+    if (nextDraft.documentType === 'ghic') {
+      await runHealthCardOcrOnDraft(nextDraft);
+      return;
+    }
+    if (isFormalDocumentType(nextDraft.documentType)) {
+      await runFormalDocumentOcrOnDraft(nextDraft);
+    }
+  }
+
+  async function startDocumentFlow(action: 'scan' | 'ocr_import' | 'manual', documentType: DocumentType) {
+    if (action === 'manual') {
+      openManualDocument(documentType);
+      return;
+    }
+
+    if (action === 'scan') {
+      const asset = await pickManagedDocumentAsset('camera');
+      if (!asset) {
+        return;
+      }
+      const nextDraft = buildStarterDocumentDraft(documentType, asset);
+      if (!nextDraft) {
+        return;
+      }
+      setDraft(nextDraft);
+      setEditorVisible(true);
+      await runInitialOcrIfAvailable(nextDraft);
+      return;
+    }
+
+    Alert.alert('Choose import source', 'Use an existing image, photo, or PDF file for OCR.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Photos',
+        onPress: async () => {
+          const asset = await pickManagedDocumentAsset('photos');
+          if (!asset) {
+            return;
+          }
+          const nextDraft = buildStarterDocumentDraft(documentType, asset);
+          if (!nextDraft) {
+            return;
+          }
+          setDraft(nextDraft);
+          setEditorVisible(true);
+          await runInitialOcrIfAvailable(nextDraft);
+        },
+      },
+      {
+        text: 'Files / PDFs',
+        onPress: async () => {
+          const asset = await pickManagedDocumentAsset('files');
+          if (!asset) {
+            return;
+          }
+          const nextDraft = buildStarterDocumentDraft(documentType, asset);
+          if (!nextDraft) {
+            return;
+          }
+          setDraft(nextDraft);
+          setEditorVisible(true);
+          await runInitialOcrIfAvailable(nextDraft);
+        },
+      },
+    ]);
   }
 
   async function handleDraftScanPick(side: DocumentScanSide, source: DocumentAssetSource) {
@@ -834,15 +950,20 @@ export default function VaultScreen() {
       ) : null}
 
       <AppCard title="Vault controls">
-        <View style={styles.buttonRow}>
-          <AppButton label="Add from files" tone="secondary" onPress={() => handleSourcePick('files')} />
-          <AppButton label="Add from photos" tone="secondary" onPress={() => handleSourcePick('photos')} />
-          <AppButton label="Add without file" tone="secondary" onPress={openManualDocument} />
-        </View>
+        <DocumentAddActionsCard
+          title="Add a document"
+          description="Use OCR first for passports, licences, cards, passes, and similar travel records."
+          selectedType={addDocumentType}
+          onTypeChange={setAddDocumentType}
+          typeOptions={addDocumentTypeOptions}
+          onScan={() => startDocumentFlow('scan', addDocumentType)}
+          onImportForOcr={() => startDocumentFlow('ocr_import', addDocumentType)}
+          onManual={() => startDocumentFlow('manual', addDocumentType)}
+        />
         <AppButton
           label={isVaultUnlocked ? 'Vault unlocked' : 'Unlock previews'}
           onPress={() => setPinPromptVisible(true)}
-          tone={isVaultUnlocked ? 'ghost' : 'primary'}
+          tone={isVaultUnlocked ? 'ghost' : 'secondary'}
         />
       </AppCard>
 
@@ -855,9 +976,11 @@ export default function VaultScreen() {
           showTravellerPrompt={setupState.needsTravellerName}
           pinConfigured={security.pinConfigured}
           onOpenSecurity={() => router.push('/setup-pin')}
-          onAddPassport={() => openManualDocument('passport')}
-          onAddDrivingLicence={() => openManualDocument('driving_licence')}
-          onImport={() => handleSourcePick('files', setupState.hasIdentityDocument ? 'custom' : 'passport')}
+          selectedIdentityType={addDocumentType === 'driving_licence' ? 'driving_licence' : 'passport'}
+          onIdentityTypeChange={(value) => setAddDocumentType(value)}
+          onScanIdentity={() => startDocumentFlow('scan', addDocumentType === 'driving_licence' ? 'driving_licence' : 'passport')}
+          onImportIdentityForOcr={() => startDocumentFlow('ocr_import', addDocumentType === 'driving_licence' ? 'driving_licence' : 'passport')}
+          onEnterIdentityManually={() => startDocumentFlow('manual', addDocumentType === 'driving_licence' ? 'driving_licence' : 'passport')}
           onAddHealthCard={() => openManualDocument('ghic')}
           onAddInsurance={() => openManualDocument('insurance')}
           onAddOther={() => openManualDocument('custom')}
