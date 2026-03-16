@@ -36,6 +36,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 ### Core features
 
 - PIN setup and lock flow with a minimum 4-digit PIN, explicit Enter/Cancel actions, and optional biometric unlock
+- Direct-to-unlock auth flow with rotating multilingual greetings and 100 short etiquette facts to keep the lock screen polished without adding extra taps
 - Optional biometric unlock when the device supports it
 - Expo Go first-run testing now clears stale PIN state when no onboarding or trip data exists yet
 - Auto-lock after inactivity and best-effort privacy overlay for the app switcher
@@ -57,6 +58,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking
+- Home alerts now live behind the bell icon instead of taking over the dashboard, with a red-dot badge only when something needs attention
 - Reusable document expiry status system for passports, visas, GHIC / EHIC, travel insurance, driving licences, ID cards, and custom docs with expiry dates
 - Packing lists grouped by category with multi-traveller assignment, templates, duplicate action, and priority flags
 - Flight / travel segment management
@@ -96,6 +98,14 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - PDF page rendering for OCR via `react-native-pdf-page-image`
 - Backup encryption via PBKDF2-derived AES with HMAC integrity using `crypto-js`
 - State management via `zustand`
+
+### Security notes
+
+- PIN configuration is stored in device secure storage and verified locally
+- Backup exports are encrypted before they leave the app
+- Document files are stored in Pineapple-managed app storage on the device; this round also removes transient picker/cache copies after import so scans are not left duplicated in common temp locations unnecessarily
+- OCR-generated temporary images are cleaned up after use
+- Pineapple does not currently claim a separate per-file encryption layer for every stored document attachment, so release notes should continue describing document storage as local app-managed storage rather than end-to-end encrypted at rest
 
 ### Project structure
 

@@ -157,12 +157,7 @@ export default function RootLayout() {
           <Stack.Screen name="trip/[tripId]" />
           <Stack.Screen name="trip/[tripId]/travel-mode" />
         </Stack>
-        {privacyOverlayVisible && segments[0] !== '(auth)' ? (
-          <View pointerEvents="none" style={styles.overlay}>
-            <PineappleMark size={72} simplified />
-            <Text style={styles.overlayText}>Pineapple is locked</Text>
-          </View>
-        ) : null}
+        {privacyOverlayVisible && segments[0] !== '(auth)' ? <View pointerEvents="none" style={styles.overlay} /> : null}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
@@ -194,14 +189,6 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.warmSand,
-  },
-  overlayText: {
-    color: colors.nightNavy,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 18,
+    backgroundColor: colors.authBlue,
   },
 });

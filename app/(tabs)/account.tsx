@@ -35,7 +35,7 @@ export default function AccountScreen() {
         badgeLabel="A"
         title="Account"
         subtitle="Profile and traveller setup"
-        actionIcon="edit"
+        actionIcon="settings"
         onActionPress={() => router.push('/settings')}
       />
 

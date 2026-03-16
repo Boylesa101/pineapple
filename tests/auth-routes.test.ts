@@ -62,3 +62,29 @@ test('route guard redirects unlocked returning users from auth screens into home
     '/home',
   );
 });
+
+test('route guard sends locked users straight to the real unlock screen', () => {
+  assert.equal(
+    resolveAuthRoute({
+      currentPath: '/',
+      hasCompletedOnboarding: true,
+      pinConfigured: true,
+      isUnlocked: false,
+      tripCount: 1,
+    }),
+    '/lock',
+  );
+});
+
+test('route guard sends unlocked root visits straight to the main app route', () => {
+  assert.equal(
+    resolveAuthRoute({
+      currentPath: '/',
+      hasCompletedOnboarding: true,
+      pinConfigured: true,
+      isUnlocked: true,
+      tripCount: 1,
+    }),
+    '/home',
+  );
+});

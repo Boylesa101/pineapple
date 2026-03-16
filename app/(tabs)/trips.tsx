@@ -18,7 +18,7 @@ import { packingTemplates, type PackingTemplateId } from '@/data/packingTemplate
 import { useAppStore } from '@/store/useAppStore';
 import type { TripDraft, TripStatus } from '@/types/models';
 import { tripDateRange } from '@/utils/format';
-import { copyIntoAppStorage } from '@/utils/fileStorage';
+import { cleanupImportedSource, copyIntoAppStorage } from '@/utils/fileStorage';
 import { validateTrip } from '@/utils/validation';
 
 const emptyTripDraft: TripDraft = {
@@ -71,6 +71,7 @@ export default function TripsScreen() {
 
       if (result.canceled || !result.assets[0]) return;
       const localUri = await copyIntoAppStorage(result.assets[0].uri, 'trips', result.assets[0].mimeType);
+      await cleanupImportedSource(result.assets[0].uri);
       setDraft((current) => ({ ...current, coverImageUri: localUri }));
     } catch {
       Alert.alert('Cover image unavailable', 'Pineapple could not import that image right now. Try a different photo.');

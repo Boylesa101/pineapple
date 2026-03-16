@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { PineappleMark } from '@/brand/PineappleMark';
 import { AppScreen } from '@/components/AppScreen';
 import { FingerprintIcon } from '@/components/FingerprintIcon';
 import { PinPad } from '@/components/PinPad';
 import { colors, spacing } from '@/constants/theme';
+import { unlockCultureFacts, unlockGreetings } from '@/data/unlockCulture';
 import { useAppStore } from '@/store/useAppStore';
+import { getPostUnlockRoute } from '@/utils/authRoutes';
 
 export default function LockScreen() {
   const router = useRouter();
@@ -15,17 +16,38 @@ export default function LockScreen() {
   const unlockWithPin = useAppStore((state) => state.unlockWithPin);
   const unlockWithBiometrics = useAppStore((state) => state.unlockWithBiometrics);
   const unlockBlockedUntil = useAppStore((state) => state.unlockBlockedUntil);
+  const tripCount = useAppStore((state) => state.data.trips.length);
   const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [greetingIndex, setGreetingIndex] = useState(() => Date.now() % unlockGreetings.length);
+  const [factIndex, setFactIndex] = useState(() => Date.now() % unlockCultureFacts.length);
 
   const blockedSeconds = unlockBlockedUntil ? Math.max(0, Math.ceil((unlockBlockedUntil - Date.now()) / 1000)) : 0;
   const canEnter = useMemo(
     () => pin.length === security.pinLength && blockedSeconds === 0,
     [blockedSeconds, pin.length, security.pinLength]
   );
+  const greeting = unlockGreetings[greetingIndex];
+  const fact = unlockCultureFacts[factIndex];
+  const nextRoute = getPostUnlockRoute(tripCount);
+
+  useEffect(() => {
+    const base = Date.now();
+    setGreetingIndex(base % unlockGreetings.length);
+    setFactIndex(base % unlockCultureFacts.length);
+
+    const timer = setInterval(() => {
+      setGreetingIndex((value) => (value + 1) % unlockGreetings.length);
+    }, 2600);
+
+    return () => clearInterval(timer);
+  }, []);
 
   async function handleEnter() {
     if (!canEnter || submitting) {
+      if (pin.length > 0 && pin.length < security.pinLength) {
+        Alert.alert('PIN too short', `Enter all ${security.pinLength} digits to continue.`);
+      }
       return;
     }
 
@@ -33,6 +55,7 @@ export default function LockScreen() {
     try {
       const valid = await unlockWithPin(pin);
       if (valid) {
+        router.replace(nextRoute);
         return;
       }
 
@@ -77,6 +100,7 @@ export default function LockScreen() {
       if (!unlocked) {
         return;
       }
+      router.replace(nextRoute);
     } catch (error) {
       if (__DEV__) {
         console.error('Biometric unlock failed', error);
@@ -91,9 +115,8 @@ export default function LockScreen() {
     <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor contentStyle={styles.content}>
       <View style={styles.screen}>
         <View style={styles.topRail}>
-          <PineappleMark size={76} />
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Enter your PIN, or use biometrics if it is enabled on this device.</Text>
+          <Text style={styles.greeting}>{greeting}</Text>
+          <Text style={styles.fact}>{fact}</Text>
         </View>
 
         <View style={styles.centerRail}>
@@ -138,24 +161,25 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   topRail: {
-    minHeight: 180,
+    minHeight: 196,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
     width: '100%',
+    paddingHorizontal: spacing.md,
   },
-  title: {
+  greeting: {
     color: colors.white,
     fontFamily: 'Poppins_700Bold',
     fontSize: 30,
     textAlign: 'center',
   },
-  subtitle: {
+  fact: {
     color: 'rgba(255,255,255,0.88)',
     fontFamily: 'Inter_400Regular',
-    fontSize: 16,
-    lineHeight: 24,
-    maxWidth: 320,
+    fontSize: 15,
+    lineHeight: 22,
+    maxWidth: 336,
     textAlign: 'center',
   },
   centerRail: {
@@ -164,6 +188,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.md,
     width: '100%',
+    paddingHorizontal: spacing.md,
   },
   stepLabel: {
     color: colors.white,

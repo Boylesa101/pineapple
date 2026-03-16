@@ -28,25 +28,24 @@ export function resolveAuthRoute({
   }
 
   if (!isUnlocked) {
-    if (currentPath === '/' || currentPath === '/lock') {
+    if (currentPath === '/lock') {
       return null;
     }
-    return '/';
+    return '/lock';
   }
 
-  if (tripCount === 0) {
-    if (currentPath === '/create-first-trip') {
-      return null;
-    }
-    return '/create-first-trip';
-  }
+  const postUnlockRoute = getPostUnlockRoute(tripCount);
 
   if (currentPath === '/') {
-    return null;
+    return postUnlockRoute;
   }
 
   if (authSetupPaths.has(currentPath)) {
-    return '/home';
+    return postUnlockRoute;
+  }
+
+  if (tripCount === 0 && currentPath !== '/create-first-trip') {
+    return '/create-first-trip';
   }
 
   return null;

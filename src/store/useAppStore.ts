@@ -224,7 +224,9 @@ export const useAppStore = create<StoreState>((set, get) => ({
           hasCompletedOnboarding,
         });
       }
-      queueNotificationRefresh(data, { requestPermissions: false, delayMs: 150 });
+      if (!security.pinConfigured) {
+        queueNotificationRefresh(data, { requestPermissions: false, delayMs: 300 });
+      }
     } catch (error) {
       logStoreError('bootstrap failed', error);
       set({
@@ -296,6 +298,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
         failedUnlockAttempts: 0,
         unlockBlockedUntil: null,
       });
+      queueNotificationRefresh(get().data, { requestPermissions: false, delayMs: 900 });
       if (__DEV__) {
         console.log('[auth] pin created', {
           pinLength,
@@ -323,6 +326,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
           failedUnlockAttempts: 0,
           unlockBlockedUntil: null,
         });
+        queueNotificationRefresh(get().data, { requestPermissions: false, delayMs: 900 });
         if (__DEV__) {
           console.log('[auth] pin unlock success');
         }
@@ -369,6 +373,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
           failedUnlockAttempts: 0,
           unlockBlockedUntil: null,
         });
+        queueNotificationRefresh(get().data, { requestPermissions: false, delayMs: 900 });
         if (__DEV__) {
           console.log('[auth] biometric unlock success');
         }

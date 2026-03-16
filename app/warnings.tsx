@@ -13,6 +13,7 @@ import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { formatShortDate } from '@/utils/date';
 import { documentTypeSupportsExpiryWarnings, getDocumentExpiryInfo } from '@/utils/documentExpiry';
+import { getDashboardAlerts, getDashboardTrip } from '@/utils/selectors';
 
 const documentLabels = {
   passport: 'Passport',
@@ -34,6 +35,8 @@ export default function WarningsScreen() {
   const router = useRouter();
   const { data, setActiveTrip } = useAppStore();
   const [filter, setFilter] = useState<FilterMode>('all');
+  const dashboardTrip = useMemo(() => getDashboardTrip(data), [data]);
+  const alerts = useMemo(() => getDashboardAlerts(data, dashboardTrip?.id), [dashboardTrip?.id, data]);
 
   const documents = useMemo(() => {
     return data.documents
@@ -63,7 +66,23 @@ export default function WarningsScreen() {
   }, [data.documents, data.travellers, data.trips, filter]);
 
   return (
-    <AppScreen title="Expiry warnings" subtitle="Track document validity locally and edit reminder settings before travel.">
+    <AppScreen title="Alerts" subtitle="Important document, trip, and reminder issues that need attention on this device.">
+      <AppCard title="Current alerts">
+        {alerts.length ? (
+          alerts.map((alert, index) => (
+            <View key={`${alert.title}-${index}`} style={[styles.alertRow, index === alerts.length - 1 ? styles.alertRowLast : null]}>
+              <View style={styles.alertCopy}>
+                <Text style={styles.alertTitle}>{alert.title}</Text>
+                <Text style={styles.alertText}>{alert.subtitle}</Text>
+              </View>
+              <InfoChip label={alert.tone === 'danger' ? 'Urgent' : alert.tone === 'coral' ? 'Soon' : 'Review'} tone={alert.tone === 'danger' ? 'danger' : alert.tone === 'coral' ? 'coral' : 'gold'} />
+            </View>
+          ))
+        ) : (
+          <Text style={styles.note}>No current trip or document alerts. Pineapple will show them here when something needs attention.</Text>
+        )}
+      </AppCard>
+
       <AppCard title="Filters">
         <ChoiceChips<FilterMode>
           value={filter}
@@ -136,6 +155,33 @@ const styles = StyleSheet.create({
   rowRight: {
     alignItems: 'flex-end',
     gap: spacing.xs,
+  },
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF3F8',
+  },
+  alertRowLast: {
+    borderBottomWidth: 0,
+  },
+  alertCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  alertTitle: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  },
+  alertText: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 18,
   },
   note: {
     color: colors.textMuted,

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.1 - 2026-03-16
+
+- Unlock screen greeting + etiquette facts: removed the extra pre-auth landing step and rebuilt the real unlock screen with rotating multilingual greetings plus a curated set of 100 short etiquette facts for first meetings
+- Removal of redundant locked screen: locked users now route straight into `/lock`, and the old `Pineapple is locked` overlay text was removed so the app no longer shows a dead intermediate lock layer
+- Home screen simplification: removed the Pineapple logo, hamburger, title, travel-organiser text, quick actions, and recent alerts from the dashboard top area, replacing them with a cleaner greeting bar and bell-based alerts entry
+- Alerts bell + red dot behavior: home now shows a bell icon with a red dot only when Pineapple has active trip or document alerts, and the alerts view now combines current trip issues with document expiry detail in one place
+- Security hardening / encryption review: confirmed PIN state remains in secure device storage and backups remain encrypted, removed transient document-import copies from picker/cache directories after Pineapple stores them locally, and kept OCR temp cleanup in place to reduce plaintext leftovers
+- Unlock performance improvements: bypassed the old root welcome screen for locked users, send successful PIN and biometric unlocks straight to the post-auth route, and deferred notification refresh work until after unlock so the app reaches the main shell faster
+
 ## 1.5.0 - 2026-03-16
 
 - UI redesign to match approved mockup: rebuilt the main shell around a blue-and-white card layout with new shared headers, hero cards, action tiles, stat rows, and a floating-safe bottom navigation for `Home`, `Account`, `Vault`, `Trips`, and `SOS`

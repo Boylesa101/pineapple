@@ -9,11 +9,10 @@ import { AppScreen } from '@/components/AppScreen';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
-import { AppHeader } from '@/components/ui/AppHeader';
 import { HeroCard } from '@/components/ui/HeroCard';
 import { MiniActionCard } from '@/components/ui/MiniActionCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { countdownLabel, formatDateTime, formatShortDate } from '@/utils/date';
 import { tripDateRange } from '@/utils/format';
@@ -35,10 +34,11 @@ export default function HomeScreen() {
   const { data, setActiveTrip } = useAppStore();
   const dashboardTrip = useMemo(() => getDashboardTrip(data), [data]);
   const bundle = useMemo(() => getTripBundle(data, dashboardTrip?.id), [data, dashboardTrip?.id]);
-  const alerts = useMemo(() => getDashboardAlerts(data, dashboardTrip?.id).slice(0, 3), [data, dashboardTrip?.id]);
+  const alerts = useMemo(() => getDashboardAlerts(data, dashboardTrip?.id), [data, dashboardTrip?.id]);
   const expiryOverview = getDocumentExpiryOverview(data, dashboardTrip?.id);
   const nextEvent = getNextEvent(data, dashboardTrip?.id);
   const greetingName = dashboardTrip ? firstNameFromBundle(bundle) : 'there';
+  const alertCount = alerts.length;
 
   function goToTrips() {
     router.push('/trips');
@@ -71,13 +71,20 @@ export default function HomeScreen() {
 
   return (
     <AppScreen scroll contentStyle={styles.screen}>
-      <AppHeader
-        badgeLabel="P"
-        title="Pineapple"
-        subtitle="Travel organiser"
-        actionIcon="menu"
-        onActionPress={() => router.push('/settings')}
-      />
+      <View style={styles.topBar}>
+        <View style={styles.topCopy}>
+          <Text style={styles.topGreeting}>{dashboardTrip ? `Hello ${greetingName}` : 'Ready when you are'}</Text>
+          <Text style={styles.topSubtitle}>
+            {dashboardTrip
+              ? 'Keep your next trip, key documents, and travellers tidy in one place.'
+              : 'Start a trip, add your travel documents, and keep everything local to this device.'}
+          </Text>
+        </View>
+        <Pressable onPress={() => router.push('/warnings')} style={styles.bellButton} accessibilityLabel="Open alerts">
+          <MaterialIcons name="notifications-none" size={24} color={colors.primaryBlue} />
+          {alertCount > 0 ? <View style={styles.bellDot} /> : null}
+        </Pressable>
+      </View>
 
       <HeroCard
         title={`Hello ${greetingName}`}
@@ -129,51 +136,27 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Quick actions" />
-        <View style={styles.grid}>
-          <MiniActionCard
-            icon={<MaterialIcons name="folder" size={28} color={colors.primaryBlue} />}
-            title="Document Vault"
-            description="Store passports, cards, tickets, and scans."
-            onPress={openVault}
-          />
-          <MiniActionCard
-            icon={<MaterialIcons name="checklist" size={28} color={colors.primaryBlue} />}
-            title="Packing Lists"
-            description="Create and reuse travel packing templates."
-            onPress={() => router.push('/packing')}
-          />
-          <MiniActionCard
-            icon={<MaterialIcons name="bed" size={28} color={colors.primaryBlue} />}
-            title="Bookings"
-            description="Keep hotels, flights, and travel segments together."
-            onPress={openTrip}
-          />
-          <MiniActionCard
-            icon={<MaterialIcons name="sos" size={28} color={colors.dangerRed} />}
-            title="SOS"
-            description="Emergency embassy, hospital, police, and pharmacy tools."
-            onPress={() => router.push('/sos')}
-          />
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <SectionHeader title="Recent alerts" />
+        <SectionHeader title="Travel status" right={alertCount ? `${alertCount} alert${alertCount === 1 ? '' : 's'}` : 'All clear'} />
         <AppCard>
-          {alerts.length ? (
-            alerts.map((alert, index) => (
-              <View key={`${alert.title}-${index}`} style={[styles.listItem, index === alerts.length - 1 ? styles.listItemLast : null]}>
-                <View style={styles.listLeft}>
-                  <Text style={styles.listTitle}>{alert.title}</Text>
-                  <Text style={styles.listText}>{alert.subtitle}</Text>
-                </View>
-                <Text style={styles.listAction}>{alert.tone === 'coral' ? 'Review' : 'Open'}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noAlertText}>No current alerts. Pineapple will show expiry, insurance, and emergency gaps here.</Text>
-          )}
+          <View style={styles.travelStatusGrid}>
+            <MiniActionCard
+              icon={<MaterialIcons name="folder" size={26} color={colors.primaryBlue} />}
+              title="Document Vault"
+              description={`${bundle.documents.length || 0} document records ready for travel.`}
+              onPress={openVault}
+            />
+            <MiniActionCard
+              icon={<MaterialIcons name="sos" size={26} color={colors.dangerRed} />}
+              title="SOS"
+              description="Open emergency tools, embassy notes, and support info."
+              onPress={() => router.push('/sos')}
+            />
+          </View>
+          <View style={styles.chipRow}>
+            <InfoChip label={`${expiryOverview.expiredCount} expired`} tone={expiryOverview.expiredCount ? 'coral' : 'blue'} />
+            <InfoChip label={`${expiryOverview.expiringCount} expiring soon`} tone={expiryOverview.expiringCount ? 'gold' : 'blue'} />
+            <InfoChip label={nextEvent ? 'Itinerary live' : 'No next event'} tone="blue" />
+          </View>
         </AppCard>
       </View>
 
@@ -214,6 +197,49 @@ const styles = StyleSheet.create({
   screen: {
     gap: spacing.lg,
   },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  topCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  topGreeting: {
+    color: colors.primaryBlueDark,
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 24,
+  },
+  topSubtitle: {
+    color: '#6D8194',
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+    maxWidth: 280,
+  },
+  bellButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D6E7FF',
+    backgroundColor: colors.primaryBlueSurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellDot: {
+    position: 'absolute',
+    top: 9,
+    right: 9,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.dangerRed,
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
   section: {
     gap: spacing.sm,
   },
@@ -238,48 +264,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  grid: {
+  travelStatusGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  listItem: {
+  chipRow: {
+    marginTop: spacing.sm,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEF3F8',
-  },
-  listItemLast: {
-    borderBottomWidth: 0,
-  },
-  listLeft: {
-    flex: 1,
-    gap: 4,
-  },
-  listTitle: {
-    color: colors.primaryBlueText,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-  },
-  listText: {
-    color: '#6D8194',
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  listAction: {
-    color: colors.primaryBlue,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-  },
-  noAlertText: {
-    color: '#6D8194',
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    lineHeight: 20,
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   },
   travellerRow: {
     flexDirection: 'row',

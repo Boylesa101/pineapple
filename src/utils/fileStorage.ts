@@ -69,6 +69,25 @@ export async function copyIntoAppStorage(sourceUri: string, folder: ManagedFolde
   return destination;
 }
 
+export async function cleanupImportedSource(sourceUri: string | null | undefined) {
+  if (!sourceUri || Platform.OS === 'web') {
+    return;
+  }
+
+  const cacheDirectory = FileSystem.cacheDirectory ?? '';
+  const isTransientCopy =
+    sourceUri.startsWith(cacheDirectory) ||
+    sourceUri.includes('/cache/') ||
+    sourceUri.includes('/ImagePicker/') ||
+    sourceUri.includes('/DocumentPicker/');
+
+  if (!isTransientCopy) {
+    return;
+  }
+
+  await deleteLocalFile(sourceUri);
+}
+
 export async function writeUtf8File(folder: ManagedFolder, fileName: string, contents: string) {
   await ensureManagedFolder(folder);
   const destination = `${folderMap[folder]}/${fileName}`;

@@ -9,6 +9,7 @@ import { PinPad } from '@/components/PinPad';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { canAdvancePinSetup, canConfirmPinSetup } from '@/utils/authFlow';
+import { getPostUnlockRoute } from '@/utils/authRoutes';
 import { canUseBiometrics } from '@/utils/security';
 
 const MAX_PIN_LENGTH = 12;
@@ -16,6 +17,7 @@ const MAX_PIN_LENGTH = 12;
 export default function SetupPinScreen() {
   const router = useRouter();
   const createPin = useAppStore((state) => state.createPin);
+  const tripCount = useAppStore((state) => state.data.trips.length);
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [step, setStep] = useState<'create' | 'confirm'>('create');
@@ -59,7 +61,7 @@ export default function SetupPinScreen() {
     }
 
     setPin('');
-    router.replace('/');
+    router.replace('/onboarding');
   }
 
   async function handleEnter() {
@@ -86,6 +88,7 @@ export default function SetupPinScreen() {
       await createPin(pin, pin.length, {
         biometricEnabled: biometricsAvailable && biometricsPreferred,
       });
+      router.replace(getPostUnlockRoute(tripCount));
     } catch (error) {
       if (__DEV__) {
         console.error('PIN setup failed', error);

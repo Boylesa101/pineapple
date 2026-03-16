@@ -53,7 +53,7 @@ import {
   getDrivingLicenceVerificationStatus,
 } from '@/utils/drivingLicence';
 import { applyDrivingLicenceOcrToDraft, canRunDrivingLicenceOcr } from '@/utils/drivingLicenceOcr';
-import { copyIntoAppStorage } from '@/utils/fileStorage';
+import { cleanupImportedSource, copyIntoAppStorage } from '@/utils/fileStorage';
 import {
   buildFormalDocumentCopyPayload,
   ensureFormalDocumentDraftData,
@@ -377,6 +377,7 @@ export default function VaultScreen() {
         if (result.canceled || !result.assets[0]) return null;
         const asset = result.assets[0];
         const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
+        await cleanupImportedSource(asset.uri);
         return {
           localFileUri,
           previewUri: localFileUri,
@@ -392,6 +393,7 @@ export default function VaultScreen() {
         if (result.canceled || !result.assets[0]) return null;
         const asset = result.assets[0];
         const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
+        await cleanupImportedSource(asset.uri);
         return {
           localFileUri,
           previewUri: asset.mimeType?.startsWith('image') ? localFileUri : null,
@@ -415,6 +417,7 @@ export default function VaultScreen() {
       if (result.canceled || !result.assets[0]) return null;
       const asset = result.assets[0];
       const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
+      await cleanupImportedSource(asset.uri);
       return {
         localFileUri,
         previewUri: localFileUri,
