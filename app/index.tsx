@@ -8,6 +8,7 @@ import { AppScreen } from '@/components/AppScreen';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { getWelcomeGreeting } from '@/utils/authFlow';
+import { getPostUnlockRoute } from '@/utils/authRoutes';
 
 export default function IndexScreen() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function IndexScreen() {
       return '/lock';
     }
 
-    return tripCount === 0 ? '/create-first-trip' : '/home';
+    return getPostUnlockRoute(tripCount);
   }, [hasCompletedOnboarding, isUnlocked, pinConfigured, tripCount]);
 
   return (

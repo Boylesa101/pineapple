@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.20 - 2026-03-16
+
+- Round 4 testing fixes: identified the main auth failure as a route-guard loop that redirected unlocked no-trip users from `/create-first-trip` to `/home` and then immediately back again
+- Replaced the ad hoc auth redirect checks with a single shared route resolver so onboarding, lock, PIN setup, biometric unlock, and main-app entry all use the same source of truth
+- Confirmed the post-unlock main app route is `/home`, backed by the existing tab shell in `app/(tabs)/_layout.tsx` and `app/(tabs)/home.tsx`
+- Added auth-flow debug logging for bootstrap, PIN setup, PIN unlock, biometric unlock, and route-guard decisions in development builds
+- Added regression tests for the no-trip post-auth route so Pineapple no longer loops or stalls behind the auth gate after successful unlock
+
 ## 1.4.19 - 2026-03-16
 
 - Round 3 testing fixes: removed the stale sand-colored backing baked into the native Android splash drawables so the launch icon now renders cleanly without the beige ring

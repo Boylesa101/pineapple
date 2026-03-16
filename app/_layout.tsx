@@ -22,6 +22,7 @@ import { PineappleMark } from '@/brand/PineappleMark';
 import { AppButton } from '@/components/AppButton';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
+import { resolveAuthRoute } from '@/utils/authRoutes';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -48,46 +49,27 @@ function RouteGuard() {
     }
 
     const currentPath = pathname || '/';
-    const isEntry = currentPath === '/';
-    const inAuth =
-      currentPath === '/onboarding' ||
-      currentPath === '/setup-pin' ||
-      currentPath === '/lock' ||
-      currentPath === '/create-first-trip';
-    const isChecklist = currentPath === '/getting-started';
+    const target = resolveAuthRoute({
+      currentPath,
+      hasCompletedOnboarding,
+      pinConfigured: security.pinConfigured,
+      isUnlocked,
+      tripCount: data.trips.length,
+    });
 
-    function replaceIfNeeded(target: string) {
-      if (currentPath !== target) {
-        router.replace(target);
-      }
+    if (__DEV__) {
+      console.log('[auth] route guard', {
+        currentPath,
+        target,
+        hasCompletedOnboarding,
+        pinConfigured: security.pinConfigured,
+        isUnlocked,
+        tripCount: data.trips.length,
+      });
     }
 
-    if (isEntry) {
-      return;
-    }
-
-    if (!hasCompletedOnboarding && currentPath !== '/onboarding') {
-      replaceIfNeeded('/onboarding');
-      return;
-    }
-
-    if (hasCompletedOnboarding && !security.pinConfigured && currentPath !== '/setup-pin') {
-      replaceIfNeeded('/setup-pin');
-      return;
-    }
-
-    if (security.pinConfigured && !isUnlocked && currentPath !== '/lock') {
-      replaceIfNeeded('/');
-      return;
-    }
-
-    if (security.pinConfigured && isUnlocked && data.trips.length === 0 && currentPath !== '/create-first-trip') {
-      replaceIfNeeded('/create-first-trip');
-      return;
-    }
-
-    if (security.pinConfigured && isUnlocked && inAuth && !isChecklist) {
-      replaceIfNeeded('/home');
+    if (target && currentPath !== target) {
+      router.replace(target);
     }
   }, [
     data.trips.length,

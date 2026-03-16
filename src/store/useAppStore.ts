@@ -217,6 +217,13 @@ export const useAppStore = create<StoreState>((set, get) => ({
         bootError: null,
         lastInteractionAt: Date.now(),
       });
+      if (__DEV__) {
+        console.log('[auth] bootstrap complete', {
+          pinConfigured: security.pinConfigured,
+          tripCount: data.trips.length,
+          hasCompletedOnboarding,
+        });
+      }
       queueNotificationRefresh(data, { requestPermissions: false, delayMs: 150 });
     } catch (error) {
       logStoreError('bootstrap failed', error);
@@ -289,6 +296,12 @@ export const useAppStore = create<StoreState>((set, get) => ({
         failedUnlockAttempts: 0,
         unlockBlockedUntil: null,
       });
+      if (__DEV__) {
+        console.log('[auth] pin created', {
+          pinLength,
+          biometricEnabled: security.biometricEnabled,
+        });
+      }
     } catch (error) {
       logStoreError('createPin failed', error);
       throw error;
@@ -310,6 +323,9 @@ export const useAppStore = create<StoreState>((set, get) => ({
           failedUnlockAttempts: 0,
           unlockBlockedUntil: null,
         });
+        if (__DEV__) {
+          console.log('[auth] pin unlock success');
+        }
       } else {
         const failedUnlockAttempts = state.failedUnlockAttempts + 1;
         const shouldBlock = failedUnlockAttempts >= 5;
@@ -317,6 +333,12 @@ export const useAppStore = create<StoreState>((set, get) => ({
           failedUnlockAttempts,
           unlockBlockedUntil: shouldBlock ? Date.now() + 30_000 : null,
         });
+        if (__DEV__) {
+          console.log('[auth] pin unlock rejected', {
+            failedUnlockAttempts,
+            blocked: shouldBlock,
+          });
+        }
       }
       return valid;
     } catch (error) {
@@ -347,6 +369,9 @@ export const useAppStore = create<StoreState>((set, get) => ({
           failedUnlockAttempts: 0,
           unlockBlockedUntil: null,
         });
+        if (__DEV__) {
+          console.log('[auth] biometric unlock success');
+        }
       }
 
       return true;
