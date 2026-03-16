@@ -6,12 +6,20 @@ const root = new URL('..', import.meta.url).pathname;
 const assetsDir = join(root, 'assets');
 const brandDir = join(assetsDir, 'brand');
 const logoDir = join(assetsDir, 'logo');
+const androidResDir = join(root, 'android', 'app', 'src', 'main', 'res');
 
 const iconSource = join(logoDir, 'pineapple-icon-source.png');
 const markSource = join(logoDir, 'pineapple-mark-source.png');
 const roundSource = join(logoDir, 'pineapple-round-source.png');
 
 const backgroundBlue = '#33A3DF';
+const splashLogoTargets = [
+  ['drawable-mdpi', 288],
+  ['drawable-hdpi', 432],
+  ['drawable-xhdpi', 576],
+  ['drawable-xxhdpi', 864],
+  ['drawable-xxxhdpi', 1152],
+];
 
 async function render() {
   await mkdir(brandDir, { recursive: true });
@@ -55,6 +63,14 @@ async function render() {
     .toFile(join(assetsDir, 'android-icon-monochrome.png'));
 
   await sharp(roundSource).resize(192, 192).png().toFile(join(assetsDir, 'icons', 'pineapple-round-preview.png'));
+
+  await Promise.all(
+    splashLogoTargets.map(async ([folder, size]) => {
+      const targetDir = join(androidResDir, folder);
+      await mkdir(targetDir, { recursive: true });
+      await sharp(markSource).resize(size, size).png().toFile(join(targetDir, 'splashscreen_logo.png'));
+    }),
+  );
 }
 
 render().catch((error) => {

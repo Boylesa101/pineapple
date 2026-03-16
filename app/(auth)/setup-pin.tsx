@@ -3,7 +3,6 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { PineappleMark } from '@/brand/PineappleMark';
-import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { FingerprintIcon } from '@/components/FingerprintIcon';
 import { PinPad } from '@/components/PinPad';
@@ -17,8 +16,6 @@ const MAX_PIN_LENGTH = 12;
 export default function SetupPinScreen() {
   const router = useRouter();
   const createPin = useAppStore((state) => state.createPin);
-  const updateSecurityPreferences = useAppStore((state) => state.updateSecurityPreferences);
-  const tripCount = useAppStore((state) => state.data.trips.length);
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [step, setStep] = useState<'create' | 'confirm'>('create');
@@ -43,6 +40,15 @@ export default function SetupPinScreen() {
 
   function handleCancel() {
     if (saving) {
+      return;
+    }
+
+    if (currentValue.length > 0) {
+      if (step === 'create') {
+        setPin('');
+      } else {
+        setConfirmation('');
+      }
       return;
     }
 
@@ -77,10 +83,13 @@ export default function SetupPinScreen() {
     setSaving(true);
 
     try {
-      await createPin(pin, pin.length);
-      await updateSecurityPreferences({ biometricEnabled: biometricsAvailable && biometricsPreferred });
-      router.replace(tripCount === 0 ? '/create-first-trip' : '/home');
-    } catch {
+      await createPin(pin, pin.length, {
+        biometricEnabled: biometricsAvailable && biometricsPreferred,
+      });
+    } catch (error) {
+      if (__DEV__) {
+        console.error('PIN setup failed', error);
+      }
       Alert.alert('PIN setup failed', 'Pineapple could not save that PIN. Please try again.');
     } finally {
       setSaving(false);
@@ -107,7 +116,11 @@ export default function SetupPinScreen() {
             pinLength={step === 'create' ? Math.max(4, pin.length) : Math.max(pin.length, 4)}
             maxLength={step === 'create' ? MAX_PIN_LENGTH : pin.length || MAX_PIN_LENGTH}
             onChange={step === 'create' ? setPin : setConfirmation}
+            onEnter={handleEnter}
+            onCancel={handleCancel}
+            canEnter={canEnter}
             disabled={saving}
+            variant="auth"
           />
         </View>
 
@@ -126,28 +139,6 @@ export default function SetupPinScreen() {
           ) : (
             <View style={styles.biometricSpacer} />
           )}
-
-          <View style={styles.actions}>
-            <AppButton
-              label="Cancel"
-              tone="secondary"
-              size="large"
-              style={styles.actionButton}
-              labelStyle={styles.actionLabel}
-              onPress={handleCancel}
-              disabled={saving}
-            />
-            <AppButton
-              label="Enter"
-              tone="secondary"
-              size="large"
-              style={styles.actionButton}
-              labelStyle={styles.actionLabel}
-              onPress={handleEnter}
-              disabled={!canEnter}
-              loading={saving}
-            />
-          </View>
         </View>
       </View>
     </AppScreen>
@@ -226,17 +217,5 @@ const styles = StyleSheet.create({
   },
   biometricSpacer: {
     height: 92,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  actionButton: {
-    flex: 1,
-    borderColor: colors.white,
-  },
-  actionLabel: {
-    color: colors.authBlue,
-    fontSize: 17,
   },
 });

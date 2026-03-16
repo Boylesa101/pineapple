@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 
 import { colors, radii, spacing } from '@/constants/theme';
 
@@ -8,24 +7,56 @@ type Props = {
   value: string;
   pinLength: number;
   onChange: (value: string) => void;
+  onEnter?: () => void;
+  onCancel?: () => void;
+  canEnter?: boolean;
   maxLength?: number;
   disabled?: boolean;
+  variant?: 'default' | 'auth';
 };
 
-const rows = [
+const defaultRows = [
   ['1', '2', '3'],
   ['4', '5', '6'],
   ['7', '8', '9'],
   ['', '0', 'delete'],
 ] as const;
 
-export function PinPad({ value, pinLength, onChange, maxLength, disabled = false }: Props) {
+const authRows = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['enter', '0', 'cancel'],
+] as const;
+
+export function PinPad({
+  value,
+  pinLength,
+  onChange,
+  onEnter,
+  onCancel,
+  canEnter = false,
+  maxLength,
+  disabled = false,
+  variant = 'default',
+}: Props) {
   const dots = useMemo(() => Array.from({ length: Math.max(pinLength, value.length, 4) }), [pinLength, value.length]);
+  const rows = variant === 'auth' ? authRows : defaultRows;
 
   function handlePress(key: string) {
     if (!key || disabled) return;
     if (key === 'delete') {
       onChange(value.slice(0, -1));
+      return;
+    }
+    if (key === 'enter') {
+      if (canEnter) {
+        onEnter?.();
+      }
+      return;
+    }
+    if (key === 'cancel') {
+      onCancel?.();
       return;
     }
     if (maxLength && value.length >= maxLength) return;
@@ -44,18 +75,32 @@ export function PinPad({ value, pinLength, onChange, maxLength, disabled = false
           <View key={`row-${rowIndex}`} style={styles.row}>
             {row.map((digit, index) => {
               const cellKey = `${digit || 'empty'}-${rowIndex}-${index}`;
+              const isAction = digit === 'enter' || digit === 'cancel';
+              const actionDisabled = digit === 'enter' ? !canEnter || disabled : disabled;
 
               if (!digit) {
                 return <View key={cellKey} style={styles.keySpacer} />;
               }
 
               return (
-                <Pressable key={cellKey} onPress={() => handlePress(digit)} style={[styles.key, disabled ? styles.keyDisabled : null]}>
-                  {digit === 'delete' ? (
-                    <MaterialIcons name="backspace" size={22} color={disabled ? '#87CFF7' : colors.authBlue} />
-                  ) : (
-                    <Text style={[styles.keyLabel, disabled ? styles.keyLabelDisabled : null]}>{digit}</Text>
-                  )}
+                <Pressable
+                  key={cellKey}
+                  onPress={() => handlePress(digit)}
+                  style={[
+                    styles.key,
+                    isAction ? styles.actionKey : null,
+                    actionDisabled ? styles.keyDisabled : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.keyLabel,
+                      isAction ? styles.actionKeyLabel : null,
+                      actionDisabled ? styles.keyLabelDisabled : null,
+                    ]}
+                  >
+                    {digit === 'enter' ? 'Enter' : digit === 'cancel' ? 'Cancel' : digit}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -97,15 +142,18 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   key: {
-    width: 66,
+    width: 82,
     height: 66,
     borderRadius: radii.pill,
     backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  actionKey: {
+    paddingHorizontal: spacing.sm,
+  },
   keySpacer: {
-    width: 66,
+    width: 82,
     height: 66,
   },
   keyDisabled: {
@@ -115,6 +163,9 @@ const styles = StyleSheet.create({
     color: colors.authBlue,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 21,
+  },
+  actionKeyLabel: {
+    fontSize: 14,
   },
   keyLabelDisabled: {
     color: '#87CFF7',

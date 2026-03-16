@@ -3,7 +3,6 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { PineappleMark } from '@/brand/PineappleMark';
-import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { FingerprintIcon } from '@/components/FingerprintIcon';
 import { PinPad } from '@/components/PinPad';
@@ -13,7 +12,6 @@ import { useAppStore } from '@/store/useAppStore';
 export default function LockScreen() {
   const router = useRouter();
   const security = useAppStore((state) => state.security);
-  const tripCount = useAppStore((state) => state.data.trips.length);
   const unlockWithPin = useAppStore((state) => state.unlockWithPin);
   const unlockWithBiometrics = useAppStore((state) => state.unlockWithBiometrics);
   const unlockBlockedUntil = useAppStore((state) => state.unlockBlockedUntil);
@@ -26,8 +24,6 @@ export default function LockScreen() {
     [blockedSeconds, pin.length, security.pinLength]
   );
 
-  const nextRoute = tripCount === 0 ? '/create-first-trip' : '/home';
-
   async function handleEnter() {
     if (!canEnter || submitting) {
       return;
@@ -37,7 +33,6 @@ export default function LockScreen() {
     try {
       const valid = await unlockWithPin(pin);
       if (valid) {
-        router.replace(nextRoute);
         return;
       }
 
@@ -48,11 +43,27 @@ export default function LockScreen() {
         latestBlockedSeconds > 0 ? `Wait ${latestBlockedSeconds} seconds before trying again.` : 'Please try again.'
       );
       setPin('');
-    } catch {
+    } catch (error) {
+      if (__DEV__) {
+        console.error('PIN unlock failed', error);
+      }
       Alert.alert('Unlock failed', 'Pineapple could not complete unlock. Please try again.');
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleCancel() {
+    if (submitting) {
+      return;
+    }
+
+    if (pin.length > 0) {
+      setPin('');
+      return;
+    }
+
+    router.replace('/');
   }
 
   async function handleBiometricUnlock() {
@@ -63,10 +74,13 @@ export default function LockScreen() {
     setSubmitting(true);
     try {
       const unlocked = await unlockWithBiometrics('app');
-      if (unlocked) {
-        router.replace(nextRoute);
+      if (!unlocked) {
+        return;
       }
-    } catch {
+    } catch (error) {
+      if (__DEV__) {
+        console.error('Biometric unlock failed', error);
+      }
       Alert.alert('Biometric unlock unavailable', 'Use your PIN to unlock Pineapple on this device.');
     } finally {
       setSubmitting(false);
@@ -90,7 +104,11 @@ export default function LockScreen() {
             pinLength={security.pinLength}
             maxLength={security.pinLength}
             onChange={setPin}
+            onEnter={handleEnter}
+            onCancel={handleCancel}
+            canEnter={canEnter}
             disabled={submitting || blockedSeconds > 0}
+            variant="auth"
           />
         </View>
 
@@ -105,31 +123,6 @@ export default function LockScreen() {
           ) : (
             <View style={styles.biometricSpacer} />
           )}
-
-          <View style={styles.actions}>
-            <AppButton
-              label="Cancel"
-              tone="secondary"
-              size="large"
-              style={styles.actionButton}
-              labelStyle={styles.actionLabel}
-              onPress={() => {
-                setPin('');
-                router.replace('/');
-              }}
-              disabled={submitting}
-            />
-            <AppButton
-              label="Enter"
-              tone="secondary"
-              size="large"
-              style={styles.actionButton}
-              labelStyle={styles.actionLabel}
-              onPress={handleEnter}
-              disabled={!canEnter}
-              loading={submitting}
-            />
-          </View>
         </View>
       </View>
     </AppScreen>
@@ -211,17 +204,5 @@ const styles = StyleSheet.create({
   },
   biometricSpacer: {
     height: 92,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  actionButton: {
-    flex: 1,
-    borderColor: colors.white,
-  },
-  actionLabel: {
-    color: colors.authBlue,
-    fontSize: 17,
   },
 });

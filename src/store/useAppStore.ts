@@ -111,7 +111,11 @@ type StoreState = {
   noteInteraction: () => void;
   enforceInactivityLock: () => void;
   handleAppStateChange: (state: AppStateStatus) => void;
-  createPin: (pin: string, pinLength: number) => Promise<void>;
+  createPin: (
+    pin: string,
+    pinLength: number,
+    options?: Partial<Pick<StoredSecurityConfig, 'biometricEnabled' | 'autoLockSeconds'>>
+  ) => Promise<void>;
   unlockWithPin: (pin: string) => Promise<boolean>;
   confirmPin: (pin: string) => Promise<boolean>;
   unlockWithBiometrics: (scope?: 'app' | 'vault') => Promise<boolean>;
@@ -148,6 +152,12 @@ function nextActiveTripId(state: StoreState, snapshot: AppDataSnapshot) {
   }
 
   return snapshot.trips[0]?.id ?? null;
+}
+
+function logStoreError(context: string, error: unknown) {
+  if (__DEV__) {
+    console.error(context, error);
+  }
 }
 
 export const useAppStore = create<StoreState>((set, get) => ({
@@ -208,7 +218,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
         lastInteractionAt: Date.now(),
       });
       queueNotificationRefresh(data, { requestPermissions: false, delayMs: 150 });
-    } catch {
+    } catch (error) {
+      logStoreError('bootstrap failed', error);
       set({
         isBusy: false,
         isBootstrapped: false,
@@ -262,15 +273,26 @@ export const useAppStore = create<StoreState>((set, get) => ({
       });
     }
   },
-  createPin: async (pin, pinLength) => {
-    const security = await createPinConfig(pin, pinLength);
-    await persistSecurityConfig(security);
-    set({
-      security,
-      isUnlocked: true,
-      privacyOverlayVisible: false,
-      lastInteractionAt: Date.now(),
-    });
+  createPin: async (pin, pinLength, options) => {
+    if (pin.length < 4) {
+      throw new Error('PIN must be at least 4 digits long.');
+    }
+
+    try {
+      const security = { ...(await createPinConfig(pin, pinLength)), ...options };
+      await persistSecurityConfig(security);
+      set({
+        security,
+        isUnlocked: true,
+        privacyOverlayVisible: false,
+        lastInteractionAt: Date.now(),
+        failedUnlockAttempts: 0,
+        unlockBlockedUntil: null,
+      });
+    } catch (error) {
+      logStoreError('createPin failed', error);
+      throw error;
+    }
   },
   unlockWithPin: async (pin) => {
     const state = get();
@@ -278,24 +300,29 @@ export const useAppStore = create<StoreState>((set, get) => ({
       return false;
     }
 
-    const valid = await verifyPin(pin, state.security);
-    if (valid) {
-      set({
-        isUnlocked: true,
-        privacyOverlayVisible: false,
-        lastInteractionAt: Date.now(),
-        failedUnlockAttempts: 0,
-        unlockBlockedUntil: null,
-      });
-    } else {
-      const failedUnlockAttempts = state.failedUnlockAttempts + 1;
-      const shouldBlock = failedUnlockAttempts >= 5;
-      set({
-        failedUnlockAttempts,
-        unlockBlockedUntil: shouldBlock ? Date.now() + 30_000 : null,
-      });
+    try {
+      const valid = await verifyPin(pin, state.security);
+      if (valid) {
+        set({
+          isUnlocked: true,
+          privacyOverlayVisible: false,
+          lastInteractionAt: Date.now(),
+          failedUnlockAttempts: 0,
+          unlockBlockedUntil: null,
+        });
+      } else {
+        const failedUnlockAttempts = state.failedUnlockAttempts + 1;
+        const shouldBlock = failedUnlockAttempts >= 5;
+        set({
+          failedUnlockAttempts,
+          unlockBlockedUntil: shouldBlock ? Date.now() + 30_000 : null,
+        });
+      }
+      return valid;
+    } catch (error) {
+      logStoreError('unlockWithPin failed', error);
+      throw error;
     }
-    return valid;
   },
   confirmPin: async (pin) => verifyPin(pin, get().security),
   unlockWithBiometrics: async (scope = 'app') => {
@@ -323,7 +350,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
       }
 
       return true;
-    } catch {
+    } catch (error) {
+      logStoreError('unlockWithBiometrics failed', error);
       return false;
     }
   },

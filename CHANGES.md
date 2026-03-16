@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.19 - 2026-03-16
+
+- Round 3 testing fixes: removed the stale sand-colored backing baked into the native Android splash drawables so the launch icon now renders cleanly without the beige ring
+- Rebuilt the auth keypad so setup and unlock now use an integrated `Enter 0 Cancel` bottom row and no longer rely on separate standalone Enter/Cancel buttons
+- Fixed the main post-PIN crash path by removing redundant success navigation from the auth screens and letting the central auth route guard handle the transition after state changes
+- Reduced PIN setup race risk by persisting the initial PIN and biometric preference in one auth write instead of two back-to-back secure storage updates
+- Hardened PIN create/unlock error handling with safer validation and development logging so auth failures surface cleanly instead of crashing silently
+
 ## 1.4.18 - 2026-03-16
 
 - Round 2 testing fixes: removed the extra JS startup loading layer so Pineapple now stays on the native splash until the first real screen is ready, instead of flashing a second splash-style screen
