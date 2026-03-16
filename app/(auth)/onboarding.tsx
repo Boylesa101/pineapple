@@ -61,6 +61,10 @@ export default function OnboardingScreen() {
       <View style={styles.footer}>
         <AppButton
           label={isLast ? 'Continue' : 'Next'}
+          tone="secondary"
+          size="large"
+          style={styles.footerButton}
+          labelStyle={styles.footerButtonLabel}
           onPress={async () => {
             if (!isLast) {
               setIndex((value) => Math.min(value + 1, slides.length - 1));
@@ -75,7 +79,10 @@ export default function OnboardingScreen() {
         />
         <AppButton
           label="Skip"
-          tone="ghost"
+          tone="secondary"
+          size="large"
+          style={styles.footerButton}
+          labelStyle={styles.footerButtonLabel}
           onPress={async () => {
             setSubmitting(true);
             await completeOnboarding();
@@ -89,7 +96,7 @@ export default function OnboardingScreen() {
   );
 
   return (
-    <AppScreen scroll={false} footer={footer}>
+    <AppScreen scroll={false} footer={footer} backgroundColor={colors.authBlue} hideBackgroundDecor>
       <View style={styles.hero}>
         <PineappleMark size={82} />
         <Text style={styles.brand}>Pineapple</Text>
@@ -118,7 +125,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxl,
   },
   brand: {
-    color: colors.nightNavy,
+    color: colors.white,
     fontFamily: 'Poppins_700Bold',
     fontSize: 28,
   },
@@ -152,5 +159,12 @@ const styles = StyleSheet.create({
   },
   footer: {
     gap: spacing.sm,
+  },
+  footerButton: {
+    borderColor: colors.white,
+  },
+  footerButtonLabel: {
+    color: colors.authBlue,
+    fontSize: 17,
   },
 });

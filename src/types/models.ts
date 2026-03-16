@@ -42,7 +42,7 @@ export type SyncMode = 'manual_share';
 export type SyncStatus = 'local_only' | 'ready' | 'pending_export' | 'pending_import' | 'conflict';
 export type ConflictStatus = 'open' | 'resolved_keep_local' | 'resolved_use_incoming';
 export type PrivacyMaskingMode = 'always' | 'travel_mode';
-export type PinLength = 4 | 6;
+export type PinLength = number;
 export type VerificationStatus = 'verified' | 'review' | 'unverified';
 export type PassportVerificationStatus = VerificationStatus;
 

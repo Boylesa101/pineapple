@@ -5,11 +5,10 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 ### Android test and release builds
 
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
-- For a sideloadable test APK on a spare Android device, run `npm run apk:debug`
-- Pineapple copies the finished debug APK to `build/apk/pineapple-debug.apk` so you have a stable path even when Gradle uses intermediate output folders internally
-- The APK scripts clean stale generated native caches first, disable Gradle daemon reuse for the build command, and target `arm64-v8a` so they stay focused on real modern Android phones instead of emulator architectures
-- For a local release-style APK build, run `npm run apk:release`
-- Pineapple copies the finished release APK to `build/apk/pineapple-release.apk`
+- For a dev-only APK that still expects Metro, run `npm run apk:debug`
+- Pineapple copies the finished debug APK to `build/apk/pineapple-v2-debug.apk`
+- For direct phone testing without USB or Metro, run `npm run apk:release`
+- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
 - Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
 - When you are ready for Google Play, provide these environment variables before building:
@@ -23,7 +22,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 
 ### Core features
 
-- PIN setup and lock flow with 4-digit or 6-digit PIN support
+- PIN setup and lock flow with a minimum 4-digit PIN, explicit Enter/Cancel actions, and optional biometric unlock
 - Optional biometric unlock when the device supports it
 - Expo Go first-run testing now clears stale PIN state when no onboarding or trip data exists yet
 - Auto-lock after inactivity and best-effort privacy overlay for the app switcher
@@ -59,14 +58,15 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Expanded settings surface for security, reminders, sync, backup/restore, and privacy masking
 - Expo web/PWA companion mode for trip overview, packing, itinerary, emergency info, and printable summaries
 - Five-screen first-launch onboarding with PIN setup, first-trip creation, and a setup checklist
+- Blue first-run welcome/auth flow with setup-aware greeting copy and centered PIN pad layout
 - Retryable startup recovery if local bootstrap fails unexpectedly
 - Lighter startup path with lazy file-directory creation for faster cold launch
 - Development-only demo data reset for QA
 
 ### Stack
 
-- Expo SDK 54
-- React Native 0.81
+- Expo SDK 55
+- React Native 0.83
 - Expo Router
 - TypeScript
 - SQLite via `expo-sqlite`

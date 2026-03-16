@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing } from '@/constants/theme';
@@ -8,25 +9,40 @@ type Props = {
   onPress: () => void;
   icon?: ReactNode;
   tone?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  size?: 'default' | 'large';
   disabled?: boolean;
   loading?: boolean;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
 };
 
-export function AppButton({ label, onPress, icon, tone = 'primary', disabled, loading }: Props) {
+export function AppButton({
+  label,
+  onPress,
+  icon,
+  tone = 'primary',
+  size = 'default',
+  disabled,
+  loading,
+  style,
+  labelStyle,
+}: Props) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.base,
+        sizeStyles[size],
         toneStyles[tone],
         pressed && !disabled ? styles.pressed : null,
         disabled ? styles.disabled : null,
+        style,
       ]}
     >
       {loading ? <ActivityIndicator color={tone === 'primary' ? colors.white : colors.nightNavy} /> : null}
       {!loading && icon ? <View>{icon}</View> : null}
-      {!loading ? <Text style={[styles.label, labelStyles[tone]]}>{label}</Text> : null}
+      {!loading ? <Text style={[styles.label, labelStyles[tone], labelStyle]}>{label}</Text> : null}
     </Pressable>
   );
 }
@@ -83,5 +99,13 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.55,
+  },
+});
+
+const sizeStyles = StyleSheet.create({
+  default: {},
+  large: {
+    minHeight: 60,
+    paddingHorizontal: spacing.xl,
   },
 });

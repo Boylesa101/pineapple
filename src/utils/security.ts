@@ -112,19 +112,35 @@ export async function verifyPin(pin: string, config: StoredSecurityConfig) {
 }
 
 export async function canUseBiometrics() {
-  const [hasHardware, isEnrolled] = await Promise.all([
-    LocalAuthentication.hasHardwareAsync(),
-    LocalAuthentication.isEnrolledAsync(),
-  ]);
+  if (Platform.OS === 'web') {
+    return false;
+  }
 
-  return hasHardware && isEnrolled;
+  try {
+    const [hasHardware, isEnrolled] = await Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
+    ]);
+
+    return hasHardware && isEnrolled;
+  } catch {
+    return false;
+  }
 }
 
 export async function authenticateBiometrics() {
-  return LocalAuthentication.authenticateAsync({
-    promptMessage: 'Unlock Pineapple',
-    fallbackLabel: 'Use PIN',
-    cancelLabel: 'Cancel',
-    disableDeviceFallback: false,
-  });
+  try {
+    return await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Unlock Pineapple',
+      fallbackLabel: 'Use PIN',
+      cancelLabel: 'Cancel',
+      disableDeviceFallback: false,
+    });
+  } catch {
+    return {
+      success: false,
+      error: 'biometric_unavailable',
+      warning: undefined,
+    };
+  }
 }

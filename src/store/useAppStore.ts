@@ -111,7 +111,7 @@ type StoreState = {
   noteInteraction: () => void;
   enforceInactivityLock: () => void;
   handleAppStateChange: (state: AppStateStatus) => void;
-  createPin: (pin: string, pinLength: 4 | 6) => Promise<void>;
+  createPin: (pin: string, pinLength: number) => Promise<void>;
   unlockWithPin: (pin: string) => Promise<boolean>;
   confirmPin: (pin: string) => Promise<boolean>;
   unlockWithBiometrics: (scope?: 'app' | 'vault') => Promise<boolean>;
@@ -299,29 +299,33 @@ export const useAppStore = create<StoreState>((set, get) => ({
   },
   confirmPin: async (pin) => verifyPin(pin, get().security),
   unlockWithBiometrics: async (scope = 'app') => {
-    const enabled = await canUseBiometrics();
-    if (!enabled) {
+    try {
+      const enabled = await canUseBiometrics();
+      if (!enabled) {
+        return false;
+      }
+
+      const result = await authenticateBiometrics();
+      if (!result.success) {
+        return false;
+      }
+
+      if (scope === 'vault') {
+        get().unlockVault();
+      } else {
+        set({
+          isUnlocked: true,
+          privacyOverlayVisible: false,
+          lastInteractionAt: Date.now(),
+          failedUnlockAttempts: 0,
+          unlockBlockedUntil: null,
+        });
+      }
+
+      return true;
+    } catch {
       return false;
     }
-
-    const result = await authenticateBiometrics();
-    if (!result.success) {
-      return false;
-    }
-
-    if (scope === 'vault') {
-      get().unlockVault();
-    } else {
-      set({
-        isUnlocked: true,
-        privacyOverlayVisible: false,
-        lastInteractionAt: Date.now(),
-        failedUnlockAttempts: 0,
-        unlockBlockedUntil: null,
-      });
-    }
-
-    return true;
   },
   lockApp: () =>
     set({

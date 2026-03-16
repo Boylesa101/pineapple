@@ -7,6 +7,7 @@ import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
+import { getWelcomeGreeting } from '@/utils/authFlow';
 
 export default function IndexScreen() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function IndexScreen() {
   const isUnlocked = useAppStore((state) => state.isUnlocked);
   const tripCount = useAppStore((state) => state.data.trips.length);
   const pinConfigured = useAppStore((state) => state.security.pinConfigured);
+  const greeting = useMemo(() => getWelcomeGreeting(hasCompletedOnboarding), [hasCompletedOnboarding]);
 
   const nextRoute = useMemo(() => {
     if (!hasCompletedOnboarding) {
@@ -38,7 +40,15 @@ export default function IndexScreen() {
         <View style={styles.hero}>
           <PineappleMark size={220} />
         </View>
-        <AppButton label="Let's go" tone="secondary" onPress={() => router.push(nextRoute)} />
+        <Text style={styles.greeting}>{greeting}</Text>
+        <AppButton
+          label="Let's go"
+          tone="secondary"
+          size="large"
+          style={styles.cta}
+          labelStyle={styles.ctaLabel}
+          onPress={() => router.replace(nextRoute)}
+        />
       </View>
     </AppScreen>
   );
@@ -61,7 +71,24 @@ const styles = StyleSheet.create({
   },
   hero: {
     minHeight: 260,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  greeting: {
+    color: colors.white,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 19,
+    lineHeight: 28,
+    maxWidth: 320,
+    textAlign: 'center',
+  },
+  cta: {
+    minWidth: 220,
+    borderColor: colors.white,
+  },
+  ctaLabel: {
+    color: colors.authBlue,
+    fontSize: 18,
   },
 });

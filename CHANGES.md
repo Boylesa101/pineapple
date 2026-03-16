@@ -94,6 +94,15 @@
 - Added platform-safe local storage fallbacks so the web companion no longer depends on native-only secure/file storage behavior during startup
 - Kept file-directory creation lazy so Android import, export, and backup flows still work without slowing cold launch
 
+## 1.4.17 - 2026-03-16
+
+- Round 1 testing fixes: centered the welcome screen icon, updated the first-launch greeting copy, and restyled the welcome/onboarding/auth screens with the requested blue-and-white treatment
+- Rebuilt PIN setup and unlock around explicit Enter and Cancel actions, removed the old 4-digit vs 6-digit chooser, and now accept any PIN length of 4 digits or more during setup
+- Fixed setup and unlock navigation loops by removing auto-submit side effects and routing explicitly after successful PIN creation or unlock
+- Hardened biometric auth handling so missing hardware, disabled enrollment, or runtime failures fall back safely instead of crashing the app
+- Fixed the cold-start loading background so the first visible screen and splash transition stay aligned with the intended blue welcome flow
+- Fixed Android release builds by pointing Hermes at the correct compiler package for React Native 0.83 / Expo SDK 55 and regenerated the standalone phone-test APK
+
 ## 1.4.2 - 2026-03-14
 
 - Fixed orphaned local file cleanup when deleting vault documents, deleting trips, replacing trip cover images, clearing local data, and restoring backups

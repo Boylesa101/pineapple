@@ -200,18 +200,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.warmSand,
+    backgroundColor: colors.authBlue,
     padding: spacing.lg,
   },
   loadingTitle: {
-    color: colors.nightNavy,
+    color: colors.white,
     fontFamily: 'Poppins_700Bold',
     fontSize: 28,
   },
   loadingSubtitle: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.86)',
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
+    textAlign: 'center',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,

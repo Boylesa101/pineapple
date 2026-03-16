@@ -38,3 +38,6 @@ yarn-error.*
 
 # generated native folders
 /ios
+/build
+/apk to test
+/new apk

@@ -35,7 +35,7 @@ export function AppScreen({
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, backgroundColor ? { backgroundColor } : null]} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, backgroundColor ? { backgroundColor } : null]} edges={['top', 'bottom']}>
       {!hideBackgroundDecor ? <View style={styles.backgroundBlobOne} /> : null}
       {!hideBackgroundDecor ? <View style={styles.backgroundBlobTwo} /> : null}
       {scroll ? <ScrollView contentContainerStyle={styles.scroll}>{content}</ScrollView> : content}

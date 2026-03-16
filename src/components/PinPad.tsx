@@ -8,6 +8,8 @@ type Props = {
   value: string;
   pinLength: number;
   onChange: (value: string) => void;
+  maxLength?: number;
+  disabled?: boolean;
 };
 
 const rows = [
@@ -17,16 +19,16 @@ const rows = [
   ['', '0', 'delete'],
 ] as const;
 
-export function PinPad({ value, pinLength, onChange }: Props) {
-  const dots = useMemo(() => Array.from({ length: pinLength }), [pinLength]);
+export function PinPad({ value, pinLength, onChange, maxLength, disabled = false }: Props) {
+  const dots = useMemo(() => Array.from({ length: Math.max(pinLength, value.length, 4) }), [pinLength, value.length]);
 
   function handlePress(key: string) {
-    if (!key) return;
+    if (!key || disabled) return;
     if (key === 'delete') {
       onChange(value.slice(0, -1));
       return;
     }
-    if (value.length >= pinLength) return;
+    if (maxLength && value.length >= maxLength) return;
     onChange(`${value}${key}`);
   }
 
@@ -48,11 +50,11 @@ export function PinPad({ value, pinLength, onChange }: Props) {
               }
 
               return (
-                <Pressable key={cellKey} onPress={() => handlePress(digit)} style={styles.key}>
+                <Pressable key={cellKey} onPress={() => handlePress(digit)} style={[styles.key, disabled ? styles.keyDisabled : null]}>
                   {digit === 'delete' ? (
-                    <MaterialIcons name="backspace" size={22} color={colors.authBlue} />
+                    <MaterialIcons name="backspace" size={22} color={disabled ? '#87CFF7' : colors.authBlue} />
                   ) : (
-                    <Text style={styles.keyLabel}>{digit}</Text>
+                    <Text style={[styles.keyLabel, disabled ? styles.keyLabelDisabled : null]}>{digit}</Text>
                   )}
                 </Pressable>
               );
@@ -106,9 +108,15 @@ const styles = StyleSheet.create({
     width: 66,
     height: 66,
   },
+  keyDisabled: {
+    opacity: 0.55,
+  },
   keyLabel: {
     color: colors.authBlue,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 21,
+  },
+  keyLabelDisabled: {
+    color: '#87CFF7',
   },
 });
