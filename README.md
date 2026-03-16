@@ -28,10 +28,10 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - APK download is hosted from Cloudflare R2 because the release APK is too large to bundle directly into a Pages deployment
 - Current stable APK link used by the page: `https://pub-e921959b6412492f9b7d39739cf8f48c.r2.dev/downloads/pineapple-latest.apk`
 - The static page source lives in `cloudflare/pinapple-dev/`
-- To refresh the hosted APK later:
-  - upload the new APK to the same R2 bucket key `downloads/pineapple-latest.apk`
-  - update the version text in `cloudflare/pinapple-dev/index.html`
-  - redeploy with `npx wrangler@4 pages deploy cloudflare/pinapple-dev --project-name pinapple-dev`
+- To refresh the hosted APK later in one command:
+  - `npm run deploy:pinapple-dev -- --apk "new apk/<your file>.apk" --build-label "Internal test build"`
+- If `--apk` is omitted, Pineapple will automatically use the newest APK in `new apk/` or `build/apk/`
+- The deploy script uploads both the versioned APK object and the stable `downloads/pineapple-latest.apk` alias, updates the page metadata, and redeploys the Cloudflare Pages site
 
 ### Core features
 

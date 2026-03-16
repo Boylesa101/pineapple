@@ -7,6 +7,5 @@ Deployment shape:
 - R2 stores the APK itself
 
 Manual update flow:
-1. Upload the latest APK to the R2 bucket
-2. Replace the `__APK_URL__` placeholder in `index.html`
-3. Deploy this folder to the `pinapple-dev` Pages project
+1. Run `npm run deploy:pinapple-dev -- --apk "new apk/<your file>.apk" --build-label "Internal test build"` from the repo root
+2. The script uploads the APK to R2, refreshes the static page metadata, and deploys this folder to the `pinapple-dev` Pages project

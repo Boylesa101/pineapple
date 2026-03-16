@@ -5,6 +5,7 @@
 - Added a live Cloudflare Pages test-download site at `https://pinapple-dev.pages.dev`
 - Added Cloudflare R2 hosting for the latest installable Android test APK so testers can download the current Pineapple phone build directly without using GitHub artifacts
 - Added the static page source under `cloudflare/pinapple-dev/` and documented the update flow in the README
+- Added a one-command `npm run deploy:pinapple-dev` script to upload the latest APK, refresh the page metadata, and redeploy the Cloudflare test page
 
 ## 1.4.16 - 2026-03-15
 
