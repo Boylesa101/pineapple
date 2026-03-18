@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.4 - 2026-03-18
+
+- Security hardening pass: upgraded current PIN protection to a stronger PBKDF2-based hash, persisted failed-attempt lockout state across app restarts, and reset cooldown state safely after valid PIN or biometric unlock
+- Backup and restore hardening: tightened backup schema validation for malformed/tampered attachment metadata, sanitized restored filenames, and now force Pineapple back to a locked state after restore instead of leaving the previous unlock state in place
+- Android privacy hardening: enabled `FLAG_SECURE` to block screenshots/screen recording capture, disabled Android OS backup in favor of Pineapple's encrypted backup flow, and removed unnecessary broad storage and overlay permissions
+- Release-build hardening: release builds now default to code shrinking and resource shrinking, and the recommended fast test path is now an arm64 release APK rather than Expo Go
+- Product workflow cleanup: Pineapple now treats installable APKs and release bundles as the supported test/release path, while keeping only internal crash-safe fallbacks for unsupported runtimes
+- Documentation and threat-model update: added `SECURITY.md`, refreshed the README security model, and documented the current honest limitation that Pineapple still protects sensitive SQLite data with field-level encryption rather than full SQLCipher-style database encryption
+
 ## 1.6.3 - 2026-03-18
 
 - Live document scanner integration: Pineapple now uses the native `react-native-document-scanner-plugin` scan flow for camera-based document capture on supported native builds, giving the Vault a real live edge-detection scanner instead of only the plain camera fallback

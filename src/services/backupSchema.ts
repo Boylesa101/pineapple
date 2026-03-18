@@ -1,10 +1,30 @@
 import type { BackupEnvelope, BackupPayload } from '@/types/models';
 
 export const BACKUP_SCHEMA_VERSION = 3;
+const MAX_ATTACHMENT_COUNT = 400;
+const MAX_FILE_NAME_LENGTH = 160;
 
 export function validateBackupPayload(payload: BackupPayload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Backup file is missing required data sections.');
+  }
+
   if (payload.version !== BACKUP_SCHEMA_VERSION) {
     throw new Error('Unsupported backup version.');
+  }
+
+  if (typeof payload.exportedAt !== 'string' || !payload.exportedAt.trim()) {
+    throw new Error('Backup file is missing required data sections.');
+  }
+
+  if (
+    !payload.settings ||
+    typeof payload.settings !== 'object' ||
+    typeof payload.settings.autoLockSeconds !== 'number' ||
+    payload.settings.autoLockSeconds < 15 ||
+    payload.settings.autoLockSeconds > 3600
+  ) {
+    throw new Error('Backup file is missing required data sections.');
   }
 
   const data = payload.data;
@@ -26,6 +46,27 @@ export function validateBackupPayload(payload: BackupPayload) {
     !Array.isArray(payload.attachments)
   ) {
     throw new Error('Backup file is missing required data sections.');
+  }
+
+  if (payload.attachments.length > MAX_ATTACHMENT_COUNT) {
+    throw new Error('Backup file is invalid or incomplete.');
+  }
+
+  for (const attachment of payload.attachments) {
+    if (
+      !attachment ||
+      typeof attachment !== 'object' ||
+      (attachment.folder !== 'trips' && attachment.folder !== 'vault') ||
+      typeof attachment.originalUri !== 'string' ||
+      typeof attachment.fileName !== 'string' ||
+      attachment.fileName.length === 0 ||
+      attachment.fileName.length > MAX_FILE_NAME_LENGTH ||
+      /[\\/]/.test(attachment.fileName) ||
+      (attachment.mimeType !== null && typeof attachment.mimeType !== 'string') ||
+      typeof attachment.base64 !== 'string'
+    ) {
+      throw new Error('Backup file is invalid or incomplete.');
+    }
   }
 }
 

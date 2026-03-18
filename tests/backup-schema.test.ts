@@ -59,3 +59,67 @@ test('backup schema rejects unsupported payload versions and missing sections', 
     /missing required data sections/i
   );
 });
+
+test('backup schema rejects unsafe attachment metadata and invalid lock settings', () => {
+  assert.throws(
+    () =>
+      validateBackupPayload({
+        version: 3,
+        exportedAt: new Date().toISOString(),
+        settings: { autoLockSeconds: 5 },
+        data: {
+          trips: [],
+          travellers: [],
+          documents: [],
+          packingItems: [],
+          travelSegments: [],
+          hotelStays: [],
+          itineraryEvents: [],
+          emergencyInfos: [],
+          reminderSettings: [],
+          appPreferences: {},
+          tripParticipants: [],
+          tripInvites: [],
+          sharedTripStates: [],
+          syncConflicts: [],
+        } as never,
+        attachments: [],
+      }),
+    /missing required data sections/i
+  );
+
+  assert.throws(
+    () =>
+      validateBackupPayload({
+        version: 3,
+        exportedAt: new Date().toISOString(),
+        settings: { autoLockSeconds: 90 },
+        data: {
+          trips: [],
+          travellers: [],
+          documents: [],
+          packingItems: [],
+          travelSegments: [],
+          hotelStays: [],
+          itineraryEvents: [],
+          emergencyInfos: [],
+          reminderSettings: [],
+          appPreferences: {},
+          tripParticipants: [],
+          tripInvites: [],
+          sharedTripStates: [],
+          syncConflicts: [],
+        } as never,
+        attachments: [
+          {
+            originalUri: 'file:///tmp/scan.jpg',
+            folder: 'vault',
+            mimeType: 'image/jpeg',
+            fileName: '../escape.jpg',
+            base64: 'ZmFrZQ==',
+          },
+        ],
+      }),
+    /invalid or incomplete/i
+  );
+});

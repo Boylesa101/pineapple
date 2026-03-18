@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import CryptoJS from 'crypto-js';
 import * as Crypto from 'expo-crypto';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -6,6 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { PinLength, StoredSecurityConfig } from '@/types/models';
 
 const SECURITY_KEY = 'pineapple.security';
+const PIN_PBKDF2_ITERATIONS = 150000;
 
 function canUseWebStorage() {
   return Platform.OS === 'web' && typeof window !== 'undefined' && 'localStorage' in window;
@@ -14,11 +16,13 @@ function canUseWebStorage() {
 export const defaultSecurityConfig: StoredSecurityConfig = {
   pinConfigured: false,
   pinLength: 4,
-  hashVersion: 2,
+  hashVersion: 3,
   salt: '',
   hash: '',
   biometricEnabled: false,
   autoLockSeconds: 90,
+  failedUnlockAttempts: 0,
+  unlockBlockedUntil: null,
 };
 
 function bytesToHex(bytes: Uint8Array) {
@@ -43,6 +47,33 @@ async function hashPinV2(pin: string, salt: string) {
   return digest;
 }
 
+async function hashPinV3(pin: string, salt: string) {
+  return CryptoJS.PBKDF2(pin, CryptoJS.enc.Hex.parse(salt), {
+    keySize: 256 / 32,
+    iterations: PIN_PBKDF2_ITERATIONS,
+    hasher: CryptoJS.algo.SHA256,
+  }).toString(CryptoJS.enc.Hex);
+}
+
+function normalizeSecurityConfig(config: StoredSecurityConfig) {
+  const next = {
+    ...defaultSecurityConfig,
+    ...config,
+    failedUnlockAttempts: Number.isFinite(config.failedUnlockAttempts) ? config.failedUnlockAttempts : 0,
+    unlockBlockedUntil:
+      typeof config.unlockBlockedUntil === 'number' && Number.isFinite(config.unlockBlockedUntil)
+        ? config.unlockBlockedUntil
+        : null,
+  } satisfies StoredSecurityConfig;
+
+  if (next.unlockBlockedUntil && next.unlockBlockedUntil <= Date.now()) {
+    next.failedUnlockAttempts = 0;
+    next.unlockBlockedUntil = null;
+  }
+
+  return next;
+}
+
 export async function loadSecurityConfig() {
   if (canUseWebStorage()) {
     const raw = window.localStorage.getItem(SECURITY_KEY);
@@ -51,7 +82,7 @@ export async function loadSecurityConfig() {
     }
 
     try {
-      return { ...defaultSecurityConfig, ...(JSON.parse(raw) as StoredSecurityConfig) };
+      return normalizeSecurityConfig(JSON.parse(raw) as StoredSecurityConfig);
     } catch {
       return defaultSecurityConfig;
     }
@@ -63,19 +94,20 @@ export async function loadSecurityConfig() {
   }
 
   try {
-    return { ...defaultSecurityConfig, ...(JSON.parse(raw) as StoredSecurityConfig) };
+    return normalizeSecurityConfig(JSON.parse(raw) as StoredSecurityConfig);
   } catch {
     return defaultSecurityConfig;
   }
 }
 
 export async function persistSecurityConfig(config: StoredSecurityConfig) {
+  const normalized = normalizeSecurityConfig(config);
   if (canUseWebStorage()) {
-    window.localStorage.setItem(SECURITY_KEY, JSON.stringify(config));
+    window.localStorage.setItem(SECURITY_KEY, JSON.stringify(normalized));
     return;
   }
 
-  await SecureStore.setItemAsync(SECURITY_KEY, JSON.stringify(config));
+  await SecureStore.setItemAsync(SECURITY_KEY, JSON.stringify(normalized));
 }
 
 export async function clearSecurityConfig() {
@@ -89,13 +121,13 @@ export async function clearSecurityConfig() {
 
 export async function createPinConfig(pin: string, pinLength: PinLength) {
   const salt = bytesToHex(Crypto.getRandomBytes(16));
-  const hash = await hashPinV2(pin, salt);
+  const hash = await hashPinV3(pin, salt);
 
   return {
     ...defaultSecurityConfig,
     pinConfigured: true,
     pinLength,
-    hashVersion: 2,
+    hashVersion: 3,
     salt,
     hash,
   } satisfies StoredSecurityConfig;
@@ -107,8 +139,47 @@ export async function verifyPin(pin: string, config: StoredSecurityConfig) {
   }
 
   const candidate =
-    config.hashVersion === 1 ? await hashPinV1(pin, config.salt) : await hashPinV2(pin, config.salt);
+    config.hashVersion === 1
+      ? await hashPinV1(pin, config.salt)
+      : config.hashVersion === 2
+        ? await hashPinV2(pin, config.salt)
+        : await hashPinV3(pin, config.salt);
   return candidate === config.hash;
+}
+
+export function clearUnlockLockout(config: StoredSecurityConfig): StoredSecurityConfig {
+  return normalizeSecurityConfig({
+    ...config,
+    failedUnlockAttempts: 0,
+    unlockBlockedUntil: null,
+  });
+}
+
+export function getUnlockCooldownMs(failedUnlockAttempts: number) {
+  if (failedUnlockAttempts >= 10) {
+    return 15 * 60 * 1000;
+  }
+
+  if (failedUnlockAttempts >= 8) {
+    return 5 * 60 * 1000;
+  }
+
+  if (failedUnlockAttempts >= 5) {
+    return 30 * 1000;
+  }
+
+  return 0;
+}
+
+export function registerFailedUnlock(config: StoredSecurityConfig): StoredSecurityConfig {
+  const failedUnlockAttempts = Math.max(0, config.failedUnlockAttempts) + 1;
+  const cooldownMs = getUnlockCooldownMs(failedUnlockAttempts);
+
+  return normalizeSecurityConfig({
+    ...config,
+    failedUnlockAttempts,
+    unlockBlockedUntil: cooldownMs > 0 ? Date.now() + cooldownMs : null,
+  });
 }
 
 export async function canUseBiometrics() {

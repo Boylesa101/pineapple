@@ -64,7 +64,7 @@ function bytesToHex(bytes: Uint8Array) {
 }
 
 function getFileName(uri: string) {
-  return uri.split('/').pop() || 'attachment.bin';
+  return sanitizeFileName(uri.split('/').pop() || 'attachment.bin');
 }
 
 function getExtension(uri: string, mimeType?: string | null) {
@@ -78,6 +78,17 @@ function getExtension(uri: string, mimeType?: string | null) {
   if (mimeType?.includes('jpeg')) return '.jpg';
   if (mimeType?.includes('png')) return '.png';
   return '';
+}
+
+function sanitizeFileName(fileName: string, fallback = 'attachment.bin') {
+  const leafName = fileName.split(/[\\/]/).pop() || fallback;
+  const sanitized = leafName
+    .replace(/[^A-Za-z0-9._-]+/g, '_')
+    .replace(/^_+/, '')
+    .replace(/_+/g, '_')
+    .slice(0, 120);
+
+  return sanitized || fallback;
 }
 
 function createCipherKeys(rawKeyHex: string) {
@@ -211,7 +222,7 @@ async function writeEncryptedFile(
     throw new Error('Secure document storage is unavailable on this platform.');
   }
 
-  const safeName = fileName.replace(/\.[^/.]+$/, '');
+  const safeName = sanitizeFileName(fileName, 'attachment').replace(/\.[^/.]+$/, '');
   const destination = `${folderMap[folder]}/${safeName}${ENCRYPTED_FILE_EXTENSION}`;
   await FileSystem.writeAsStringAsync(destination, envelope);
   return destination;
@@ -310,7 +321,7 @@ export async function clearMaterializedSecureFiles() {
 
 export async function writeUtf8File(folder: ManagedFolder, fileName: string, contents: string) {
   await ensureManagedFolder(folder);
-  const destination = `${folderMap[folder]}/${fileName}`;
+  const destination = `${folderMap[folder]}/${sanitizeFileName(fileName)}`;
   await FileSystem.writeAsStringAsync(destination, contents);
   return destination;
 }
@@ -326,7 +337,7 @@ export async function writeBase64File(
   }
 
   await ensureManagedFolder(folder);
-  const destination = `${folderMap[folder]}/${fileName}`;
+  const destination = `${folderMap[folder]}/${sanitizeFileName(fileName)}`;
   await FileSystem.writeAsStringAsync(destination, base64, {
     encoding: FileSystem.EncodingType.Base64,
   });

@@ -1,5 +1,4 @@
 import { AppStateStatus } from 'react-native';
-import Constants from 'expo-constants';
 
 import { create } from 'zustand';
 
@@ -35,11 +34,14 @@ import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, 
 import {
   authenticateBiometrics,
   canUseBiometrics,
+  clearUnlockLockout,
   clearSecurityConfig,
   createPinConfig,
   defaultSecurityConfig,
+  getUnlockCooldownMs,
   loadSecurityConfig,
   persistSecurityConfig,
+  registerFailedUnlock,
   verifyPin,
 } from '@/utils/security';
 import { defaultAppExpiryPreferences } from '@/utils/documentExpiry';
@@ -201,17 +203,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
         loadOnboardingComplete(),
       ]);
       let data = initialData;
-      let security = loadedSecurity;
-      const shouldResetStaleExpoGoPin =
-        Boolean(Constants.expoGoConfig) &&
-        onboardingStatus === null &&
-        initialData.trips.length === 0 &&
-        loadedSecurity.pinConfigured;
-
-      if (shouldResetStaleExpoGoPin) {
-        await clearSecurityConfig();
-        security = defaultSecurityConfig;
-      }
+      const security = loadedSecurity;
 
       const protectionResult = await protectStoredFilesAtRest(data);
       data = protectionResult.snapshot;
@@ -235,6 +227,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
         isBusy: false,
         bootError: null,
         lastInteractionAt: Date.now(),
+        failedUnlockAttempts: security.failedUnlockAttempts,
+        unlockBlockedUntil: security.unlockBlockedUntil,
       });
       if (__DEV__) {
         console.log('[auth] bootstrap complete', {
@@ -340,7 +334,17 @@ export const useAppStore = create<StoreState>((set, get) => ({
     try {
       const valid = await verifyPin(pin, state.security);
       if (valid) {
+        let nextSecurity = clearUnlockLockout(state.security);
+        if (state.security.hashVersion !== 3) {
+          nextSecurity = {
+            ...(await createPinConfig(pin, state.security.pinLength)),
+            biometricEnabled: state.security.biometricEnabled,
+            autoLockSeconds: state.security.autoLockSeconds,
+          };
+        }
+        await persistSecurityConfig(nextSecurity);
         set({
+          security: nextSecurity,
           isUnlocked: true,
           privacyOverlayVisible: false,
           lastInteractionAt: Date.now(),
@@ -352,16 +356,21 @@ export const useAppStore = create<StoreState>((set, get) => ({
           console.log('[auth] pin unlock success');
         }
       } else {
-        const failedUnlockAttempts = state.failedUnlockAttempts + 1;
-        const shouldBlock = failedUnlockAttempts >= 5;
+        const nextSecurity = registerFailedUnlock(state.security);
+        await persistSecurityConfig(nextSecurity);
+        const cooldownMs =
+          nextSecurity.unlockBlockedUntil && nextSecurity.unlockBlockedUntil > Date.now()
+            ? nextSecurity.unlockBlockedUntil - Date.now()
+            : 0;
         set({
-          failedUnlockAttempts,
-          unlockBlockedUntil: shouldBlock ? Date.now() + 30_000 : null,
+          security: nextSecurity,
+          failedUnlockAttempts: nextSecurity.failedUnlockAttempts,
+          unlockBlockedUntil: nextSecurity.unlockBlockedUntil,
         });
         if (__DEV__) {
           console.log('[auth] pin unlock rejected', {
-            failedUnlockAttempts,
-            blocked: shouldBlock,
+            failedUnlockAttempts: nextSecurity.failedUnlockAttempts,
+            cooldownMs,
           });
         }
       }
@@ -387,7 +396,10 @@ export const useAppStore = create<StoreState>((set, get) => ({
       if (scope === 'vault') {
         get().unlockVault();
       } else {
+        const nextSecurity = clearUnlockLockout(get().security);
+        await persistSecurityConfig(nextSecurity);
         set({
+          security: nextSecurity,
           isUnlocked: true,
           privacyOverlayVisible: false,
           lastInteractionAt: Date.now(),
@@ -550,10 +562,22 @@ export const useAppStore = create<StoreState>((set, get) => ({
   },
   importBackupFile: async (encryptedContents, password) => {
     const restoredSettings = await restoreEncryptedBackup({ encryptedContents, password });
-    const nextSecurity = { ...get().security, autoLockSeconds: restoredSettings.autoLockSeconds };
+    const nextSecurity = clearUnlockLockout({
+      ...get().security,
+      autoLockSeconds: restoredSettings.autoLockSeconds,
+    });
     await persistSecurityConfig(nextSecurity);
+    await clearMaterializedSecureFiles();
     await get().refreshData();
-    set({ security: nextSecurity });
+    set({
+      security: nextSecurity,
+      isUnlocked: false,
+      privacyOverlayVisible: true,
+      vaultUnlockedUntil: null,
+      failedUnlockAttempts: 0,
+      unlockBlockedUntil: null,
+      lastInteractionAt: Date.now(),
+    });
   },
   exportSharedTripFile: async (tripId) => {
     const { uri, packet } = await exportSharedTripPacket(get().data, tripId);

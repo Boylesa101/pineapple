@@ -1,6 +1,7 @@
 package com.pineapple.travel
 import expo.modules.splashscreen.SplashScreenManager
 
+import android.view.WindowManager
 import android.os.Build
 import android.os.Bundle
 
@@ -21,6 +22,10 @@ class MainActivity : ReactActivity() {
     SplashScreenManager.registerOnActivity(this)
     // @generated end expo-splashscreen
     super.onCreate(null)
+    window.setFlags(
+      WindowManager.LayoutParams.FLAG_SECURE,
+      WindowManager.LayoutParams.FLAG_SECURE
+    )
   }
 
   /**
