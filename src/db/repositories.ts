@@ -13,6 +13,7 @@ import { normalizeHealthCardData } from '@/utils/healthCard';
 import { deleteLocalFile } from '@/utils/fileStorage';
 import { normalizePaymentCardData } from '@/utils/paymentCard';
 import { normalizePassportData } from '@/utils/passport';
+import { normalizeTripRecord } from '@/utils/trips';
 import type {
   AppDataSnapshot,
   AppPreferences,
@@ -230,7 +231,7 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     : defaultAppPreferences();
 
   return {
-    trips,
+    trips: trips.map((trip) => normalizeTripRecord(trip)),
     travellers,
     documents: documents.map((document) =>
       normalizeDocumentRecord({
@@ -280,28 +281,41 @@ export async function upsertTrip(input: TripDraft) {
   const timestamp = now();
   const id = input.id ?? createId('trip');
   const existing = input.id
-    ? await db.getFirstAsync<{ coverImageUri: string | null }>('SELECT coverImageUri FROM trips WHERE id = ?', input.id)
+    ? await db.getFirstAsync<{ coverImageUri: string | null }>(
+        'SELECT coverImageUri FROM trips WHERE id = ?',
+        input.id
+      )
     : null;
 
   await db.runAsync(
-    `INSERT INTO trips (id, name, destination, startDate, endDate, coverImageUri, notes, status, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO trips (
+      id, name, destination, destinationType, startDate, endDate, coverImageUri, heroImageRemoteUrl, heroImageStatus, notes, transferSummary, status, createdAt, updatedAt
+    )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        destination = excluded.destination,
+       destinationType = excluded.destinationType,
        startDate = excluded.startDate,
        endDate = excluded.endDate,
        coverImageUri = excluded.coverImageUri,
+       heroImageRemoteUrl = excluded.heroImageRemoteUrl,
+       heroImageStatus = excluded.heroImageStatus,
        notes = excluded.notes,
+       transferSummary = excluded.transferSummary,
        status = excluded.status,
        updatedAt = excluded.updatedAt`,
     id,
     input.name,
     input.destination,
+    input.destinationType ?? 'unknown',
     input.startDate,
     input.endDate,
-    input.coverImageUri,
-    input.notes,
+    input.coverImageUri ?? null,
+    input.heroImageRemoteUrl ?? null,
+    input.heroImageStatus ?? 'idle',
+    input.notes ?? '',
+    input.transferSummary ?? '',
     input.status,
     timestamp,
     timestamp

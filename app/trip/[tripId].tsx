@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Image } from 'expo-image';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -17,6 +16,7 @@ import { DateTimeField } from '@/components/DateTimeField';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
 import { ListRow } from '@/components/ListRow';
+import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { colors, spacing } from '@/constants/theme';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
@@ -77,7 +77,7 @@ const documentTypeLabels = {
 
 export default function TripDetailScreen() {
   const router = useRouter();
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId, focus } = useLocalSearchParams<{ tripId: string; focus?: string }>();
   const {
     data,
     setActiveTrip,
@@ -331,7 +331,7 @@ export default function TripDetailScreen() {
 
   return (
     <AppScreen title={trip.name} subtitle={tripDateRange(trip.startDate, trip.endDate)}>
-      {trip.coverImageUri ? <Image source={trip.coverImageUri} style={styles.cover} contentFit="cover" /> : null}
+      {trip.coverImageUri ? <ManagedFileImage uri={trip.coverImageUri} style={styles.cover} /> : null}
 
       <AppCard>
         <Text style={styles.destination}>{trip.destination}</Text>
@@ -363,6 +363,21 @@ export default function TripDetailScreen() {
           {trip.notes || (trip.status === 'completed' ? 'This trip is complete and kept locally for reference.' : 'Add notes, reminders, and local context for the trip.')}
         </Text>
       </AppCard>
+
+      {focus ? (
+        <AppCard title="Focused area">
+          <InfoChip
+            label={
+              focus === 'travel'
+                ? 'Flight Info Centre'
+                : focus === 'hotel'
+                  ? 'Hotel Info'
+                  : 'Transfers / pickup information'
+            }
+            tone="blue"
+          />
+        </AppCard>
+      ) : null}
 
       <AppCard title="Trip overview">
         <View style={styles.metrics}>
@@ -545,7 +560,7 @@ export default function TripDetailScreen() {
         />
       </AppCard>
 
-      <AppCard title="Flights / travel" right={<AppButton label="Add" tone="secondary" onPress={() => openSegmentEditor()} />}>
+      <AppCard title="Flight Info Centre" right={<AppButton label="Add" tone="secondary" onPress={() => openSegmentEditor()} />}>
         {bundle.travelSegments.length ? (
           bundle.travelSegments.map((segment) => (
             <ListRow
@@ -572,7 +587,7 @@ export default function TripDetailScreen() {
         )}
       </AppCard>
 
-      <AppCard title="Hotel" right={<AppButton label="Add" tone="secondary" onPress={() => openHotelEditor()} />}>
+      <AppCard title="Hotel Info" right={<AppButton label="Add" tone="secondary" onPress={() => openHotelEditor()} />}>
         {bundle.hotelStays.length ? (
           bundle.hotelStays.map((hotel) => (
             <ListRow
@@ -595,6 +610,17 @@ export default function TripDetailScreen() {
           <EmptyState
             title="No hotel saved"
             description="Add hotel name, address, phone number, booking ref, dates, and notes."
+          />
+        )}
+      </AppCard>
+
+      <AppCard title="Transfers / pickup">
+        {trip.transferSummary ? (
+          <Text style={styles.notes}>{trip.transferSummary}</Text>
+        ) : (
+          <EmptyState
+            title="No transfer details saved"
+            description="Add airport pickup, car hire handoff, or transfer notes in the trip editor so they are easy to reach from the trip card."
           />
         )}
       </AppCard>

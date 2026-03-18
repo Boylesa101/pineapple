@@ -1,4 +1,6 @@
 export type TripStatus = 'upcoming' | 'active' | 'completed';
+export type DestinationType = 'country' | 'place' | 'unknown';
+export type HeroImageStatus = 'idle' | 'loading' | 'ready' | 'failed';
 export type DocumentType =
   | 'passport'
   | 'ghic'
@@ -50,10 +52,14 @@ export interface Trip {
   id: string;
   name: string;
   destination: string;
+  destinationType: DestinationType;
   startDate: string;
   endDate: string;
   coverImageUri: string | null;
+  heroImageRemoteUrl: string | null;
+  heroImageStatus: HeroImageStatus;
   notes: string;
+  transferSummary: string;
   status: TripStatus;
   createdAt: string;
   updatedAt: string;

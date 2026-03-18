@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 - 2026-03-18
+
+- Trip hero image upgrade: trip cards now resolve destination imagery automatically from the destination text, distinguish country-only entries from places, cache the chosen image locally after the first fetch, and fall back cleanly when no image can be resolved
+- Premium trip-card redesign: trips now render as taller image-led cards with larger white destination text, dark readability overlays, and quick right-side shortcuts into flight info, hotel info, and transfer / pickup details
+- Main-screen layout tidy-up: the home action row now keeps `Document Vault` and `SOS` at matching widths with cleaner side-by-side spacing while preserving the approved Pineapple shell
+- Expanded local file protection: trip hero images now join Vault attachments in encrypted-at-rest Pineapple storage, and legacy plain trip covers are migrated into the protected format during bootstrap when possible
+- New trip data wiring: trips now store destination type, remote hero reference, local cached hero state, and transfer / pickup summary without breaking older trips or older backups
+- Reliability pass: destination-image lookup is non-blocking, failed lookups never block trip creation, and the app continues to render stable fallback cards offline
+
 ## 1.5.2 - 2026-03-17
 
 - Auth/storage/OCR/backup audit pass: traced the live auth and data-protection paths, removed remaining plaintext Vault attachment writes, and tightened the post-audit weak spots instead of only documenting them

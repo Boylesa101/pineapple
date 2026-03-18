@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 11;
+const DATABASE_VERSION = 12;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -9,10 +9,14 @@ CREATE TABLE IF NOT EXISTS trips (
   id TEXT PRIMARY KEY NOT NULL,
   name TEXT NOT NULL,
   destination TEXT NOT NULL,
+  destinationType TEXT NOT NULL DEFAULT 'unknown',
   startDate TEXT NOT NULL,
   endDate TEXT NOT NULL,
   coverImageUri TEXT,
+  heroImageRemoteUrl TEXT,
+  heroImageStatus TEXT NOT NULL DEFAULT 'idle',
   notes TEXT NOT NULL DEFAULT '',
+  transferSummary TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
@@ -281,6 +285,13 @@ async function runPhaseTwoMigration(db: SQLiteDatabase) {
   `);
 }
 
+async function runPhaseTwelveMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'trips', 'destinationType', "TEXT NOT NULL DEFAULT 'unknown'");
+  await ensureColumn(db, 'trips', 'heroImageRemoteUrl', 'TEXT');
+  await ensureColumn(db, 'trips', 'heroImageStatus', "TEXT NOT NULL DEFAULT 'idle'");
+  await ensureColumn(db, 'trips', 'transferSummary', "TEXT NOT NULL DEFAULT ''");
+}
+
 async function runPhaseThreeMigration(db: SQLiteDatabase) {
   await db.execAsync(`
     INSERT OR IGNORE INTO app_preferences (
@@ -386,6 +397,10 @@ export async function runMigrations(db: SQLiteDatabase) {
   }
   if (version < 11) {
     await runPhaseElevenMigration(db);
+  }
+
+  if (version < 12) {
+    await runPhaseTwelveMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

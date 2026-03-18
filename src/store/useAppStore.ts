@@ -26,7 +26,8 @@ import {
   upsertTripParticipant,
 } from '@/db/repositories';
 import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup';
-import { protectVaultDocumentsAtRest } from '@/services/documentProtection';
+import { protectStoredFilesAtRest } from '@/services/documentProtection';
+import { resolveTripHeroImage } from '@/services/destinationImageService';
 import { queueNotificationRefresh } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
 import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, resolveConflict } from '@/services/sync';
@@ -41,9 +42,11 @@ import {
   verifyPin,
 } from '@/utils/security';
 import { defaultAppExpiryPreferences } from '@/utils/documentExpiry';
+import { resolveDestinationType } from '@/utils/destinationImage';
 import { clearMaterializedSecureFiles } from '@/utils/fileStorage';
 import { loadOnboardingComplete, persistOnboardingComplete } from '@/utils/onboarding';
 import { deriveOnboardingCompletionStatus } from '@/utils/onboardingState';
+import { normalizeDestinationLabel } from '@/utils/trips';
 import type {
   AppDataSnapshot,
   ConflictStatus,
@@ -162,6 +165,12 @@ function logStoreError(context: string, error: unknown) {
   }
 }
 
+function destinationNeedsHeroRefresh(current: TripDraft, previous?: { destination: string; coverImageUri: string | null } | null) {
+  const nextDestination = normalizeDestinationLabel(current.destination);
+  const previousDestination = normalizeDestinationLabel(previous?.destination ?? '');
+  return nextDestination !== previousDestination || !previous?.coverImageUri;
+}
+
 export const useAppStore = create<StoreState>((set, get) => ({
   isBootstrapped: false,
   isBusy: false,
@@ -203,7 +212,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
         security = defaultSecurityConfig;
       }
 
-      const protectionResult = await protectVaultDocumentsAtRest(data);
+      const protectionResult = await protectStoredFilesAtRest(data);
       data = protectionResult.snapshot;
 
       const hasCompletedOnboarding = deriveOnboardingCompletionStatus(onboardingStatus, {
@@ -418,9 +427,43 @@ export const useAppStore = create<StoreState>((set, get) => ({
     await get().refreshData();
   },
   saveTrip: async (draft) => {
-    const id = await upsertTrip(draft);
+    const existingTrip = draft.id ? get().data.trips.find((trip) => trip.id === draft.id) ?? null : null;
+    const nextDestinationType = resolveDestinationType(draft.destination);
+    const shouldRefreshHero = destinationNeedsHeroRefresh(draft, existingTrip);
+    const preparedDraft: TripDraft = {
+      ...draft,
+      destinationType: nextDestinationType,
+      heroImageRemoteUrl: shouldRefreshHero ? null : draft.heroImageRemoteUrl ?? existingTrip?.heroImageRemoteUrl ?? null,
+      heroImageStatus: shouldRefreshHero ? 'loading' : draft.heroImageStatus ?? existingTrip?.heroImageStatus ?? 'idle',
+      coverImageUri: shouldRefreshHero ? null : draft.coverImageUri ?? existingTrip?.coverImageUri ?? null,
+      transferSummary: draft.transferSummary ?? existingTrip?.transferSummary ?? '',
+    };
+
+    const id = await upsertTrip(preparedDraft);
     await get().refreshData();
     set({ activeTripId: id });
+
+    if (shouldRefreshHero) {
+      void (async () => {
+        const resolved = await resolveTripHeroImage(draft.destination);
+        const latestTrip = get().data.trips.find((trip) => trip.id === id);
+        if (!latestTrip || normalizeDestinationLabel(latestTrip.destination) !== normalizeDestinationLabel(draft.destination)) {
+          return;
+        }
+
+        await upsertTrip({
+          ...latestTrip,
+          destinationType: resolved.destinationType,
+          heroImageRemoteUrl: resolved.heroImageRemoteUrl,
+          heroImageStatus: resolved.heroImageStatus,
+          coverImageUri: resolved.coverImageUri,
+        });
+        await get().refreshData();
+      })().catch((error) => {
+        logStoreError('resolveTripHeroImage failed', error);
+      });
+    }
+
     return id;
   },
   saveTraveller: async (draft) => {

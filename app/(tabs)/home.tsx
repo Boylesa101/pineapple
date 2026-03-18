@@ -12,6 +12,7 @@ import { InfoChip } from '@/components/InfoChip';
 import { HeroCard } from '@/components/ui/HeroCard';
 import { MiniActionCard } from '@/components/ui/MiniActionCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { TripHeroCard } from '@/components/ui/TripHeroCard';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { countdownLabel, formatDateTime, formatShortDate } from '@/utils/date';
@@ -100,30 +101,29 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <SectionHeader title="Current trip" right="View all" />
         {dashboardTrip ? (
-          <Pressable onPress={openTrip}>
-            <AppCard>
-              <View style={styles.tripCard}>
-                <View style={styles.tripMeta}>
-                  <Text style={styles.tripTitle}>{dashboardTrip.name}</Text>
-                  <Text style={styles.tripText}>{tripDateRange(dashboardTrip.startDate, dashboardTrip.endDate)}</Text>
-                  <Text style={styles.tripText}>
-                    {bundle.travellers.length} traveller{bundle.travellers.length === 1 ? '' : 's'} · {bundle.hotelStays.length ? 'hotel' : 'no hotel'}
-                    {bundle.travelSegments.length ? ', flights' : ''}
-                    {bundle.itineraryEvents.length ? ', itinerary saved' : ''}
-                  </Text>
-                  <InfoChip
-                    label={
-                      expiryOverview.expiringCount || expiryOverview.expiredCount
-                        ? `${expiryOverview.expiredCount + expiryOverview.expiringCount} docs need attention`
-                        : 'All key docs look current'
-                    }
-                    tone={expiryOverview.expiredCount ? 'coral' : expiryOverview.expiringCount ? 'gold' : 'blue'}
-                  />
-                </View>
-                <MaterialIcons name="flight-takeoff" size={34} color={colors.primaryBlue} />
-              </View>
-            </AppCard>
-          </Pressable>
+          <TripHeroCard
+            trip={dashboardTrip}
+            subtitle={tripDateRange(dashboardTrip.startDate, dashboardTrip.endDate)}
+            meta={`${bundle.travellers.length} traveller${bundle.travellers.length === 1 ? '' : 's'} · ${bundle.hotelStays.length ? 'hotel saved' : 'no hotel yet'}${bundle.travelSegments.length ? ' · flights ready' : ''}`}
+            badgeLabel={
+              expiryOverview.expiringCount || expiryOverview.expiredCount
+                ? `${expiryOverview.expiredCount + expiryOverview.expiringCount} docs need attention`
+                : 'All key docs look current'
+            }
+            onPress={openTrip}
+            onOpenFlights={() => {
+              setActiveTrip(dashboardTrip.id);
+              router.push({ pathname: '/trip/[tripId]', params: { tripId: dashboardTrip.id, focus: 'travel' } });
+            }}
+            onOpenHotel={() => {
+              setActiveTrip(dashboardTrip.id);
+              router.push({ pathname: '/trip/[tripId]', params: { tripId: dashboardTrip.id, focus: 'hotel' } });
+            }}
+            onOpenTransfers={() => {
+              setActiveTrip(dashboardTrip.id);
+              router.push({ pathname: '/trip/[tripId]', params: { tripId: dashboardTrip.id, focus: 'transfer' } });
+            }}
+          />
         ) : (
           <AppCard>
             <EmptyState
@@ -139,18 +139,22 @@ export default function HomeScreen() {
         <SectionHeader title="Travel status" right={alertCount ? `${alertCount} alert${alertCount === 1 ? '' : 's'}` : 'All clear'} />
         <AppCard>
           <View style={styles.travelStatusGrid}>
-            <MiniActionCard
-              icon={<MaterialIcons name="folder" size={26} color={colors.primaryBlue} />}
-              title="Document Vault"
-              description={`${bundle.documents.length || 0} document records ready for travel.`}
-              onPress={openVault}
-            />
-            <MiniActionCard
-              icon={<MaterialIcons name="sos" size={26} color={colors.dangerRed} />}
-              title="SOS"
-              description="Open emergency tools, embassy notes, and support info."
-              onPress={() => router.push('/sos')}
-            />
+            <View style={styles.actionCell}>
+              <MiniActionCard
+                icon={<MaterialIcons name="folder" size={26} color={colors.primaryBlue} />}
+                title="Document Vault"
+                description={`${bundle.documents.length || 0} document records ready for travel.`}
+                onPress={openVault}
+              />
+            </View>
+            <View style={styles.actionCell}>
+              <MiniActionCard
+                icon={<MaterialIcons name="sos" size={26} color={colors.dangerRed} />}
+                title="SOS"
+                description="Open emergency tools, embassy notes, and support info."
+                onPress={() => router.push('/sos')}
+              />
+            </View>
           </View>
           <View style={styles.chipRow}>
             <InfoChip label={`${expiryOverview.expiredCount} expired`} tone={expiryOverview.expiredCount ? 'coral' : 'blue'} />
@@ -243,31 +247,12 @@ const styles = StyleSheet.create({
   section: {
     gap: spacing.sm,
   },
-  tripCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  tripMeta: {
-    flex: 1,
-    gap: 6,
-  },
-  tripTitle: {
-    color: colors.primaryBlueDark,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 16,
-  },
-  tripText: {
-    color: '#5C738A',
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    lineHeight: 19,
-  },
   travelStatusGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  actionCell: {
+    flex: 1,
   },
   chipRow: {
     marginTop: spacing.sm,

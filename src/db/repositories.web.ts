@@ -6,6 +6,7 @@ import {
   normalizeAppPreferences,
   normalizeDocumentRecord,
 } from '@/utils/documentExpiry';
+import { normalizeTripRecord } from '@/utils/trips';
 import type {
   AppDataSnapshot,
   AppPreferences,
@@ -70,6 +71,7 @@ async function readSnapshot() {
   const snapshot = (await get<AppDataSnapshot>(SNAPSHOT_KEY)) ?? emptySnapshot();
   return {
     ...snapshot,
+    trips: (snapshot.trips ?? []).map((trip) => normalizeTripRecord(trip as any)),
     documents: (snapshot.documents ?? []).map((document) => normalizeDocumentRecord(document as any)),
     appPreferences: {
       ...normalizeAppPreferences({
@@ -84,6 +86,7 @@ async function readSnapshot() {
 function normalizeSnapshot(snapshot: AppDataSnapshot) {
   return {
     ...snapshot,
+    trips: (snapshot.trips ?? []).map((trip) => normalizeTripRecord(trip as any)),
     documents: (snapshot.documents ?? []).map((document) => normalizeDocumentRecord(document as any)),
     appPreferences: normalizeAppPreferences({
       ...defaultAppPreferences(snapshot.appPreferences?.createdAt ?? now()),
@@ -118,6 +121,12 @@ export async function upsertTrip(input: TripDraft) {
     trips: withUpsert(snapshot.trips, {
       ...input,
       id,
+      destinationType: input.destinationType ?? 'unknown',
+      coverImageUri: input.coverImageUri ?? null,
+      heroImageRemoteUrl: input.heroImageRemoteUrl ?? null,
+      heroImageStatus: input.heroImageStatus ?? 'idle',
+      notes: input.notes ?? '',
+      transferSummary: input.transferSummary ?? '',
       createdAt: snapshot.trips.find((trip) => trip.id === id)?.createdAt ?? timestamp,
       updatedAt: timestamp,
     }),

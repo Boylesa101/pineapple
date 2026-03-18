@@ -41,7 +41,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Expo Go first-run testing now clears stale PIN state when no onboarding or trip data exists yet
 - Auto-lock after inactivity and best-effort privacy overlay for the app switcher
 - Mockup-matched blue/white shell with a safe-area-aware bottom nav for Home, Account, Vault, Trips, and SOS
-- Trip CRUD with optional local cover image
+- Trip CRUD with automatic destination hero imagery, local cached trip covers, and per-trip transfer / pickup notes
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
@@ -63,12 +63,13 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Packing lists grouped by category with multi-traveller assignment, templates, duplicate action, and priority flags
 - Flight / travel segment management
 - Hotel stay management
+- Automatic trip-card destination images that resolve from country or place text, cache locally after the first fetch, and fall back cleanly when offline or unresolved
 - Chronological itinerary timeline
 - Emergency reference storage per trip
 - High-contrast Travel Mode with family overview, traveller tabs/swipe, quick copy actions, and temporary sensitive reveal
 - Printable branded trip PDF export with inclusion/hide controls
 - Encrypted local backup export/import with `.pineapplebackup` files, validation, and attachment preservation where the original local files are still available
-- Vault-managed document attachments are encrypted at rest on-device and only materialized into a temporary readable cache when Pineapple needs to view or OCR them
+- Vault-managed document attachments and trip hero images are encrypted at rest on-device and only materialized into a temporary readable cache when Pineapple needs to view or OCR them
 - Local reminders and notifications for trip start, passport/GHIC expiry, missing insurance, packing completeness, flights, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
 - Dedicated expiry warnings screen with filters for all, expiring soon, expired, and notifications off
@@ -105,8 +106,9 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - PIN configuration is stored in device secure storage and verified locally
 - Backup exports are encrypted before they leave the app
 - Vault-managed document attachments are encrypted at rest in Pineapple storage on-device
-- Pineapple only materializes encrypted Vault files into a temporary readable cache when viewing or OCR needs access, and clears that cache when the app locks or backgrounds
-- Trip cover images and non-Vault exports remain normal app-managed local files unless they are inside an encrypted backup
+- Pineapple only materializes encrypted local sensitive files into a temporary readable cache when viewing or OCR needs access, and clears that cache when the app locks or backgrounds
+- Trip hero images are now stored in the same encrypted-at-rest local format as Vault attachments; non-Vault exports still remain normal app-managed files unless they are inside an encrypted backup
+- Pineapple still uses `expo-sqlite` for structured local records, so whole-database encryption is not yet in place; sensitive file attachments are protected separately instead of claiming full SQLCipher-style database encryption
 - Transient picker/cache copies are removed after import so scans are not left duplicated in common temp locations unnecessarily
 - OCR-generated temporary images are cleaned up after use
 

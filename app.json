@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pineapple",
     "slug": "pineapple",
-    "version": "1.5.2",
+    "version": "1.6.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,10 +15,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pineapple.travel",
-      "buildNumber": "27"
+      "buildNumber": "28"
     },
     "android": {
-      "versionCode": 27,
+      "versionCode": 28,
       "package": "com.pineapple.travel",
       "adaptiveIcon": {
         "backgroundColor": "#F7E7CE",
@@ -40,7 +40,9 @@
       "expo-document-picker",
       "expo-local-authentication",
       "expo-notifications",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-sharing",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": false

@@ -34,10 +34,14 @@ export default function CreateFirstTripScreen() {
     const tripDraft = {
       name: destination ? `${destination} getaway` : '',
       destination,
+      destinationType: 'unknown' as const,
       startDate,
       endDate,
       coverImageUri: null,
+      heroImageRemoteUrl: null,
+      heroImageStatus: 'idle' as const,
       notes: '',
+      transferSummary: '',
       status: 'upcoming' as const,
     };
 

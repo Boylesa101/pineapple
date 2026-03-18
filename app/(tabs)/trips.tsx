@@ -2,8 +2,6 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -13,21 +11,25 @@ import { AppTextField } from '@/components/AppTextField';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { EmptyState } from '@/components/EmptyState';
+import { TripHeroCard } from '@/components/ui/TripHeroCard';
 import { colors, radii, spacing } from '@/constants/theme';
 import { packingTemplates, type PackingTemplateId } from '@/data/packingTemplates';
 import { useAppStore } from '@/store/useAppStore';
 import type { TripDraft, TripStatus } from '@/types/models';
 import { tripDateRange } from '@/utils/format';
-import { cleanupImportedSource, copyIntoAppStorage } from '@/utils/fileStorage';
 import { validateTrip } from '@/utils/validation';
 
 const emptyTripDraft: TripDraft = {
   name: '',
   destination: '',
+  destinationType: 'unknown',
   startDate: new Date().toISOString(),
   endDate: new Date().toISOString(),
   coverImageUri: null,
+  heroImageRemoteUrl: null,
+  heroImageStatus: 'idle',
   notes: '',
+  transferSummary: '',
   status: 'upcoming',
 };
 
@@ -51,31 +53,6 @@ export default function TripsScreen() {
     setDraft(current);
     setTemplateId('none');
     setVisible(true);
-  }
-
-  async function pickCover() {
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          'Photos permission needed',
-          'Allow photo library access if you want to add a local cover image for this trip.'
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-      });
-
-      if (result.canceled || !result.assets[0]) return;
-      const localUri = await copyIntoAppStorage(result.assets[0].uri, 'trips', result.assets[0].mimeType);
-      await cleanupImportedSource(result.assets[0].uri);
-      setDraft((current) => ({ ...current, coverImageUri: localUri }));
-    } catch {
-      Alert.alert('Cover image unavailable', 'Pineapple could not import that image right now. Try a different photo.');
-    }
   }
 
   async function handleSave() {
@@ -109,20 +86,30 @@ export default function TripsScreen() {
         </AppCard>
       ) : (
         sortedTrips.map((trip) => (
-          <AppCard key={trip.id}>
-            {trip.coverImageUri ? <Image source={trip.coverImageUri} style={styles.cover} contentFit="cover" /> : null}
-            <Text style={styles.tripName}>{trip.name}</Text>
-            <Text style={styles.tripMeta}>{trip.destination}</Text>
-            <Text style={styles.tripMeta}>{tripDateRange(trip.startDate, trip.endDate)}</Text>
+          <View key={trip.id} style={styles.tripBlock}>
+            <TripHeroCard
+              trip={trip}
+              subtitle={tripDateRange(trip.startDate, trip.endDate)}
+              meta={trip.transferSummary || 'Flight, hotel, and pickup shortcuts stay ready on this card.'}
+              badgeLabel={trip.heroImageStatus === 'ready' ? null : trip.heroImageStatus === 'loading' ? 'Loading image' : 'Fallback background'}
+              onPress={() => {
+                setActiveTrip(trip.id);
+                router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id } });
+              }}
+              onOpenFlights={() => {
+                setActiveTrip(trip.id);
+                router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'travel' } });
+              }}
+              onOpenHotel={() => {
+                setActiveTrip(trip.id);
+                router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'hotel' } });
+              }}
+              onOpenTransfers={() => {
+                setActiveTrip(trip.id);
+                router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'transfer' } });
+              }}
+            />
             <View style={styles.actions}>
-              <AppButton
-                label="Open"
-                tone="primary"
-                onPress={() => {
-                  setActiveTrip(trip.id);
-                  router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id } });
-                }}
-              />
               <AppButton label="Edit" tone="secondary" onPress={() => openEditTrip(trip)} />
               <Pressable
                 onPress={() =>
@@ -140,7 +127,7 @@ export default function TripsScreen() {
                 <MaterialIcons name="delete-outline" size={20} color={colors.danger} />
               </Pressable>
             </View>
-          </AppCard>
+          </View>
         ))
       )}
 
@@ -180,8 +167,16 @@ export default function TripsScreen() {
           </View>
         ) : null}
         <AppTextField label="Notes" value={draft.notes} onChangeText={(value) => setDraft((current) => ({ ...current, notes: value }))} multiline placeholder="Check airport parking, request late checkout..." />
-        {draft.coverImageUri ? <Image source={draft.coverImageUri} style={styles.cover} contentFit="cover" /> : null}
-        <AppButton label={draft.coverImageUri ? 'Change cover image' : 'Add cover image'} tone="secondary" onPress={pickCover} />
+        <AppTextField
+          label="Transfers / pickup info"
+          value={draft.transferSummary}
+          onChangeText={(value) => setDraft((current) => ({ ...current, transferSummary: value }))}
+          multiline
+          placeholder="Airport transfer booked with Blue Cars at 14:20, meeting point T2 pickup bay 6."
+        />
+        <Text style={styles.autoImageNote}>
+          Pineapple picks a destination image automatically from the place you enter and keeps a local cached copy after the first lookup.
+        </Text>
         <AppButton label="Save trip" onPress={handleSave} loading={saving} />
       </AppModal>
     </AppScreen>
@@ -189,20 +184,8 @@ export default function TripsScreen() {
 }
 
 const styles = StyleSheet.create({
-  cover: {
-    width: '100%',
-    height: 160,
-    borderRadius: radii.md,
-  },
-  tripName: {
-    color: colors.nightNavy,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 20,
-  },
-  tripMeta: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
+  tripBlock: {
+    gap: spacing.sm,
   },
   actions: {
     flexDirection: 'row',
@@ -220,5 +203,11 @@ const styles = StyleSheet.create({
     color: colors.nightNavy,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
+  },
+  autoImageNote: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
   },
 });
