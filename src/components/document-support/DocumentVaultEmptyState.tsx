@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { PineappleMark } from '@/brand/PineappleMark';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -27,13 +28,13 @@ type Props = {
 export function DocumentVaultEmptyState(props: Props) {
   return (
     <View style={styles.wrapper}>
-      <View style={styles.hero}>
+      <LinearGradient colors={['#0D6EFD', '#3F8CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <PineappleMark size={64} simplified />
         <Text style={styles.title}>Your secure travel documents live here</Text>
         <Text style={styles.description}>
           Keep passports, licences, health cards, insurance records, tickets, and other travel paperwork in one local vault on this device.
         </Text>
-      </View>
+      </LinearGradient>
       <DocumentSetupFlow {...props} />
     </View>
   );
@@ -48,18 +49,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
     borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: '#FFF9F0',
   },
   title: {
-    color: colors.nightNavy,
+    color: colors.white,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 20,
     textAlign: 'center',
   },
   description: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.9)',
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     lineHeight: 20,

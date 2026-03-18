@@ -90,8 +90,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: '#E5D8C8',
-    backgroundColor: '#FFFDF8',
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: colors.card,
   },
   title: {
     color: colors.nightNavy,

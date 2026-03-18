@@ -56,8 +56,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: '#E4D8CA',
-    backgroundColor: '#FBF7F0',
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: '#F8FBFF',
   },
   header: {
     flexDirection: 'row',

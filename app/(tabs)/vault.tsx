@@ -14,7 +14,10 @@ import { AvatarBadge } from '@/components/AvatarBadge';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { CopyDataButton } from '@/components/document-support/CopyDataButton';
-import { DocumentAddActionsCard } from '@/components/document-support/DocumentAddActionsCard';
+import { DocumentAddSheet } from '@/components/document-support/DocumentAddSheet';
+import { DocumentFloatingActionButton } from '@/components/document-support/DocumentFloatingActionButton';
+import { DocumentNoticeBanner } from '@/components/document-support/DocumentNoticeBanner';
+import { DocumentScanFlowModal, type DocumentScanStage } from '@/components/document-support/DocumentScanFlowModal';
 import { DocumentScanViewerModal } from '@/components/document-support/DocumentScanViewerModal';
 import { ExtractedFieldEditor } from '@/components/document-support/ExtractedFieldEditor';
 import { VerificationBadge } from '@/components/document-support/VerificationBadge';
@@ -113,6 +116,27 @@ type ScanViewerState = {
   mimeType?: string | null;
   emptyText?: string;
 };
+type EditorNotice = {
+  tone: 'info' | 'warning' | 'danger' | 'success';
+  title: string;
+  description: string;
+};
+type GuidedScanState = {
+  mode: 'scan' | 'ocr_import';
+  documentType: DocumentType;
+  stage: DocumentScanStage;
+  previewUri?: string | null;
+  mimeType?: string | null;
+  detail?: string;
+  warningText?: string | null;
+};
+
+const guidedFormalTypeOptions: DocumentType[] = ['insurance', 'visa', 'boarding_pass', 'hotel_booking', 'excursion_ticket', 'custom'];
+const guidedImportTypeOptions: DocumentType[] = ['passport', 'driving_licence', 'ghic', 'insurance'];
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export default function VaultScreen() {
   const router = useRouter();
@@ -146,6 +170,9 @@ export default function VaultScreen() {
   const [paymentCardOpen, setPaymentCardOpen] = useState(false);
   const [formalDocumentOpen, setFormalDocumentOpen] = useState(false);
   const [scanViewer, setScanViewer] = useState<ScanViewerState | null>(null);
+  const [guidedScan, setGuidedScan] = useState<GuidedScanState | null>(null);
+  const [addSheetVisible, setAddSheetVisible] = useState(false);
+  const [editorNotice, setEditorNotice] = useState<EditorNotice | null>(null);
   const [setupTravellerName, setSetupTravellerName] = useState('');
   const [savingSetupTraveller, setSavingSetupTraveller] = useState(false);
   const [passportOcrLoading, setPassportOcrLoading] = useState(false);
@@ -260,9 +287,50 @@ export default function VaultScreen() {
   }
 
   function openExtractedFieldEditor(sourceDocument: DocumentDraft) {
+    setEditorNotice(null);
     setDraft(withSpecializedDocumentData(sourceDocument));
     setDetailVisible(false);
     setEditorVisible(true);
+  }
+
+  function resolveFormalDocumentType(type: DocumentType) {
+    if (guidedFormalTypeOptions.includes(type)) {
+      return type;
+    }
+    return 'insurance';
+  }
+
+  function resolveImportTargetType(type: DocumentType) {
+    if (guidedImportTypeOptions.includes(type)) {
+      return type;
+    }
+    return 'passport';
+  }
+
+  function getScanDocumentLabel(documentType: DocumentType) {
+    if (documentType === 'ghic') {
+      return 'Health card';
+    }
+
+    if (isFormalDocumentType(documentType)) {
+      return documentLabels[documentType];
+    }
+
+    return documentLabels[documentType];
+  }
+
+  function openGuidedDocumentFlow(mode: 'scan' | 'ocr_import', documentType: DocumentType) {
+    setAddSheetVisible(false);
+    setEditorNotice(null);
+    setGuidedScan({
+      mode,
+      documentType,
+      stage: 'ready',
+      detail:
+        mode === 'scan'
+          ? 'Position the document so all edges are visible. Keep it flat, reduce glare, and hold steady while Pineapple prepares the OCR review.'
+          : 'Choose a clear photo or PDF from this device. Pineapple will secure it locally and prepare the extracted fields for review.',
+    });
   }
 
   function getDocumentDetailTitle(document: (typeof selectedDocument)) {
@@ -307,18 +375,6 @@ export default function VaultScreen() {
       return true;
     });
   }, [bundle.documents, primaryFilter, travellerFilter, typeFilter]);
-
-  const addDocumentTypeOptions: Array<{ label: string; value: DocumentType }> = useMemo(
-    () => [
-      { label: 'Passport', value: 'passport' },
-      { label: 'Driving licence', value: 'driving_licence' },
-      { label: 'GHIC / EHIC', value: 'ghic' },
-      { label: 'Insurance', value: 'insurance' },
-      { label: 'Boarding pass', value: 'boarding_pass' },
-      { label: 'Other', value: 'custom' },
-    ],
-    []
-  );
 
   const groupedDocuments = useMemo(() => {
     if (groupMode === 'flat') {
@@ -437,95 +493,33 @@ export default function VaultScreen() {
     }
   }
 
-  async function handleSourcePick(source: DocumentAssetSource, documentType: DocumentType = 'custom') {
-    if (!selectedTripId) return;
-    const asset = await pickManagedDocumentAsset(source);
-    if (!asset) {
-      return;
-    }
-
-    const nextDraft = buildStarterDocumentDraft(documentType, asset);
-    if (!nextDraft) {
-      return;
-    }
-    setDraft(nextDraft);
-    setEditorVisible(true);
-  }
-
   async function runInitialOcrIfAvailable(nextDraft: DocumentDraft) {
     if (nextDraft.documentType === 'passport') {
-      await runPassportOcrOnDraft(nextDraft);
-      return;
+      return runPassportOcrOnDraft(nextDraft);
     }
     if (nextDraft.documentType === 'driving_licence') {
-      await runDrivingLicenceOcrOnDraft(nextDraft);
-      return;
+      return runDrivingLicenceOcrOnDraft(nextDraft);
     }
     if (nextDraft.documentType === 'ghic') {
-      await runHealthCardOcrOnDraft(nextDraft);
-      return;
+      return runHealthCardOcrOnDraft(nextDraft);
     }
     if (isFormalDocumentType(nextDraft.documentType)) {
-      await runFormalDocumentOcrOnDraft(nextDraft);
+      return runFormalDocumentOcrOnDraft(nextDraft);
     }
+    return null;
   }
 
   async function startDocumentFlow(action: 'scan' | 'ocr_import' | 'manual', documentType: DocumentType) {
     if (action === 'manual') {
+      setAddSheetVisible(false);
       openManualDocument(documentType);
       return;
     }
 
-    if (action === 'scan') {
-      const asset = await pickManagedDocumentAsset('camera');
-      if (!asset) {
-        return;
-      }
-      const nextDraft = buildStarterDocumentDraft(documentType, asset);
-      if (!nextDraft) {
-        return;
-      }
-      setDraft(nextDraft);
-      setEditorVisible(true);
-      await runInitialOcrIfAvailable(nextDraft);
+    if (action === 'scan' || action === 'ocr_import') {
+      openGuidedDocumentFlow(action, documentType);
       return;
     }
-
-    Alert.alert('Choose import source', 'Use an existing image, photo, or PDF file for OCR.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Photos',
-        onPress: async () => {
-          const asset = await pickManagedDocumentAsset('photos');
-          if (!asset) {
-            return;
-          }
-          const nextDraft = buildStarterDocumentDraft(documentType, asset);
-          if (!nextDraft) {
-            return;
-          }
-          setDraft(nextDraft);
-          setEditorVisible(true);
-          await runInitialOcrIfAvailable(nextDraft);
-        },
-      },
-      {
-        text: 'Files / PDFs',
-        onPress: async () => {
-          const asset = await pickManagedDocumentAsset('files');
-          if (!asset) {
-            return;
-          }
-          const nextDraft = buildStarterDocumentDraft(documentType, asset);
-          if (!nextDraft) {
-            return;
-          }
-          setDraft(nextDraft);
-          setEditorVisible(true);
-          await runInitialOcrIfAvailable(nextDraft);
-        },
-      },
-    ]);
   }
 
   async function handleDraftScanPick(side: DocumentScanSide, source: DocumentAssetSource) {
@@ -550,13 +544,100 @@ export default function VaultScreen() {
             secondaryLocalFileUri: asset.localFileUri,
             secondaryPreviewUri: asset.previewUri,
             secondaryMimeType: asset.mimeType,
-          };
+        };
     });
+  }
+
+  async function handleGuidedSourcePick(source: DocumentAssetSource) {
+    if (!guidedScan) {
+      return;
+    }
+
+    setGuidedScan((current) =>
+      current
+        ? {
+            ...current,
+            stage: 'capturing',
+            detail:
+              source === 'camera'
+                ? 'Opening the camera and preparing a secure local capture.'
+                : 'Securing the selected file locally before Pineapple reviews the document.',
+            warningText: null,
+          }
+        : current
+    );
+
+    const asset = await pickManagedDocumentAsset(source);
+    if (!asset) {
+      setGuidedScan(null);
+      return;
+    }
+
+    setGuidedScan((current) =>
+      current
+        ? {
+            ...current,
+            stage: 'capturing',
+            previewUri: asset.previewUri ?? asset.localFileUri,
+            mimeType: asset.mimeType,
+            detail: 'Document captured. Hold steady while Pineapple prepares the extracted fields.',
+            warningText: null,
+          }
+        : current
+    );
+
+    await wait(420);
+
+    const nextDraft = buildStarterDocumentDraft(guidedScan.documentType, asset);
+    if (!nextDraft) {
+      setGuidedScan(null);
+      return;
+    }
+
+    setDraft(nextDraft);
+    setGuidedScan((current) =>
+      current
+        ? {
+            ...current,
+            stage: 'processing',
+            previewUri: asset.previewUri ?? asset.localFileUri,
+            mimeType: asset.mimeType,
+            detail: 'Extracting fields locally on this device and preparing the review screen.',
+            warningText: null,
+          }
+        : current
+    );
+
+    const notice = await runInitialOcrIfAvailable(nextDraft);
+
+    const terminalStage: DocumentScanStage =
+      notice?.tone === 'danger' ? 'error' : notice?.tone === 'warning' ? 'warning' : 'extracted';
+
+    setGuidedScan((current) =>
+      current
+        ? {
+            ...current,
+            stage: terminalStage,
+            previewUri: asset.previewUri ?? asset.localFileUri,
+            mimeType: asset.mimeType,
+            detail:
+              notice?.tone === 'danger'
+                ? 'OCR could not finish cleanly, but Pineapple kept the document and opened a manual review so you can continue.'
+                : 'The extracted fields are ready for review before you save the document.',
+            warningText: notice?.description ?? null,
+          }
+        : current
+    );
+
+    await wait(terminalStage === 'extracted' ? 520 : 760);
+    setGuidedScan(null);
+    setEditorVisible(true);
   }
 
   function openManualDocument(documentType: DocumentType = 'custom') {
     const nextDraft = buildStarterDocumentDraft(documentType);
     if (!nextDraft) return;
+    setEditorNotice(null);
     setDraft(nextDraft);
     setEditorVisible(true);
   }
@@ -612,6 +693,7 @@ export default function VaultScreen() {
     }
 
     await saveDocument(draft);
+    setEditorNotice(null);
     setEditorVisible(false);
     if (params.editDocumentId) {
       router.setParams({ editDocumentId: undefined });
@@ -676,13 +758,15 @@ export default function VaultScreen() {
   async function runPassportOcrOnDraft(sourceDraft: DocumentDraft, options?: { openEditor?: boolean }) {
     const openEditor = options?.openEditor ?? false;
     if (!hasPassportImageForOcr(sourceDraft)) {
-      Alert.alert(
-        'Image scan needed',
-        sourceDraft.localFileUri
+      const notice: EditorNotice = {
+        tone: 'warning',
+        title: 'Passport scan needed',
+        description: sourceDraft.localFileUri
           ? 'Passport OCR can read local image scans and PDFs in the Android build.'
-          : 'Attach a passport image or PDF first, then Pineapple can extract the MRZ and fill the passport fields for review.'
-      );
-      return;
+          : 'Attach a passport image or PDF first, then Pineapple can extract the MRZ and fill the passport fields for review.',
+      };
+      setEditorNotice(notice);
+      return notice;
     }
 
     try {
@@ -701,23 +785,38 @@ export default function VaultScreen() {
         setEditorVisible(true);
       }
 
-      Alert.alert(
-        'Passport fields extracted',
-        [
-          extracted.source === 'mrz'
-            ? 'Pineapple read the passport MRZ and filled the passport fields.'
-            : 'Pineapple filled the passport fields from the scan text.',
-          extracted.warnings.length ? `Review notes:\n- ${extracted.warnings.join('\n- ')}` : 'Review them before saving.',
-        ].join('\n\n')
-      );
+      const notice: EditorNotice = extracted.warnings.length
+        ? {
+            tone: 'warning',
+            title: 'Passport extracted with review notes',
+            description: [
+              extracted.source === 'mrz'
+                ? 'Pineapple read the passport MRZ and filled the passport fields.'
+                : 'Pineapple filled the passport fields from the scan text.',
+              `Review: ${extracted.warnings.join(' ')}`,
+            ].join(' '),
+          }
+        : {
+            tone: 'success',
+            title: 'Passport extracted',
+            description:
+              extracted.source === 'mrz'
+                ? 'Pineapple read the passport MRZ and filled the passport fields for review.'
+                : 'Pineapple filled the passport fields from the scan text for review.',
+          };
+      setEditorNotice(notice);
+      return notice;
     } catch (error) {
-      Alert.alert(
-        'Passport OCR unavailable',
-        toUserMessage(
+      const notice: EditorNotice = {
+        tone: 'danger',
+        title: 'Passport OCR unavailable',
+        description: toUserMessage(
           error,
           'Pineapple could not read that passport scan right now. You can still enter the passport fields manually.'
-        )
-      );
+        ),
+      };
+      setEditorNotice(notice);
+      return notice;
     } finally {
       setPassportOcrLoading(false);
     }
@@ -744,13 +843,15 @@ export default function VaultScreen() {
   async function runDrivingLicenceOcrOnDraft(sourceDraft: DocumentDraft, options?: { openEditor?: boolean }) {
     const openEditor = options?.openEditor ?? false;
     if (!canRunDrivingLicenceOcr(sourceDraft)) {
-      Alert.alert(
-        'Scan needed',
-        sourceDraft.localFileUri
+      const notice: EditorNotice = {
+        tone: 'warning',
+        title: 'Driving licence scan needed',
+        description: sourceDraft.localFileUri
           ? 'Driving licence OCR can read the front image or PDF in the Android build.'
-          : 'Attach the front driving licence scan first, then Pineapple can extract the holder record for review.'
-      );
-      return;
+          : 'Attach the front driving licence scan first, then Pineapple can extract the holder record for review.',
+      };
+      setEditorNotice(notice);
+      return notice;
     }
 
     try {
@@ -769,21 +870,30 @@ export default function VaultScreen() {
         setEditorVisible(true);
       }
 
-      Alert.alert(
-        'Licence fields extracted',
-        [
-          'Pineapple filled the driving licence fields from the front scan.',
-          extracted.warnings.length ? `Review notes:\n- ${extracted.warnings.join('\n- ')}` : 'Review them before saving.',
-        ].join('\n\n')
-      );
+      const notice: EditorNotice = extracted.warnings.length
+        ? {
+            tone: 'warning',
+            title: 'Driving licence extracted with review notes',
+            description: `Pineapple filled the driving licence fields from the front scan. Review: ${extracted.warnings.join(' ')}`,
+          }
+        : {
+            tone: 'success',
+            title: 'Driving licence extracted',
+            description: 'Pineapple filled the driving licence fields from the front scan for review.',
+          };
+      setEditorNotice(notice);
+      return notice;
     } catch (error) {
-      Alert.alert(
-        'Driving licence OCR unavailable',
-        toUserMessage(
+      const notice: EditorNotice = {
+        tone: 'danger',
+        title: 'Driving licence OCR unavailable',
+        description: toUserMessage(
           error,
           'Pineapple could not read that driving licence scan right now. You can still enter the licence fields manually.'
-        )
-      );
+        ),
+      };
+      setEditorNotice(notice);
+      return notice;
     } finally {
       setDrivingLicenceOcrLoading(false);
     }
@@ -810,13 +920,15 @@ export default function VaultScreen() {
   async function runHealthCardOcrOnDraft(sourceDraft: DocumentDraft, options?: { openEditor?: boolean }) {
     const openEditor = options?.openEditor ?? false;
     if (!canRunHealthCardOcr(sourceDraft)) {
-      Alert.alert(
-        'Scan needed',
-        sourceDraft.localFileUri
+      const notice: EditorNotice = {
+        tone: 'warning',
+        title: 'Health card scan needed',
+        description: sourceDraft.localFileUri
           ? 'Health-card OCR can read local image scans and PDFs in the Android build.'
-          : 'Attach a GHIC or EHIC scan first, then Pineapple can extract the card fields for review.'
-      );
-      return;
+          : 'Attach a GHIC or EHIC scan first, then Pineapple can extract the card fields for review.',
+      };
+      setEditorNotice(notice);
+      return notice;
     }
 
     try {
@@ -835,21 +947,30 @@ export default function VaultScreen() {
         setEditorVisible(true);
       }
 
-      Alert.alert(
-        'Health-card fields extracted',
-        [
-          'Pineapple filled the health-card fields from the scan.',
-          extracted.warnings.length ? `Review notes:\n- ${extracted.warnings.join('\n- ')}` : 'Review them before saving.',
-        ].join('\n\n')
-      );
+      const notice: EditorNotice = extracted.warnings.length
+        ? {
+            tone: 'warning',
+            title: 'Health card extracted with review notes',
+            description: `Pineapple filled the health-card fields from the scan. Review: ${extracted.warnings.join(' ')}`,
+          }
+        : {
+            tone: 'success',
+            title: 'Health card extracted',
+            description: 'Pineapple filled the health-card fields from the scan for review.',
+          };
+      setEditorNotice(notice);
+      return notice;
     } catch (error) {
-      Alert.alert(
-        'Health-card OCR unavailable',
-        toUserMessage(
+      const notice: EditorNotice = {
+        tone: 'danger',
+        title: 'Health-card OCR unavailable',
+        description: toUserMessage(
           error,
           'Pineapple could not read that health-card scan right now. You can still enter the card fields manually.'
-        )
-      );
+        ),
+      };
+      setEditorNotice(notice);
+      return notice;
     } finally {
       setHealthCardOcrLoading(false);
     }
@@ -876,13 +997,15 @@ export default function VaultScreen() {
   async function runFormalDocumentOcrOnDraft(sourceDraft: DocumentDraft, options?: { openEditor?: boolean }) {
     const openEditor = options?.openEditor ?? false;
     if (!canRunFormalDocumentOcr(sourceDraft)) {
-      Alert.alert(
-        'Scan needed',
-        sourceDraft.localFileUri
+      const notice: EditorNotice = {
+        tone: 'warning',
+        title: 'Document scan needed',
+        description: sourceDraft.localFileUri
           ? 'Formal-document OCR can read local image scans and PDFs in the Android build.'
-          : 'Attach a scan or PDF first, then Pineapple can extract document metadata for review.'
-      );
-      return;
+          : 'Attach a scan or PDF first, then Pineapple can extract document metadata for review.',
+      };
+      setEditorNotice(notice);
+      return notice;
     }
 
     try {
@@ -901,21 +1024,30 @@ export default function VaultScreen() {
         setEditorVisible(true);
       }
 
-      Alert.alert(
-        'Document fields extracted',
-        [
-          'Pineapple filled the formal-document fields from the scan.',
-          extracted.warnings.length ? `Review notes:\n- ${extracted.warnings.join('\n- ')}` : 'Review them before saving.',
-        ].join('\n\n')
-      );
+      const notice: EditorNotice = extracted.warnings.length
+        ? {
+            tone: 'warning',
+            title: 'Document fields extracted with review notes',
+            description: `Pineapple filled the formal-document fields from the scan. Review: ${extracted.warnings.join(' ')}`,
+          }
+        : {
+            tone: 'success',
+            title: 'Document fields extracted',
+            description: 'Pineapple filled the formal-document fields from the scan for review.',
+          };
+      setEditorNotice(notice);
+      return notice;
     } catch (error) {
-      Alert.alert(
-        'Formal-document OCR unavailable',
-        toUserMessage(
+      const notice: EditorNotice = {
+        tone: 'danger',
+        title: 'Formal-document OCR unavailable',
+        description: toUserMessage(
           error,
           'Pineapple could not read that document right now. You can still enter the document fields manually.'
-        )
-      );
+        ),
+      };
+      setEditorNotice(notice);
+      return notice;
     } finally {
       setFormalDocumentOcrLoading(false);
     }
@@ -940,11 +1072,25 @@ export default function VaultScreen() {
   }
 
   return (
-    <AppScreen title="Vault" subtitle="Traveller-specific documents, grouped views, and clear expiry warnings.">
+    <AppScreen
+      footer={<DocumentFloatingActionButton onPress={() => setAddSheetVisible(true)} />}
+      contentStyle={styles.screenContent}
+    >
+      <View style={styles.vaultHeader}>
+        <View style={styles.vaultHeaderCopy}>
+          <Text style={styles.vaultEyebrow}>Pineapple</Text>
+          <Text style={styles.vaultTitle}>Document Vault</Text>
+          <Text style={styles.vaultSubtitle}>Travel-ready identity records, cards, passes, and supporting paperwork stored locally on this device.</Text>
+        </View>
+        <Pressable onPress={() => setPinPromptVisible(true)} style={styles.vaultLockButton}>
+          <MaterialIcons name={isVaultUnlocked ? 'verified-user' : 'lock-outline'} size={20} color={colors.primaryBlue} />
+        </Pressable>
+      </View>
+
       <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
 
       {!!expiryWarnings.length ? (
-        <AppCard title="Expiry warnings" subtitle="Check these before you travel.">
+        <AppCard title="Expiry warnings" subtitle="Documents that need attention before travel.">
           <View style={styles.warningList}>
             {expiryWarnings.map((document) => (
               <InfoChip
@@ -956,24 +1102,6 @@ export default function VaultScreen() {
           </View>
         </AppCard>
       ) : null}
-
-      <AppCard title="Vault controls">
-        <DocumentAddActionsCard
-          title="Add a document"
-          description="Use OCR first for passports, licences, cards, passes, and similar travel records."
-          selectedType={addDocumentType}
-          onTypeChange={setAddDocumentType}
-          typeOptions={addDocumentTypeOptions}
-          onScan={() => startDocumentFlow('scan', addDocumentType)}
-          onImportForOcr={() => startDocumentFlow('ocr_import', addDocumentType)}
-          onManual={() => startDocumentFlow('manual', addDocumentType)}
-        />
-        <AppButton
-          label={isVaultUnlocked ? 'Vault unlocked' : 'Unlock previews'}
-          onPress={() => setPinPromptVisible(true)}
-          tone={isVaultUnlocked ? 'ghost' : 'secondary'}
-        />
-      </AppCard>
 
       {setupState.isFirstTime ? (
         <DocumentVaultEmptyState
@@ -1335,8 +1463,9 @@ export default function VaultScreen() {
 
       <AppModal
         visible={editorVisible}
-        title={draft?.id ? 'Edit document' : 'Add document'}
+        title={draft?.id ? 'Review document' : 'Add document'}
         onClose={() => {
+          setEditorNotice(null);
           setEditorVisible(false);
           if (params.editDocumentId) {
             router.setParams({ editDocumentId: undefined });
@@ -1345,6 +1474,37 @@ export default function VaultScreen() {
       >
         {draft ? (
           <>
+            {editorNotice ? (
+              <DocumentNoticeBanner tone={editorNotice.tone} title={editorNotice.title} description={editorNotice.description} />
+            ) : null}
+            {(draft.previewUri || draft.localFileUri) ? (
+              <AppCard title="Document source" subtitle="Review the attached image or PDF before you save the record.">
+                {draft.previewUri ? (
+                  <View style={styles.editorPreview}>
+                    <ManagedFileImage uri={draft.previewUri} mimeType={draft.mimeType} style={styles.editorPreview} contentFit="cover" />
+                  </View>
+                ) : (
+                  <View style={[styles.editorPreview, styles.editorPreviewPlaceholder]}>
+                    <MaterialIcons name={isDocumentPdfSource(draft.mimeType, draft.localFileUri) ? 'picture-as-pdf' : 'description'} size={34} color={colors.primaryBlue} />
+                    <Text style={styles.meta}>Original file attached locally.</Text>
+                  </View>
+                )}
+                {draft.localFileUri ? (
+                  <AppButton
+                    label={getDocumentSourceCtaLabel(isDocumentPdfSource(draft.mimeType, draft.localFileUri))}
+                    tone="secondary"
+                    onPress={() =>
+                      openScanViewer({
+                        title: `${documentLabels[draft.documentType]} source`,
+                        localFileUri: draft.localFileUri,
+                        previewUri: draft.previewUri,
+                        mimeType: draft.mimeType,
+                      })
+                    }
+                  />
+                ) : null}
+              </AppCard>
+            ) : null}
             <AppTextField
               label="Holder name"
               value={draft.holderName}
@@ -2201,11 +2361,104 @@ export default function VaultScreen() {
         mimeType={scanViewer?.mimeType ?? null}
         emptyText={scanViewer?.emptyText}
       />
+
+      <DocumentAddSheet
+        visible={addSheetVisible}
+        importTarget={resolveImportTargetType(addDocumentType)}
+        onImportTargetChange={setAddDocumentType}
+        onClose={() => setAddSheetVisible(false)}
+        onScanPassport={() => startDocumentFlow('scan', 'passport')}
+        onScanDrivingLicence={() => startDocumentFlow('scan', 'driving_licence')}
+        onScanHealthCard={() => startDocumentFlow('scan', 'ghic')}
+        onAddPaymentCard={() => startDocumentFlow('manual', 'payment_card')}
+        onAddFormalDocument={() => startDocumentFlow('manual', resolveFormalDocumentType(addDocumentType))}
+        onImportPdfOrImage={() => startDocumentFlow('ocr_import', resolveImportTargetType(addDocumentType))}
+        onManualEntry={() => startDocumentFlow('manual', resolveImportTargetType(addDocumentType))}
+      />
+
+      <DocumentScanFlowModal
+        visible={Boolean(guidedScan)}
+        title={
+          guidedScan
+            ? guidedScan.mode === 'scan'
+              ? `Scan ${getScanDocumentLabel(guidedScan.documentType)}`
+              : `Import ${getScanDocumentLabel(guidedScan.documentType)}`
+            : 'Scan document'
+        }
+        stage={guidedScan?.stage ?? 'ready'}
+        documentLabel={guidedScan ? getScanDocumentLabel(guidedScan.documentType) : 'Travel document'}
+        previewUri={guidedScan?.previewUri}
+        mimeType={guidedScan?.mimeType}
+        guidance={
+          guidedScan?.mode === 'scan'
+            ? 'Position the document inside the frame. Keep it flat, include every edge, and avoid glare before capture.'
+            : 'Choose the clearest local photo or PDF you have. Pineapple keeps the file on this device and prepares the OCR review.'
+        }
+        detail={guidedScan?.detail}
+        warningText={guidedScan?.warningText}
+        onClose={() => setGuidedScan(null)}
+        primaryLabel={
+          guidedScan?.stage === 'ready'
+            ? guidedScan?.mode === 'scan'
+              ? 'Open camera'
+              : 'Choose photo'
+            : undefined
+        }
+        onPrimaryAction={
+          guidedScan?.stage === 'ready'
+            ? () => handleGuidedSourcePick(guidedScan?.mode === 'scan' ? 'camera' : 'photos')
+            : undefined
+        }
+        secondaryLabel={guidedScan?.stage === 'ready' && guidedScan?.mode === 'ocr_import' ? 'Choose PDF / image' : undefined}
+        onSecondaryAction={guidedScan?.stage === 'ready' && guidedScan?.mode === 'ocr_import' ? () => handleGuidedSourcePick('files') : undefined}
+      />
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    gap: spacing.lg,
+  },
+  vaultHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  vaultHeaderCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  vaultEyebrow: {
+    color: colors.primaryBlue,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  vaultTitle: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 28,
+    lineHeight: 34,
+  },
+  vaultSubtitle: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  vaultLockButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   warningList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2215,12 +2468,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radii.md,
+    backgroundColor: '#F4F9FF',
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
   },
   field: {
     gap: spacing.xs,
   },
   label: {
-    color: colors.nightNavy,
+    color: colors.primaryBlueText,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
   },
@@ -2228,13 +2486,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     alignItems: 'center',
-    paddingVertical: spacing.xs,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: colors.white,
   },
   passportRow: {
     flexDirection: 'row',
     gap: spacing.md,
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: '#FAFCFF',
   },
   thumbnail: {
     width: 72,
@@ -2242,9 +2508,9 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
   },
   thumbnailPlaceholder: {
-    backgroundColor: '#F8F5EE',
+    backgroundColor: '#F4F9FF',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primaryBlueBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2289,13 +2555,36 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   iconButton: {
-    padding: spacing.xs,
+    width: 36,
+    height: 36,
+    borderRadius: radii.pill,
+    backgroundColor: colors.primaryBlueSurface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   preview: {
     width: '100%',
     height: 320,
     borderRadius: radii.md,
-    backgroundColor: '#F8F5EE',
+    backgroundColor: '#F4F9FF',
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    overflow: 'hidden',
+  },
+  editorPreview: {
+    width: '100%',
+    height: 220,
+    borderRadius: radii.lg,
+    backgroundColor: '#F4F9FF',
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    overflow: 'hidden',
+  },
+  editorPreviewPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    padding: spacing.lg,
   },
   detailHeader: {
     flexDirection: 'row',

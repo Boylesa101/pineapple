@@ -48,8 +48,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: '#D5E8F2',
-    backgroundColor: '#F4FBFF',
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: '#F4F9FF',
   },
   title: {
     color: colors.nightNavy,

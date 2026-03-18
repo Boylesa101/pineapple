@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.2 - 2026-03-18
+
+- Premium Vault and scan UX refresh: rebuilt the document-vault entry flow around a branded floating blue `+` action, a cleaner add/import sheet, and a more consistent blue-and-white Pineapple document shell
+- Guided scan/import experience: document capture now uses a framed scan UI with clearer states for positioning, hold-steady, processing, extraction, and review handoff instead of abrupt picker jumps and raw OCR alerts
+- OCR review polish: OCR success, warning, and failure outcomes now surface as in-app review notices inside the document editor so users can keep moving without jarring alert stacks
+- Document editor/detail cleanup: source previews, cleaner review messaging, softer grouped rows, and improved modal styling now make Passport, Driving Licence, Health Card, Payment Card, and Formal Document flows feel like one coherent product
+- Vault layout cleanup: removed the old utility-style controls card, tightened spacing and row actions, preserved physical-style document components in the list, and kept expiry/verification behaviors intact
+
 ## 1.6.1 - 2026-03-18
 
 - Structured-data hardening: Pineapple now encrypts sensitive structured record fields before writing them to local storage instead of only encrypting attachment files, covering trips, travellers, vault metadata, itinerary, hotel, flight, emergency, and sync records

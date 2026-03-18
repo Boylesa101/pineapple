@@ -1,9 +1,10 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { ChoiceChips } from '@/components/ChoiceChips';
-import { colors, spacing } from '@/constants/theme';
+import { colors, radii, spacing } from '@/constants/theme';
 import type { DocumentType } from '@/types/models';
 
 type Props = {
@@ -35,12 +36,19 @@ export function DocumentAddActionsCard({
       </View>
       <ChoiceChips<DocumentType> value={selectedType} onChange={onTypeChange} options={typeOptions} />
       <View style={styles.actions}>
-        <AppButton label="Scan document" onPress={onScan} />
-        <Text style={styles.caption}>Use camera/live capture to scan and attempt OCR immediately.</Text>
-        <AppButton label="Add photo for OCR" tone="secondary" onPress={onImportForOcr} />
-        <Text style={styles.caption}>Choose an existing image, photo, or file and run OCR from it.</Text>
-        <AppButton label="Enter manually" tone="outline" onPress={onManual} />
-        <Text style={styles.caption}>Manual form entry fallback if a scan is not available.</Text>
+        <View style={styles.primaryAction}>
+          <MaterialIcons name="document-scanner" size={22} color={colors.white} />
+          <View style={styles.primaryCopy}>
+            <Text style={styles.primaryTitle}>Scan document</Text>
+            <Text style={styles.primaryDescription}>Use camera capture and guide the document into frame for OCR.</Text>
+          </View>
+          <AppButton label="Scan" tone="secondary" onPress={onScan} style={styles.primaryButton} />
+        </View>
+        <View style={styles.secondaryRow}>
+          <AppButton label="Add photo for OCR" tone="secondary" onPress={onImportForOcr} style={styles.secondaryButton} />
+          <AppButton label="Enter manually" tone="outline" onPress={onManual} style={styles.secondaryButton} />
+        </View>
+        <Text style={styles.caption}>If OCR is not available or needs correction, Pineapple still routes you into a full editable review before save.</Text>
       </View>
     </AppCard>
   );
@@ -62,13 +70,44 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   actions: {
-    gap: spacing.xs,
+    gap: spacing.sm,
+  },
+  primaryAction: {
+    backgroundColor: colors.primaryBlue,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  primaryCopy: {
+    gap: 2,
+  },
+  primaryTitle: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
+  },
+  primaryDescription: {
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  primaryButton: {
+    alignSelf: 'flex-start',
+    minWidth: 108,
+    backgroundColor: colors.white,
+  },
+  secondaryRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  secondaryButton: {
+    flex: 1,
   },
   caption: {
     color: '#6D8194',
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
     lineHeight: 17,
-    marginBottom: spacing.xs,
   },
 });

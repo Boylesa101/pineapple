@@ -40,22 +40,22 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderRadius: radii.pill,
-    backgroundColor: '#F8F5EE',
+    backgroundColor: '#F4F9FF',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primaryBlueBorder,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
   chipActive: {
-    backgroundColor: '#E6F7FC',
-    borderColor: colors.oceanBlue,
+    backgroundColor: colors.primaryBlue,
+    borderColor: colors.primaryBlue,
   },
   label: {
-    color: colors.nightNavy,
+    color: colors.primaryBlueText,
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
   },
   labelActive: {
-    color: colors.oceanBlue,
+    color: colors.white,
   },
 });
