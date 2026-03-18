@@ -216,7 +216,7 @@ export default function SettingsScreen() {
     if (!isNotificationsRuntimeSupported()) {
       Alert.alert(
         'Notifications unavailable here',
-        'Local reminders are not available in Expo Go on Android. Use a development build or release build to test notifications.'
+        'Local reminders are only supported in the installed Pineapple Android build.'
       );
       return;
     }
@@ -322,7 +322,7 @@ export default function SettingsScreen() {
         ) : null}
         {!isNotificationsRuntimeSupported() ? (
           <Text style={styles.meta}>
-            This runtime does not support Pineapple reminders. Expo Go on Android can open the app, but notification testing needs a development build or release build.
+            This runtime does not support Pineapple reminders. Use the installed Pineapple Android build for notification testing.
           </Text>
         ) : null}
       </AppCard>

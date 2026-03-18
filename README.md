@@ -5,8 +5,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 ### Android test and release builds
 
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
+- Expo Go is no longer a supported Pineapple test path; use installable APKs for device testing and `.aab` for Play Store release
 - For a dev-only APK that still expects Metro, run `npm run apk:debug`
 - Pineapple copies the finished debug APK to `build/apk/pineapple-v2-debug.apk`
+- For the fastest direct phone testing on a modern device, run `npm run apk:release:arm64`
+- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2-release-arm64.apk`
 - For direct phone testing without USB or Metro, run `npm run apk:release`
 - Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
@@ -38,8 +41,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - PIN setup and lock flow with a minimum 4-digit PIN, explicit Enter/Cancel actions, and optional biometric unlock
 - Direct-to-unlock auth flow with rotating multilingual greetings and 100 short etiquette facts to keep the lock screen polished without adding extra taps
 - Optional biometric unlock when the device supports it
-- Expo Go first-run testing now clears stale PIN state when no onboarding or trip data exists yet
-- Auto-lock after inactivity and best-effort privacy overlay for the app switcher
+- Auto-lock after inactivity, persistent PIN cooldown after repeated failures, and best-effort privacy overlay for the app switcher
 - Mockup-matched blue/white shell with a safe-area-aware bottom nav for Home, Account, Vault, Trips, and SOS
 - Trip CRUD with automatic destination hero imagery, local cached trip covers, and per-trip transfer / pickup notes
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
@@ -107,7 +109,8 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 
 ### Security notes
 
-- PIN configuration is stored in device secure storage and verified locally
+- PIN configuration is stored in device secure storage and verified locally using a stronger PBKDF2-based hash for current installs
+- Repeated failed PIN attempts now trigger a persisted cooldown, so restarting the app no longer clears the brute-force window
 - Backup exports are encrypted before they leave the app
 - Vault-managed document attachments are encrypted at rest in Pineapple storage on-device
 - Pineapple only materializes encrypted local sensitive files into a temporary readable cache when viewing or OCR needs access, and clears that cache when the app locks or backgrounds
@@ -115,6 +118,9 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Pineapple still uses `expo-sqlite` for structured local records, so whole-database engine encryption is not yet in place; instead, Pineapple encrypts sensitive text fields before they are written, while keeping IDs, timestamps, routing fields, and expiry dates plaintext where the app needs them for queries and navigation
 - Transient picker/cache copies are removed after import so scans are not left duplicated in common temp locations unnecessarily
 - OCR-generated temporary images are cleaned up after use
+- Android screenshots are blocked with `FLAG_SECURE`
+- Android OS backup is disabled; Pineapple relies on its own encrypted backup/restore flow instead
+- A fuller threat model and security posture summary lives in `SECURITY.md`
 
 ### Project structure
 
@@ -147,7 +153,7 @@ npm install
 npm run generate:brand
 ```
 
-3. Start Expo:
+3. Start Metro only if you are doing local native development:
 
 ```bash
 npm run start
@@ -231,10 +237,11 @@ npx expo export --platform web
 
 ### Security model
 
-- PIN hashes are stored in secure device storage with a random salt
+- PIN hashes are stored in secure device storage with a random salt and current installs use PBKDF2-based derivation
 - SQLite stores only structured trip data, not raw PINs
 - Sensitive vault previews stay hidden until the vault is authenticated
 - App content is relocked after inactivity and on background return past the configured timeout
+- Repeated failed PIN attempts trigger a persisted cooldown to slow brute-force attempts
 - Biometric unlock is optional and device-dependent
 - Backup export/import uses password-protected AES encryption in the local backup layer
 - Shared trip sync is optional and manual-share only in phase 3
@@ -242,6 +249,7 @@ npx expo export --platform web
 - Web/PWA is supported as a companion surface, but the Android app remains the most secure home for sensitive vault images
 - Notification text stays privacy-aware and does not include document numbers, images, or full document contents
 - Expiry reminder notifications also avoid traveller names and specific document types so lock-screen reminder text stays more generic
+- Android screenshots are blocked and Android OS backup is disabled
 
 ### Backup and restore
 
@@ -273,7 +281,6 @@ npx expo export --platform web
 - File picker access is used only for user-selected local files such as PDFs, images, shared-trip packets, and encrypted backups
 - Pineapple does not connect to a live inbox; any “email import” workflow is limited to local files the user chooses on-device
 - The web companion uses browser-safe local storage fallbacks for onboarding and security state instead of relying on native secure storage APIs
-- Expo Go on Android can run Pineapple for general testing, but reminder notifications themselves still require a development build or release build
 
 ### Brand direction
 

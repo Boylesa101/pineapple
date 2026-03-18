@@ -88,7 +88,7 @@ export async function recognizeDocumentText(localFileUri: string, mimeType: stri
         error.message.includes('Cannot find native module')
       ) {
         throw createUnavailableError(
-          `${label} OCR needs the Android build of Pineapple. Expo Go and the web app can still edit those fields manually.`
+          `${label} OCR needs the installed Android build of Pineapple. Unsupported runtimes can still edit those fields manually.`
         );
       }
 
