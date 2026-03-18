@@ -38,6 +38,7 @@ import { travellerAvatarColors } from '@/data/travellerOptions';
 import { recognizeDrivingLicenceScan } from '@/services/drivingLicenceOcr';
 import { recognizeFormalDocumentScan } from '@/services/formalDocumentOcr';
 import { recognizeHealthCardScan } from '@/services/healthCardOcr';
+import { isLiveDocumentScannerAvailable, scanDocumentWithLiveEdges } from '@/services/documentScanner';
 import { recognizePassportScan } from '@/services/passportOcr';
 import { useAppStore } from '@/store/useAppStore';
 import type { DocumentDraft, DocumentType, ExpiryReminderLeadTime } from '@/types/models';
@@ -328,7 +329,9 @@ export default function VaultScreen() {
       stage: 'ready',
       detail:
         mode === 'scan'
-          ? 'Position the document so all edges are visible. Keep it flat, reduce glare, and hold steady while Pineapple prepares the OCR review.'
+          ? isLiveDocumentScannerAvailable()
+            ? 'Open the live scanner, align the document inside the frame, and Pineapple will crop the edges before OCR review.'
+            : 'Position the document so all edges are visible. Keep it flat, reduce glare, and hold steady while Pineapple prepares the OCR review.'
           : 'Choose a clear photo or PDF from this device. Pineapple will secure it locally and prepare the extracted fields for review.',
     });
   }
@@ -425,6 +428,26 @@ export default function VaultScreen() {
             'Allow camera access if you want Pineapple to scan a document and extract details right away.'
           );
           return null;
+        }
+
+        if (isLiveDocumentScannerAvailable()) {
+          try {
+            const result = await scanDocumentWithLiveEdges({ maxNumDocuments: 1 });
+            if (result.status !== 'success' || !result.scannedImages[0]) {
+              return null;
+            }
+
+            const scannedUri = result.scannedImages[0];
+            const localFileUri = await copyIntoAppStorage(scannedUri, 'vault', 'image/jpeg', { encryptAtRest: true });
+            await cleanupImportedSource(scannedUri);
+            return {
+              localFileUri,
+              previewUri: localFileUri,
+              mimeType: 'image/jpeg',
+            };
+          } catch {
+            // Fall back to the plain camera flow if the native scanner cannot open.
+          }
         }
 
         const result = await ImagePicker.launchCameraAsync({
@@ -560,7 +583,9 @@ export default function VaultScreen() {
             stage: 'capturing',
             detail:
               source === 'camera'
-                ? 'Opening the camera and preparing a secure local capture.'
+                ? isLiveDocumentScannerAvailable()
+                  ? 'Opening the live document scanner and preparing a secure local capture.'
+                  : 'Opening the camera and preparing a secure local capture.'
                 : 'Securing the selected file locally before Pineapple reviews the document.',
             warningText: null,
           }
@@ -2391,7 +2416,9 @@ export default function VaultScreen() {
         mimeType={guidedScan?.mimeType}
         guidance={
           guidedScan?.mode === 'scan'
-            ? 'Position the document inside the frame. Keep it flat, include every edge, and avoid glare before capture.'
+            ? isLiveDocumentScannerAvailable()
+              ? 'Use the live scanner to keep the document inside the frame. Pineapple will crop the edges before preparing OCR review.'
+              : 'Position the document inside the frame. Keep it flat, include every edge, and avoid glare before capture.'
             : 'Choose the clearest local photo or PDF you have. Pineapple keeps the file on this device and prepares the OCR review.'
         }
         detail={guidedScan?.detail}

@@ -57,6 +57,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Live camera scan capture is now available for document intake, with OCR-supported types flowing straight into editable review when possible
 - The Vault now uses a floating blue add action with a cleaner add/import sheet for passport, driving-licence, health-card, payment-card, formal-document, and PDF/image intake
 - Guided scan/import flow now shows framed capture guidance, animated processing states, and calmer OCR review messaging before Pineapple opens the editable fields view
+- Native camera scans now use a live document-scanner module on supported Android/iOS native builds, with a fallback to the plain camera flow only if the scanner is unavailable
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file
 - Vault filtering by traveller or document type with grouped traveller/type views and document expiry warnings
 - Local image upload and PDF import with sensitive preview locking

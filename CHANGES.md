@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.3 - 2026-03-18
+
+- Live document scanner integration: Pineapple now uses the native `react-native-document-scanner-plugin` scan flow for camera-based document capture on supported native builds, giving the Vault a real live edge-detection scanner instead of only the plain camera fallback
+- Safe scanner abstraction: live capture is now wrapped behind a shared scanner service with a controlled fallback to the old camera picker path if the native scanner is unavailable, so the app stays usable across runtimes
+- Cloudflare test page update: `pinapple-dev.pages.dev` and the stable `pineapple-latest.apk` download now point to the current 1.6.x release line instead of the stale 1.5.1 test build
+
 ## 1.6.2 - 2026-03-18
 
 - Premium Vault and scan UX refresh: rebuilt the document-vault entry flow around a branded floating blue `+` action, a cleaner add/import sheet, and a more consistent blue-and-white Pineapple document shell
