@@ -26,6 +26,7 @@ import {
   upsertTripParticipant,
 } from '@/db/repositories';
 import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup';
+import { protectVaultDocumentsAtRest } from '@/services/documentProtection';
 import { queueNotificationRefresh } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
 import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, resolveConflict } from '@/services/sync';
@@ -40,6 +41,7 @@ import {
   verifyPin,
 } from '@/utils/security';
 import { defaultAppExpiryPreferences } from '@/utils/documentExpiry';
+import { clearMaterializedSecureFiles } from '@/utils/fileStorage';
 import { loadOnboardingComplete, persistOnboardingComplete } from '@/utils/onboarding';
 import { deriveOnboardingCompletionStatus } from '@/utils/onboardingState';
 import type {
@@ -182,22 +184,27 @@ export const useAppStore = create<StoreState>((set, get) => ({
 
     set({ isBusy: true, bootError: null });
     try {
-      const [loadedSecurity, data, onboardingStatus] = await Promise.all([
+      await clearMaterializedSecureFiles();
+      const [loadedSecurity, initialData, onboardingStatus] = await Promise.all([
         loadSecurityConfig(),
         loadSnapshot(),
         loadOnboardingComplete(),
       ]);
+      let data = initialData;
       let security = loadedSecurity;
       const shouldResetStaleExpoGoPin =
         Boolean(Constants.expoGoConfig) &&
         onboardingStatus === null &&
-        data.trips.length === 0 &&
+        initialData.trips.length === 0 &&
         loadedSecurity.pinConfigured;
 
       if (shouldResetStaleExpoGoPin) {
         await clearSecurityConfig();
         security = defaultSecurityConfig;
       }
+
+      const protectionResult = await protectVaultDocumentsAtRest(data);
+      data = protectionResult.snapshot;
 
       const hasCompletedOnboarding = deriveOnboardingCompletionStatus(onboardingStatus, {
         pinConfigured: security.pinConfigured,
@@ -258,11 +265,13 @@ export const useAppStore = create<StoreState>((set, get) => ({
 
     if (Date.now() - state.lastInteractionAt > state.security.autoLockSeconds * 1000) {
       set({ isUnlocked: false, vaultUnlockedUntil: null, privacyOverlayVisible: true });
+      clearMaterializedSecureFiles().catch(() => undefined);
     }
   },
   handleAppStateChange: (state) => {
     if (state === 'inactive' || state === 'background') {
       set({ privacyOverlayVisible: true, backgroundedAt: Date.now() });
+      clearMaterializedSecureFiles().catch(() => undefined);
       return;
     }
 
@@ -385,12 +394,14 @@ export const useAppStore = create<StoreState>((set, get) => ({
       return false;
     }
   },
-  lockApp: () =>
+  lockApp: () => {
+    clearMaterializedSecureFiles().catch(() => undefined);
     set({
       isUnlocked: false,
       vaultUnlockedUntil: null,
       privacyOverlayVisible: true,
-    }),
+    });
+  },
   unlockVault: (seconds = 180) => set({ vaultUnlockedUntil: Date.now() + seconds * 1000 }),
   updateSecurityPreferences: async (updates) => {
     const next = { ...get().security, ...updates };

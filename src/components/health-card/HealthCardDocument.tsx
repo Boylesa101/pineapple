@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 
 import { HealthCardOpenView } from '@/components/health-card/HealthCardOpenView';
+import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { Document, Traveller } from '@/types/models';
 import { getDocumentExpiryInfo } from '@/utils/documentExpiry';
@@ -85,7 +85,7 @@ export function HealthCardDocument({
         <View style={styles.cardBody}>
           <View style={[styles.photoFrame, compact ? styles.photoFrameCompact : null]}>
             {document.previewUri ? (
-              <Image source={document.previewUri} style={styles.photo} contentFit="cover" />
+              <ManagedFileImage uri={document.previewUri} mimeType={document.mimeType} style={styles.photo} contentFit="cover" />
             ) : (
               <View style={[styles.photo, styles.photoPlaceholder]}>
                 <MaterialIcons name="health-and-safety" size={compact ? 24 : 28} color="#BCEBFF" />

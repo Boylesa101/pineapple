@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.2 - 2026-03-17
+
+- Auth/storage/OCR/backup audit pass: traced the live auth and data-protection paths, removed remaining plaintext Vault attachment writes, and tightened the post-audit weak spots instead of only documenting them
+- Vault document encryption at rest: Pineapple now encrypts Vault-managed document files on device, decrypts them only into a managed temporary cache when OCR/viewing needs access, and clears that readable cache when the app locks or backgrounds
+- Legacy Vault protection migration: existing readable Vault attachments are now migrated opportunistically into the encrypted-at-rest format during bootstrap without breaking startup if an old file is already missing
+- Backup/export hardening: encrypted backups now export the real attachment contents from both plain and encrypted local files, and restore re-applies encrypted-at-rest storage for Vault attachments instead of writing restored sensitive files back in plaintext
+- OCR/read-path hardening: OCR now materializes encrypted source files safely before recognition, document viewers now open readable temporary copies instead of raw encrypted paths, and OCR error messaging now falls back to user-safe wording
+- Notification privacy tightening: expiry reminder notifications no longer include traveller names or specific document types, reducing sensitive information on the lock screen while keeping reminder timing intact
+
 ## 1.5.1 - 2026-03-16
 
 - Unlock screen greeting + etiquette facts: removed the extra pre-auth landing step and rebuilt the real unlock screen with rotating multilingual greetings plus a curated set of 100 short etiquette facts for first meetings

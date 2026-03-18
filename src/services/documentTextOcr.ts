@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { deleteLocalFile } from '@/utils/fileStorage';
+import { deleteLocalFile, materializeReadableFile } from '@/utils/fileStorage';
 
 const MAX_PDF_OCR_PAGES = 3;
 
@@ -56,8 +56,11 @@ export async function recognizeDocumentText(localFileUri: string, mimeType: stri
   }
 
   let generatedImageUris: string[] = [];
+  let readableSourceUri = localFileUri;
   try {
-    const source = await resolveOcrSource(localFileUri, mimeType);
+    const materialized = await materializeReadableFile(localFileUri, mimeType);
+    readableSourceUri = materialized.uri || localFileUri;
+    const source = await resolveOcrSource(readableSourceUri, mimeType);
     generatedImageUris = source.generatedUris;
     const { recognizeText } = await import('@infinitered/react-native-mlkit-text-recognition');
     const pageTexts: string[] = [];
@@ -96,6 +99,9 @@ export async function recognizeDocumentText(localFileUri: string, mimeType: stri
   } finally {
     for (const generatedImageUri of generatedImageUris) {
       await deleteLocalFile(generatedImageUri);
+    }
+    if (readableSourceUri !== localFileUri) {
+      await deleteLocalFile(readableSourceUri);
     }
   }
 }

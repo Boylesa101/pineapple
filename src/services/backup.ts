@@ -11,7 +11,7 @@ import type {
   BackupPayload,
   StoredSecurityConfig,
 } from '@/types/models';
-import { getManagedFolder, readBase64File, writeBase64File, writeUtf8File } from '@/utils/fileStorage';
+import { getManagedFileInfo, getManagedFolder, readManagedBase64File, writeBase64File, writeUtf8File } from '@/utils/fileStorage';
 
 type ExportBackupArgs = {
   data: AppDataSnapshot;
@@ -36,10 +36,6 @@ export function parseBackupEnvelope(encryptedContents: string) {
   return parseBackupEnvelopeString(encryptedContents);
 }
 
-function attachmentFileName(uri: string) {
-  return uri.split('/').pop() || 'attachment.bin';
-}
-
 export async function collectBackupAttachments(snapshot: AppDataSnapshot) {
   const unique = new Map<string, BackupAttachment>();
   let skippedAttachmentCount = 0;
@@ -58,12 +54,13 @@ export async function collectBackupAttachments(snapshot: AppDataSnapshot) {
 
     try {
       const folder = uri.startsWith(getManagedFolder('trips')) ? 'trips' : 'vault';
-      const base64 = await readBase64File(uri);
+      const fileInfo = await getManagedFileInfo(uri);
+      const base64 = await readManagedBase64File(uri);
       unique.set(uri, {
         originalUri: uri,
         folder,
-        mimeType: uri.endsWith('.pdf') ? 'application/pdf' : null,
-        fileName: attachmentFileName(uri),
+        mimeType: fileInfo.mimeType,
+        fileName: fileInfo.originalFileName,
         base64,
       });
     } catch {
@@ -192,7 +189,12 @@ export async function restoreEncryptedBackup({
     const restoredUri = await writeBase64File(
       attachment.folder,
       `${Date.now()}-${attachment.fileName}`,
-      attachment.base64
+      attachment.base64,
+      {
+        encryptAtRest: attachment.folder === 'vault',
+        mimeType: attachment.mimeType,
+        sourceFileName: attachment.fileName,
+      }
     );
     rewrittenUris[attachment.originalUri] = restoredUri;
   }

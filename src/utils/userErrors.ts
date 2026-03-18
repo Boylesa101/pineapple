@@ -30,6 +30,12 @@ export function toUserMessage(error: unknown, fallback: string) {
       return 'That shared trip file is not recognised.';
     case 'This shared trip file is incomplete.':
       return 'That shared trip file is incomplete or corrupted.';
+    case 'Secure document integrity check failed.':
+    case 'Secure document decryption failed.':
+    case 'This secure document file is invalid.':
+      return 'Pineapple could not open that stored document securely. Re-import the document if the problem continues.';
+    case 'Secure document access is unavailable on this platform.':
+      return 'Secure document access is not available in this runtime. Use the Android app build to open that document.';
     default:
       return message.length > 160 ? fallback : message;
   }

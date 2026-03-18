@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Image } from 'expo-image';
 
+import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { DocumentMetaRow } from '@/components/document-support/DocumentMetaRow';
 import { ExpiryBadge } from '@/components/document-support/ExpiryBadge';
 import { VerificationBadge } from '@/components/document-support/VerificationBadge';
@@ -36,7 +36,7 @@ export function HealthCardOpenView({ document, traveller, expiryBadge, verificat
           <View style={styles.cardFaceBody}>
             <View style={styles.photoFrame}>
               {document.previewUri ? (
-                <Image source={document.previewUri} style={styles.photo} contentFit="cover" />
+                <ManagedFileImage uri={document.previewUri} mimeType={document.mimeType} style={styles.photo} contentFit="cover" />
               ) : (
                 <View style={[styles.photo, styles.photoPlaceholder]}>
                   <Text style={styles.photoPlaceholderText}>No scan</Text>

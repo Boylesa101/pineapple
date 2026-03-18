@@ -68,6 +68,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - High-contrast Travel Mode with family overview, traveller tabs/swipe, quick copy actions, and temporary sensitive reveal
 - Printable branded trip PDF export with inclusion/hide controls
 - Encrypted local backup export/import with `.pineapplebackup` files, validation, and attachment preservation where the original local files are still available
+- Vault-managed document attachments are encrypted at rest on-device and only materialized into a temporary readable cache when Pineapple needs to view or OCR them
 - Local reminders and notifications for trip start, passport/GHIC expiry, missing insurance, packing completeness, flights, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
 - Dedicated expiry warnings screen with filters for all, expiring soon, expired, and notifications off
@@ -103,9 +104,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 
 - PIN configuration is stored in device secure storage and verified locally
 - Backup exports are encrypted before they leave the app
-- Document files are stored in Pineapple-managed app storage on the device; this round also removes transient picker/cache copies after import so scans are not left duplicated in common temp locations unnecessarily
+- Vault-managed document attachments are encrypted at rest in Pineapple storage on-device
+- Pineapple only materializes encrypted Vault files into a temporary readable cache when viewing or OCR needs access, and clears that cache when the app locks or backgrounds
+- Trip cover images and non-Vault exports remain normal app-managed local files unless they are inside an encrypted backup
+- Transient picker/cache copies are removed after import so scans are not left duplicated in common temp locations unnecessarily
 - OCR-generated temporary images are cleaned up after use
-- Pineapple does not currently claim a separate per-file encryption layer for every stored document attachment, so release notes should continue describing document storage as local app-managed storage rather than end-to-end encrypted at rest
 
 ### Project structure
 
@@ -232,12 +235,14 @@ npx expo export --platform web
 - Conflict review is explicit; Pineapple does not silently overwrite local trip changes
 - Web/PWA is supported as a companion surface, but the Android app remains the most secure home for sensitive vault images
 - Notification text stays privacy-aware and does not include document numbers, images, or full document contents
+- Expiry reminder notifications also avoid traveller names and specific document types so lock-screen reminder text stays more generic
 
 ### Backup and restore
 
 - Backups are exported as encrypted `.pineapplebackup` files from Settings > Backup & Restore
 - Backup payloads include trips, travellers, document metadata, packing items, itinerary items, hotel stays, travel segments, emergency info, reminder settings, app preferences that are safe to restore, participant/share records, and sync conflict records
 - Pineapple attempts to include locally managed attachment files such as trip cover images and vault files; if a referenced local file is no longer readable, its database metadata remains in the backup and the export still completes
+- Vault attachments are decrypted only long enough to be wrapped inside the encrypted backup payload, then restored back into encrypted-at-rest Vault storage when imported
 - Restore validates the backup structure, schema version, and encryption envelope before decrypting
 - Restore currently replaces the existing local database after an explicit confirmation step; Pineapple does not silently merge or overwrite data
 - Security-sensitive unlock material such as the PIN hash itself is not bundled into backups

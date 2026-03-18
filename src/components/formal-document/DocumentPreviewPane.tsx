@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { colors, radii, spacing } from '@/constants/theme';
+import { useManagedFileUri } from '@/hooks/useManagedFileUri';
 import { getDocumentSourceCtaLabel, getDocumentSourceEmptyText, getDocumentSourcePreviewUri, isDocumentPdfSource } from '@/utils/documentViewer';
 
 type Props = {
@@ -14,7 +15,7 @@ type Props = {
 
 export function DocumentPreviewPane({ previewUri, localFileUri, mimeType, onOpen }: Props) {
   const isPdf = isDocumentPdfSource(mimeType, localFileUri);
-  const imageUri = getDocumentSourcePreviewUri(previewUri, localFileUri, mimeType);
+  const imageUri = useManagedFileUri(getDocumentSourcePreviewUri(previewUri, localFileUri, mimeType), mimeType);
 
   return (
     <View style={styles.panel}>

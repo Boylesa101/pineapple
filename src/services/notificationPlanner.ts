@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, parseISO, subDays } from 'date-fns';
 
-import type { AppDataSnapshot, Document, DocumentType, ExpiryReminderLeadTime, ReminderKind, ReminderLeadTime } from '@/types/models';
+import type { AppDataSnapshot, Document, ExpiryReminderLeadTime, ReminderKind, ReminderLeadTime } from '@/types/models';
 import { getTripBundle } from '@/utils/selectors';
 
 export type ReminderInput = {
@@ -8,20 +8,6 @@ export type ReminderInput = {
   body: string;
   date: Date;
   silent?: boolean;
-};
-
-const documentLabelMap: Record<DocumentType, string> = {
-  passport: 'Passport',
-  ghic: 'GHIC / EHIC',
-  insurance: 'Travel insurance',
-  visa: 'Visa',
-  driving_licence: 'Driving licence',
-  payment_card: 'Payment card',
-  id_card: 'ID card',
-  boarding_pass: 'Boarding pass',
-  hotel_booking: 'Hotel booking',
-  excursion_ticket: 'Excursion ticket',
-  custom: 'Document',
 };
 
 function getReminderSetting(snapshot: AppDataSnapshot, tripId: string, kind: ReminderKind) {
@@ -52,10 +38,6 @@ function buildReminderDate(targetIso: string, leadTimeDays: number) {
 
 function isFutureDate(date: Date) {
   return date.getTime() > Date.now() + 60_000;
-}
-
-function getDocumentOwnerLabel(holderName: string, fallback: string | undefined) {
-  return holderName || fallback || 'Your';
 }
 
 function formatLeadLabel(leadDays: number) {
@@ -167,16 +149,13 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
           item.expiryDate &&
           item.expiryReminderEnabled
       )) {
-        const traveller = bundle.travellers.find((item) => item.id === document.travellerId);
-        const owner = getDocumentOwnerLabel(document.holderName, traveller?.fullName);
-
         for (const reminder of getDocumentReminderDates(document)) {
           reminders.push({
-            title: `${owner} ${documentLabelMap[document.documentType]} expires soon`,
+            title: reminder.leadDays === 0 ? 'Travel document expired' : 'Travel document reminder',
             body:
               reminder.leadDays === 0
-                ? 'One of your travel documents has expired.'
-                : `Your ${documentLabelMap[document.documentType].toLowerCase()} expires in ${formatLeadLabel(reminder.leadDays)}.`,
+                ? 'One of your saved travel documents has expired.'
+                : `A saved travel document expires in ${formatLeadLabel(reminder.leadDays)}.`,
             date: reminder.scheduledDate,
             silent: snapshot.appPreferences.expiryReminderSilent,
           });

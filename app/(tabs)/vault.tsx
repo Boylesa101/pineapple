@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,6 +24,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { FormalDocumentRecord } from '@/components/formal-document/FormalDocumentRecord';
 import { HealthCardDocument } from '@/components/health-card/HealthCardDocument';
 import { InfoChip } from '@/components/InfoChip';
+import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { PaymentCardDocument } from '@/components/payment-card/PaymentCardDocument';
 import { PinPad } from '@/components/PinPad';
@@ -75,6 +75,7 @@ import { applyPassportOcrToDraft, hasPassportImageForOcr } from '@/utils/passpor
 import { getDocumentSourceCtaLabel, isDocumentPdfSource } from '@/utils/documentViewer';
 import { getDocumentVaultSetupState } from '@/utils/documentVaultSetup';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
+import { toUserMessage } from '@/utils/userErrors';
 import { validateDocument } from '@/utils/validation';
 
 const documentLabels: Record<DocumentType, string> = {
@@ -376,7 +377,7 @@ export default function VaultScreen() {
         });
         if (result.canceled || !result.assets[0]) return null;
         const asset = result.assets[0];
-        const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
+        const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType, { encryptAtRest: true });
         await cleanupImportedSource(asset.uri);
         return {
           localFileUri,
@@ -392,7 +393,7 @@ export default function VaultScreen() {
         });
         if (result.canceled || !result.assets[0]) return null;
         const asset = result.assets[0];
-        const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
+        const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType, { encryptAtRest: true });
         await cleanupImportedSource(asset.uri);
         return {
           localFileUri,
@@ -416,7 +417,7 @@ export default function VaultScreen() {
       });
       if (result.canceled || !result.assets[0]) return null;
       const asset = result.assets[0];
-      const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType);
+      const localFileUri = await copyIntoAppStorage(asset.uri, 'vault', asset.mimeType, { encryptAtRest: true });
       await cleanupImportedSource(asset.uri);
       return {
         localFileUri,
@@ -712,9 +713,10 @@ export default function VaultScreen() {
     } catch (error) {
       Alert.alert(
         'Passport OCR unavailable',
-        error instanceof Error
-          ? error.message
-          : 'Pineapple could not read that passport scan right now. You can still enter the passport fields manually.'
+        toUserMessage(
+          error,
+          'Pineapple could not read that passport scan right now. You can still enter the passport fields manually.'
+        )
       );
     } finally {
       setPassportOcrLoading(false);
@@ -777,9 +779,10 @@ export default function VaultScreen() {
     } catch (error) {
       Alert.alert(
         'Driving licence OCR unavailable',
-        error instanceof Error
-          ? error.message
-          : 'Pineapple could not read that driving licence scan right now. You can still enter the licence fields manually.'
+        toUserMessage(
+          error,
+          'Pineapple could not read that driving licence scan right now. You can still enter the licence fields manually.'
+        )
       );
     } finally {
       setDrivingLicenceOcrLoading(false);
@@ -842,9 +845,10 @@ export default function VaultScreen() {
     } catch (error) {
       Alert.alert(
         'Health-card OCR unavailable',
-        error instanceof Error
-          ? error.message
-          : 'Pineapple could not read that health-card scan right now. You can still enter the card fields manually.'
+        toUserMessage(
+          error,
+          'Pineapple could not read that health-card scan right now. You can still enter the card fields manually.'
+        )
       );
     } finally {
       setHealthCardOcrLoading(false);
@@ -907,9 +911,10 @@ export default function VaultScreen() {
     } catch (error) {
       Alert.alert(
         'Formal-document OCR unavailable',
-        error instanceof Error
-          ? error.message
-          : 'Pineapple could not read that document right now. You can still enter the document fields manually.'
+        toUserMessage(
+          error,
+          'Pineapple could not read that document right now. You can still enter the document fields manually.'
+        )
       );
     } finally {
       setFormalDocumentOcrLoading(false);
@@ -1270,7 +1275,9 @@ export default function VaultScreen() {
                   style={styles.documentRow}
                 >
                   {previewUnlocked && document.previewUri ? (
-                    <Image source={document.previewUri} style={styles.thumbnail} contentFit="cover" />
+                    <View style={styles.thumbnail}>
+                      <ManagedFileImage uri={document.previewUri} mimeType={document.mimeType} style={styles.thumbnail} contentFit="cover" />
+                    </View>
                   ) : (
                     <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
                       <MaterialIcons name="lock" size={22} color={colors.textMuted} />
@@ -2160,7 +2167,14 @@ export default function VaultScreen() {
                     <Text style={styles.meta}>Expiry date: {formatShortDate(selectedDocument.expiryDate)}</Text>
                     {!selectedDocument.localFileUri ? <Text style={styles.meta}>No local file saved for this document.</Text> : null}
                     {selectedDocument.previewUri ? (
-                      <Image source={selectedDocument.previewUri} style={styles.preview} contentFit="contain" />
+                      <View style={styles.preview}>
+                        <ManagedFileImage
+                          uri={selectedDocument.previewUri}
+                          mimeType={selectedDocument.mimeType}
+                          style={styles.preview}
+                          contentFit="contain"
+                        />
+                      </View>
                     ) : null}
                     {selectedDocument.localFileUri ? (
                       <AppButton

@@ -78,12 +78,14 @@ test('document reminder scheduling creates future reminders for the selected sch
   const reminders = createReminderContent(createSnapshot());
   assert.equal(reminders.length, 5);
   assert.equal(reminders.every((item) => item.silent === true), true);
-  assert.equal(reminders[0]?.title.includes('Passport expires soon'), true);
+  assert.equal(reminders[0]?.title, 'Travel document reminder');
+  assert.equal(reminders[0]?.body.includes('passport'), false);
+  assert.equal(reminders[0]?.body.includes('Passport'), false);
 });
 
 test('deleting a document removes its scheduled expiry reminders from generated content', () => {
   const snapshot = createSnapshot();
   snapshot.documents = [];
   const reminders = createReminderContent(snapshot);
-  assert.equal(reminders.some((item) => item.title.includes('Passport expires soon')), false);
+  assert.equal(reminders.some((item) => item.title === 'Travel document reminder'), false);
 });

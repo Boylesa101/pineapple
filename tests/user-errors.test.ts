@@ -12,6 +12,10 @@ test('backup and shared-trip errors are translated to user-friendly copy', () =>
     toUserMessage(new Error('This shared trip file is incomplete.'), 'Fallback'),
     'That shared trip file is incomplete or corrupted.'
   );
+  assert.equal(
+    toUserMessage(new Error('Secure document decryption failed.'), 'Fallback'),
+    'Pineapple could not open that stored document securely. Re-import the document if the problem continues.'
+  );
   assert.equal(toUserMessage(new Error('Trip not found.'), 'Fallback'), 'That trip is no longer available locally.');
 });
 

@@ -5,7 +5,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { AppButton } from '@/components/AppButton';
 import { AppModal } from '@/components/AppModal';
 import { colors, radii, spacing } from '@/constants/theme';
+import { useManagedFileUri } from '@/hooks/useManagedFileUri';
 import { getDocumentSourceCtaLabel, getDocumentSourceEmptyText, getDocumentSourcePreviewUri, isDocumentPdfSource } from '@/utils/documentViewer';
+import { isEncryptedManagedFile } from '@/utils/fileStorage';
 
 type Props = {
   visible: boolean;
@@ -19,8 +21,11 @@ type Props = {
 
 export function DocumentScanViewerModal({ visible, title, onClose, localFileUri, previewUri, mimeType, emptyText }: Props) {
   const isPdf = isDocumentPdfSource(mimeType, localFileUri);
-  const imageUri = getDocumentSourcePreviewUri(previewUri, localFileUri, mimeType);
+  const sourcePreviewUri = getDocumentSourcePreviewUri(previewUri, localFileUri, mimeType);
+  const imageUri = useManagedFileUri(sourcePreviewUri, mimeType);
+  const openableUri = useManagedFileUri(localFileUri, mimeType);
   const hasFile = Boolean(localFileUri);
+  const canOpen = Boolean(openableUri || (localFileUri && !isEncryptedManagedFile(localFileUri)));
 
   return (
     <AppModal visible={visible} title={title} onClose={onClose}>
@@ -37,9 +42,11 @@ export function DocumentScanViewerModal({ visible, title, onClose, localFileUri,
           <AppButton
             label={getDocumentSourceCtaLabel(isPdf)}
             tone="secondary"
+            disabled={!canOpen}
             onPress={() => {
-              if (localFileUri) {
-                Linking.openURL(localFileUri);
+              const targetUri = openableUri || localFileUri;
+              if (targetUri) {
+                Linking.openURL(targetUri);
               }
             }}
           />
