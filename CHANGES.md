@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.1 - 2026-03-18
+
+- Structured-data hardening: Pineapple now encrypts sensitive structured record fields before writing them to local storage instead of only encrypting attachment files, covering trips, travellers, vault metadata, itinerary, hotel, flight, emergency, and sync records
+- One-time local migration: older installs are rewritten through the encrypted write path during bootstrap so existing SQLite travel data is not left in plaintext after upgrade
+- Honest security model update: attachment encryption remains in place, and Pineapple now protects sensitive text fields too, but identifiers, routing fields, timestamps, and expiry dates still remain plaintext where the app needs them for indexing and routing
+- Web snapshot parity: the companion web snapshot layer now protects the same sensitive text fields instead of reporting a protected state without actually encrypting them
+- Trip hero-image feature from 1.6.0 remains in place unchanged: automatic destination imagery, cached local hero images, and right-side trip shortcuts still ship as part of the current build
+
 ## 1.6.0 - 2026-03-18
 
 - Trip hero image upgrade: trip cards now resolve destination imagery automatically from the destination text, distinguish country-only entries from places, cache the chosen image locally after the first fetch, and fall back cleanly when no image can be resolved

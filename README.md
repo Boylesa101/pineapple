@@ -70,6 +70,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Printable branded trip PDF export with inclusion/hide controls
 - Encrypted local backup export/import with `.pineapplebackup` files, validation, and attachment preservation where the original local files are still available
 - Vault-managed document attachments and trip hero images are encrypted at rest on-device and only materialized into a temporary readable cache when Pineapple needs to view or OCR them
+- Sensitive structured record fields are also encrypted before Pineapple writes them into local storage, covering trips, travellers, document metadata, itinerary notes, emergency records, and sync payloads
 - Local reminders and notifications for trip start, passport/GHIC expiry, missing insurance, packing completeness, flights, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
 - Dedicated expiry warnings screen with filters for all, expiring soon, expired, and notifications off
@@ -108,7 +109,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Vault-managed document attachments are encrypted at rest in Pineapple storage on-device
 - Pineapple only materializes encrypted local sensitive files into a temporary readable cache when viewing or OCR needs access, and clears that cache when the app locks or backgrounds
 - Trip hero images are now stored in the same encrypted-at-rest local format as Vault attachments; non-Vault exports still remain normal app-managed files unless they are inside an encrypted backup
-- Pineapple still uses `expo-sqlite` for structured local records, so whole-database encryption is not yet in place; sensitive file attachments are protected separately instead of claiming full SQLCipher-style database encryption
+- Pineapple still uses `expo-sqlite` for structured local records, so whole-database engine encryption is not yet in place; instead, Pineapple encrypts sensitive text fields before they are written, while keeping IDs, timestamps, routing fields, and expiry dates plaintext where the app needs them for queries and navigation
 - Transient picker/cache copies are removed after import so scans are not left duplicated in common temp locations unnecessarily
 - OCR-generated temporary images are cleaned up after use
 

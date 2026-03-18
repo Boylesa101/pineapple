@@ -98,6 +98,7 @@ function createSnapshot(): AppDataSnapshot {
       expiryRemindersEnabled: true,
       expiryReminderSchedule: [90, 30, 7, 1, 0],
       expiryReminderSilent: false,
+      structuredDataProtected: true,
       syncEnabled: false,
       syncMode: 'manual_share',
       syncStatus: 'local_only',

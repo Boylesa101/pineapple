@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 12;
+const DATABASE_VERSION = 13;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -162,6 +162,7 @@ CREATE TABLE IF NOT EXISTS app_preferences (
   expiryRemindersEnabled INTEGER NOT NULL DEFAULT 1,
   expiryReminderSchedule TEXT NOT NULL DEFAULT '[90,30,7,1,0]',
   expiryReminderSilent INTEGER NOT NULL DEFAULT 0,
+  structuredDataProtected INTEGER NOT NULL DEFAULT 1,
   syncEnabled INTEGER NOT NULL DEFAULT 0,
   syncMode TEXT NOT NULL DEFAULT 'manual_share',
   syncStatus TEXT NOT NULL DEFAULT 'local_only',
@@ -292,6 +293,15 @@ async function runPhaseTwelveMigration(db: SQLiteDatabase) {
   await ensureColumn(db, 'trips', 'transferSummary', "TEXT NOT NULL DEFAULT ''");
 }
 
+async function runPhaseThirteenMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'app_preferences', 'structuredDataProtected', 'INTEGER NOT NULL DEFAULT 0');
+  await db.execAsync(`
+    UPDATE app_preferences
+    SET structuredDataProtected = 0
+    WHERE structuredDataProtected IS NULL;
+  `);
+}
+
 async function runPhaseThreeMigration(db: SQLiteDatabase) {
   await db.execAsync(`
     INSERT OR IGNORE INTO app_preferences (
@@ -401,6 +411,10 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   if (version < 12) {
     await runPhaseTwelveMigration(db);
+  }
+
+  if (version < 13) {
+    await runPhaseThirteenMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

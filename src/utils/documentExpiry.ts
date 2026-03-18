@@ -49,6 +49,7 @@ export function defaultAppExpiryPreferences() {
     expiryRemindersEnabled: true,
     expiryReminderSchedule: DEFAULT_EXPIRY_REMINDER_SCHEDULE,
     expiryReminderSilent: false,
+    structuredDataProtected: true,
   } as const;
 }
 
@@ -267,5 +268,6 @@ export function normalizeAppPreferences(input: Partial<AppPreferences> & Pick<Ap
     expiryRemindersEnabled: input.expiryRemindersEnabled ?? defaults.expiryRemindersEnabled,
     expiryReminderSchedule: normalizeExpiryReminderSchedule(input.expiryReminderSchedule),
     expiryReminderSilent: input.expiryReminderSilent ?? defaults.expiryReminderSilent,
+    structuredDataProtected: input.structuredDataProtected ?? defaults.structuredDataProtected,
   };
 }

@@ -30,6 +30,7 @@ import { protectStoredFilesAtRest } from '@/services/documentProtection';
 import { resolveTripHeroImage } from '@/services/destinationImageService';
 import { queueNotificationRefresh } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
+import { protectStructuredDataAtRest } from '@/services/structuredDataProtection';
 import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, resolveConflict } from '@/services/sync';
 import {
   authenticateBiometrics,
@@ -214,6 +215,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
 
       const protectionResult = await protectStoredFilesAtRest(data);
       data = protectionResult.snapshot;
+      const structuredProtectionResult = await protectStructuredDataAtRest(data);
+      data = structuredProtectionResult.snapshot;
 
       const hasCompletedOnboarding = deriveOnboardingCompletionStatus(onboardingStatus, {
         pinConfigured: security.pinConfigured,

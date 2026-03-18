@@ -6,6 +6,7 @@ import {
   normalizeAppPreferences,
   normalizeDocumentRecord,
 } from '@/utils/documentExpiry';
+import { decryptStructuredValue, encryptStructuredValue } from '@/utils/structuredDataEncryption';
 import { normalizeTripRecord } from '@/utils/trips';
 import type {
   AppDataSnapshot,
@@ -67,17 +68,259 @@ function emptySnapshot(timestamp = now()): AppDataSnapshot {
   };
 }
 
-async function readSnapshot() {
-  const snapshot = (await get<AppDataSnapshot>(SNAPSHOT_KEY)) ?? emptySnapshot();
+async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapshot> {
   return {
     ...snapshot,
-    trips: (snapshot.trips ?? []).map((trip) => normalizeTripRecord(trip as any)),
-    documents: (snapshot.documents ?? []).map((document) => normalizeDocumentRecord(document as any)),
+    trips: await Promise.all(
+      (snapshot.trips ?? []).map(async (trip) => ({
+        ...trip,
+        name: (await decryptStructuredValue(trip.name)) ?? '',
+        destination: (await decryptStructuredValue(trip.destination)) ?? '',
+        heroImageRemoteUrl: await decryptStructuredValue(trip.heroImageRemoteUrl),
+        notes: (await decryptStructuredValue(trip.notes)) ?? '',
+        transferSummary: (await decryptStructuredValue(trip.transferSummary)) ?? '',
+      }))
+    ),
+    travellers: await Promise.all(
+      (snapshot.travellers ?? []).map(async (traveller) => ({
+        ...traveller,
+        fullName: (await decryptStructuredValue(traveller.fullName)) ?? '',
+        dateOfBirth: await decryptStructuredValue(traveller.dateOfBirth),
+        passportNationality: (await decryptStructuredValue(traveller.passportNationality)) ?? '',
+        passportNumber: (await decryptStructuredValue(traveller.passportNumber)) ?? '',
+        ghicNumber: (await decryptStructuredValue(traveller.ghicNumber)) ?? '',
+        medicalNote: (await decryptStructuredValue(traveller.medicalNote)) ?? '',
+        notes: (await decryptStructuredValue(traveller.notes)) ?? '',
+      }))
+    ),
+    documents: await Promise.all(
+      (snapshot.documents ?? []).map(async (document) => ({
+        ...document,
+        holderName: (await decryptStructuredValue(document.holderName)) ?? '',
+        documentNumber: (await decryptStructuredValue(document.documentNumber)) ?? '',
+        notes: (await decryptStructuredValue(document.notes)) ?? '',
+        passportData: document.passportData,
+        drivingLicenceData: document.drivingLicenceData,
+        healthCardData: document.healthCardData,
+        paymentCardData: document.paymentCardData,
+        formalDocumentData: document.formalDocumentData,
+      }))
+    ),
+    packingItems: await Promise.all(
+      (snapshot.packingItems ?? []).map(async (item) => ({
+        ...item,
+        title: (await decryptStructuredValue(item.title)) ?? '',
+        notes: (await decryptStructuredValue(item.notes)) ?? '',
+      }))
+    ),
+    travelSegments: await Promise.all(
+      (snapshot.travelSegments ?? []).map(async (segment) => ({
+        ...segment,
+        airline: (await decryptStructuredValue(segment.airline)) ?? '',
+        flightNumber: (await decryptStructuredValue(segment.flightNumber)) ?? '',
+        departureAirport: (await decryptStructuredValue(segment.departureAirport)) ?? '',
+        arrivalAirport: (await decryptStructuredValue(segment.arrivalAirport)) ?? '',
+        terminal: (await decryptStructuredValue(segment.terminal)) ?? '',
+        gate: (await decryptStructuredValue(segment.gate)) ?? '',
+        bookingRef: (await decryptStructuredValue(segment.bookingRef)) ?? '',
+        notes: (await decryptStructuredValue(segment.notes)) ?? '',
+      }))
+    ),
+    hotelStays: await Promise.all(
+      (snapshot.hotelStays ?? []).map(async (hotel) => ({
+        ...hotel,
+        hotelName: (await decryptStructuredValue(hotel.hotelName)) ?? '',
+        address: (await decryptStructuredValue(hotel.address)) ?? '',
+        phone: (await decryptStructuredValue(hotel.phone)) ?? '',
+        bookingRef: (await decryptStructuredValue(hotel.bookingRef)) ?? '',
+        notes: (await decryptStructuredValue(hotel.notes)) ?? '',
+      }))
+    ),
+    itineraryEvents: await Promise.all(
+      (snapshot.itineraryEvents ?? []).map(async (event) => ({
+        ...event,
+        title: (await decryptStructuredValue(event.title)) ?? '',
+        location: (await decryptStructuredValue(event.location)) ?? '',
+        confirmationNumber: (await decryptStructuredValue(event.confirmationNumber)) ?? '',
+        notes: (await decryptStructuredValue(event.notes)) ?? '',
+      }))
+    ),
+    emergencyInfos: await Promise.all(
+      (snapshot.emergencyInfos ?? []).map(async (info) => ({
+        ...info,
+        insurerEmergencyNumber: (await decryptStructuredValue(info.insurerEmergencyNumber)) ?? '',
+        hotelPhone: (await decryptStructuredValue(info.hotelPhone)) ?? '',
+        airlinePhone: (await decryptStructuredValue(info.airlinePhone)) ?? '',
+        localEmergencyNote: (await decryptStructuredValue(info.localEmergencyNote)) ?? '',
+        embassyConsulateNote: (await decryptStructuredValue(info.embassyConsulateNote)) ?? '',
+        travellerMedicalNote: (await decryptStructuredValue(info.travellerMedicalNote)) ?? '',
+        emergencyContacts: (await decryptStructuredValue(info.emergencyContacts)) ?? '',
+      }))
+    ),
+    tripParticipants: await Promise.all(
+      (snapshot.tripParticipants ?? []).map(async (participant) => ({
+        ...participant,
+        displayName: (await decryptStructuredValue(participant.displayName)) ?? '',
+        email: (await decryptStructuredValue(participant.email)) ?? '',
+        inviteCode: (await decryptStructuredValue(participant.inviteCode)) ?? '',
+      }))
+    ),
+    tripInvites: await Promise.all(
+      (snapshot.tripInvites ?? []).map(async (invite) => ({
+        ...invite,
+        email: (await decryptStructuredValue(invite.email)) ?? '',
+        inviteCode: (await decryptStructuredValue(invite.inviteCode)) ?? '',
+      }))
+    ),
+    sharedTripStates: await Promise.all(
+      (snapshot.sharedTripStates ?? []).map(async (state) => ({
+        ...state,
+        shareCode: (await decryptStructuredValue(state.shareCode)) ?? '',
+      }))
+    ),
+    syncConflicts: await Promise.all(
+      (snapshot.syncConflicts ?? []).map(async (conflict) => ({
+        ...conflict,
+        shareCode: (await decryptStructuredValue(conflict.shareCode)) ?? '',
+        summary: (await decryptStructuredValue(conflict.summary)) ?? '',
+        incomingPayload: (await decryptStructuredValue(conflict.incomingPayload)) ?? '',
+      }))
+    ),
+  };
+}
+
+async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapshot> {
+  return {
+    ...snapshot,
+    appPreferences: {
+      ...snapshot.appPreferences,
+      structuredDataProtected: true,
+    },
+    trips: await Promise.all(
+      (snapshot.trips ?? []).map(async (trip) => ({
+        ...trip,
+        name: (await encryptStructuredValue(trip.name)) ?? '',
+        destination: (await encryptStructuredValue(trip.destination)) ?? '',
+        heroImageRemoteUrl: await encryptStructuredValue(trip.heroImageRemoteUrl),
+        notes: (await encryptStructuredValue(trip.notes)) ?? '',
+        transferSummary: (await encryptStructuredValue(trip.transferSummary)) ?? '',
+      }))
+    ),
+    travellers: await Promise.all(
+      (snapshot.travellers ?? []).map(async (traveller) => ({
+        ...traveller,
+        fullName: (await encryptStructuredValue(traveller.fullName)) ?? '',
+        dateOfBirth: await encryptStructuredValue(traveller.dateOfBirth),
+        passportNationality: (await encryptStructuredValue(traveller.passportNationality)) ?? '',
+        passportNumber: (await encryptStructuredValue(traveller.passportNumber)) ?? '',
+        ghicNumber: (await encryptStructuredValue(traveller.ghicNumber)) ?? '',
+        medicalNote: (await encryptStructuredValue(traveller.medicalNote)) ?? '',
+        notes: (await encryptStructuredValue(traveller.notes)) ?? '',
+      }))
+    ),
+    documents: await Promise.all(
+      (snapshot.documents ?? []).map(async (document) => ({
+        ...document,
+        holderName: (await encryptStructuredValue(document.holderName)) ?? '',
+        documentNumber: (await encryptStructuredValue(document.documentNumber)) ?? '',
+        notes: (await encryptStructuredValue(document.notes)) ?? '',
+      }))
+    ),
+    packingItems: await Promise.all(
+      (snapshot.packingItems ?? []).map(async (item) => ({
+        ...item,
+        title: (await encryptStructuredValue(item.title)) ?? '',
+        notes: (await encryptStructuredValue(item.notes)) ?? '',
+      }))
+    ),
+    travelSegments: await Promise.all(
+      (snapshot.travelSegments ?? []).map(async (segment) => ({
+        ...segment,
+        airline: (await encryptStructuredValue(segment.airline)) ?? '',
+        flightNumber: (await encryptStructuredValue(segment.flightNumber)) ?? '',
+        departureAirport: (await encryptStructuredValue(segment.departureAirport)) ?? '',
+        arrivalAirport: (await encryptStructuredValue(segment.arrivalAirport)) ?? '',
+        terminal: (await encryptStructuredValue(segment.terminal)) ?? '',
+        gate: (await encryptStructuredValue(segment.gate)) ?? '',
+        bookingRef: (await encryptStructuredValue(segment.bookingRef)) ?? '',
+        notes: (await encryptStructuredValue(segment.notes)) ?? '',
+      }))
+    ),
+    hotelStays: await Promise.all(
+      (snapshot.hotelStays ?? []).map(async (hotel) => ({
+        ...hotel,
+        hotelName: (await encryptStructuredValue(hotel.hotelName)) ?? '',
+        address: (await encryptStructuredValue(hotel.address)) ?? '',
+        phone: (await encryptStructuredValue(hotel.phone)) ?? '',
+        bookingRef: (await encryptStructuredValue(hotel.bookingRef)) ?? '',
+        notes: (await encryptStructuredValue(hotel.notes)) ?? '',
+      }))
+    ),
+    itineraryEvents: await Promise.all(
+      (snapshot.itineraryEvents ?? []).map(async (event) => ({
+        ...event,
+        title: (await encryptStructuredValue(event.title)) ?? '',
+        location: (await encryptStructuredValue(event.location)) ?? '',
+        confirmationNumber: (await encryptStructuredValue(event.confirmationNumber)) ?? '',
+        notes: (await encryptStructuredValue(event.notes)) ?? '',
+      }))
+    ),
+    emergencyInfos: await Promise.all(
+      (snapshot.emergencyInfos ?? []).map(async (info) => ({
+        ...info,
+        insurerEmergencyNumber: (await encryptStructuredValue(info.insurerEmergencyNumber)) ?? '',
+        hotelPhone: (await encryptStructuredValue(info.hotelPhone)) ?? '',
+        airlinePhone: (await encryptStructuredValue(info.airlinePhone)) ?? '',
+        localEmergencyNote: (await encryptStructuredValue(info.localEmergencyNote)) ?? '',
+        embassyConsulateNote: (await encryptStructuredValue(info.embassyConsulateNote)) ?? '',
+        travellerMedicalNote: (await encryptStructuredValue(info.travellerMedicalNote)) ?? '',
+        emergencyContacts: (await encryptStructuredValue(info.emergencyContacts)) ?? '',
+      }))
+    ),
+    tripParticipants: await Promise.all(
+      (snapshot.tripParticipants ?? []).map(async (participant) => ({
+        ...participant,
+        displayName: (await encryptStructuredValue(participant.displayName)) ?? '',
+        email: (await encryptStructuredValue(participant.email)) ?? '',
+        inviteCode: (await encryptStructuredValue(participant.inviteCode)) ?? '',
+      }))
+    ),
+    tripInvites: await Promise.all(
+      (snapshot.tripInvites ?? []).map(async (invite) => ({
+        ...invite,
+        email: (await encryptStructuredValue(invite.email)) ?? '',
+        inviteCode: (await encryptStructuredValue(invite.inviteCode)) ?? '',
+      }))
+    ),
+    sharedTripStates: await Promise.all(
+      (snapshot.sharedTripStates ?? []).map(async (state) => ({
+        ...state,
+        shareCode: (await encryptStructuredValue(state.shareCode)) ?? '',
+      }))
+    ),
+    syncConflicts: await Promise.all(
+      (snapshot.syncConflicts ?? []).map(async (conflict) => ({
+        ...conflict,
+        shareCode: (await encryptStructuredValue(conflict.shareCode)) ?? '',
+        summary: (await encryptStructuredValue(conflict.summary)) ?? '',
+        incomingPayload: (await encryptStructuredValue(conflict.incomingPayload)) ?? '',
+      }))
+    ),
+  };
+}
+
+async function readSnapshot() {
+  const snapshot = (await get<AppDataSnapshot>(SNAPSHOT_KEY)) ?? emptySnapshot();
+  const decrypted = await decryptSnapshot(snapshot);
+  return {
+    ...decrypted,
+    trips: (decrypted.trips ?? []).map((trip) => normalizeTripRecord(trip as any)),
+    documents: (decrypted.documents ?? []).map((document) => normalizeDocumentRecord(document as any)),
     appPreferences: {
       ...normalizeAppPreferences({
-        ...defaultAppPreferences(snapshot.appPreferences?.createdAt ?? now()),
-        ...snapshot.appPreferences,
-        lastBackupAt: snapshot.appPreferences?.lastBackupAt ?? null,
+        ...defaultAppPreferences(decrypted.appPreferences?.createdAt ?? now()),
+        ...decrypted.appPreferences,
+        lastBackupAt: decrypted.appPreferences?.lastBackupAt ?? null,
       } as any),
     },
   };
@@ -97,7 +340,7 @@ function normalizeSnapshot(snapshot: AppDataSnapshot) {
 }
 
 async function writeSnapshot(snapshot: AppDataSnapshot) {
-  await set(SNAPSHOT_KEY, normalizeSnapshot(snapshot));
+  await set(SNAPSHOT_KEY, await encryptSnapshot(normalizeSnapshot(snapshot)));
 }
 
 function withUpsert<T extends { id: string }>(items: T[], nextItem: T) {

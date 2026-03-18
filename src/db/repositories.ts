@@ -2,6 +2,10 @@ import { getDatabase } from './client';
 
 import { createId } from '@/utils/ids';
 import {
+  decryptStructuredValue,
+  encryptStructuredValue,
+} from '@/utils/structuredDataEncryption';
+import {
   defaultAppExpiryPreferences,
   normalizeAppPreferences,
   normalizeDocumentRecord,
@@ -35,6 +39,14 @@ import type {
 
 function now() {
   return new Date().toISOString();
+}
+
+async function decryptField(value: string | null | undefined) {
+  return decryptStructuredValue(value);
+}
+
+async function encryptField(value: string | null | undefined) {
+  return encryptStructuredValue(value);
 }
 
 function parsePassportData(value: unknown) {
@@ -197,9 +209,9 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     syncConflicts,
   ] = await Promise.all([
     db.getAllAsync<any>('SELECT * FROM trips ORDER BY startDate ASC'),
-    db.getAllAsync<any>('SELECT * FROM travellers ORDER BY fullName ASC'),
+    db.getAllAsync<any>('SELECT * FROM travellers ORDER BY createdAt ASC'),
     db.getAllAsync<any>('SELECT * FROM documents ORDER BY createdAt DESC'),
-    db.getAllAsync<any>('SELECT * FROM packing_items ORDER BY category ASC, title ASC'),
+    db.getAllAsync<any>('SELECT * FROM packing_items ORDER BY createdAt ASC'),
     db.getAllAsync<{ packingItemId: string; travellerId: string }>(
       'SELECT packingItemId, travellerId FROM packing_item_travellers'
     ),
@@ -226,53 +238,170 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         notificationsEnabled: toBool(appPreferencesRaw.notificationsEnabled),
         expiryRemindersEnabled: toBool(appPreferencesRaw.expiryRemindersEnabled ?? 1),
         expiryReminderSilent: toBool(appPreferencesRaw.expiryReminderSilent ?? 0),
+        structuredDataProtected: toBool(appPreferencesRaw.structuredDataProtected ?? 0),
         syncEnabled: toBool(appPreferencesRaw.syncEnabled),
       })
     : defaultAppPreferences();
 
-  return {
-    trips: trips.map((trip) => normalizeTripRecord(trip)),
-    travellers,
-    documents: documents.map((document) =>
+  const decryptedTrips = await Promise.all(
+    trips.map(async (trip) =>
+      normalizeTripRecord({
+        ...trip,
+        name: (await decryptField(trip.name)) ?? '',
+        destination: (await decryptField(trip.destination)) ?? '',
+        heroImageRemoteUrl: await decryptField(trip.heroImageRemoteUrl),
+        notes: (await decryptField(trip.notes)) ?? '',
+        transferSummary: (await decryptField(trip.transferSummary)) ?? '',
+      })
+    )
+  );
+
+  const decryptedTravellers = await Promise.all(
+    travellers.map(async (traveller) => ({
+      ...traveller,
+      fullName: (await decryptField(traveller.fullName)) ?? '',
+      dateOfBirth: await decryptField(traveller.dateOfBirth),
+      passportNationality: (await decryptField(traveller.passportNationality)) ?? '',
+      passportNumber: (await decryptField(traveller.passportNumber)) ?? '',
+      ghicNumber: (await decryptField(traveller.ghicNumber)) ?? '',
+      medicalNote: (await decryptField(traveller.medicalNote)) ?? '',
+      notes: (await decryptField(traveller.notes)) ?? '',
+    }))
+  );
+
+  const decryptedDocuments = await Promise.all(
+    documents.map(async (document) =>
       normalizeDocumentRecord({
         ...document,
+        holderName: (await decryptField(document.holderName)) ?? '',
+        documentNumber: (await decryptField(document.documentNumber)) ?? '',
+        notes: (await decryptField(document.notes)) ?? '',
         sensitive: toBool(document.sensitive),
         expiryReminderEnabled: toBool(document.expiryReminderEnabled ?? 1),
         expiryReminderSchedule: document.expiryReminderSchedule,
-        passportData: parsePassportData(document.passportData),
+        passportData: parsePassportData(await decryptField(document.passportData)),
         secondaryLocalFileUri: document.secondaryLocalFileUri ?? null,
         secondaryPreviewUri: document.secondaryPreviewUri ?? null,
         secondaryMimeType: document.secondaryMimeType ?? null,
-        drivingLicenceData: parseDrivingLicenceData(document.drivingLicenceData),
-        healthCardData: parseHealthCardData(document.healthCardData),
-        paymentCardData: parsePaymentCardData(document.paymentCardData),
-        formalDocumentData: parseFormalDocumentData(document.formalDocumentData),
+        drivingLicenceData: parseDrivingLicenceData(await decryptField(document.drivingLicenceData)),
+        healthCardData: parseHealthCardData(await decryptField(document.healthCardData)),
+        paymentCardData: parsePaymentCardData(await decryptField(document.paymentCardData)),
+        formalDocumentData: parseFormalDocumentData(await decryptField(document.formalDocumentData)),
       })
-    ),
-    packingItems: packingItemsRaw.map((item) => ({
+    )
+  );
+
+  const decryptedPackingItems = await Promise.all(
+    packingItemsRaw.map(async (item) => ({
       ...item,
+      title: (await decryptField(item.title)) ?? '',
+      notes: (await decryptField(item.notes)) ?? '',
       isPacked: toBool(item.isPacked),
       travellerIds: assignmentMap[item.id] ?? (item.travellerId ? [item.travellerId] : []),
-    })),
-    travelSegments,
-    hotelStays,
-    itineraryEvents,
-    emergencyInfos,
+    }))
+  );
+
+  const decryptedTravelSegments = await Promise.all(
+    travelSegments.map(async (segment) => ({
+      ...segment,
+      airline: (await decryptField(segment.airline)) ?? '',
+      flightNumber: (await decryptField(segment.flightNumber)) ?? '',
+      departureAirport: (await decryptField(segment.departureAirport)) ?? '',
+      arrivalAirport: (await decryptField(segment.arrivalAirport)) ?? '',
+      terminal: (await decryptField(segment.terminal)) ?? '',
+      gate: (await decryptField(segment.gate)) ?? '',
+      bookingRef: (await decryptField(segment.bookingRef)) ?? '',
+      notes: (await decryptField(segment.notes)) ?? '',
+    }))
+  );
+
+  const decryptedHotelStays = await Promise.all(
+    hotelStays.map(async (hotel) => ({
+      ...hotel,
+      hotelName: (await decryptField(hotel.hotelName)) ?? '',
+      address: (await decryptField(hotel.address)) ?? '',
+      phone: (await decryptField(hotel.phone)) ?? '',
+      bookingRef: (await decryptField(hotel.bookingRef)) ?? '',
+      notes: (await decryptField(hotel.notes)) ?? '',
+    }))
+  );
+
+  const decryptedItineraryEvents = await Promise.all(
+    itineraryEvents.map(async (event) => ({
+      ...event,
+      title: (await decryptField(event.title)) ?? '',
+      location: (await decryptField(event.location)) ?? '',
+      confirmationNumber: (await decryptField(event.confirmationNumber)) ?? '',
+      notes: (await decryptField(event.notes)) ?? '',
+    }))
+  );
+
+  const decryptedEmergencyInfos = await Promise.all(
+    emergencyInfos.map(async (info) => ({
+      ...info,
+      insurerEmergencyNumber: (await decryptField(info.insurerEmergencyNumber)) ?? '',
+      hotelPhone: (await decryptField(info.hotelPhone)) ?? '',
+      airlinePhone: (await decryptField(info.airlinePhone)) ?? '',
+      localEmergencyNote: (await decryptField(info.localEmergencyNote)) ?? '',
+      embassyConsulateNote: (await decryptField(info.embassyConsulateNote)) ?? '',
+      travellerMedicalNote: (await decryptField(info.travellerMedicalNote)) ?? '',
+      emergencyContacts: (await decryptField(info.emergencyContacts)) ?? '',
+    }))
+  );
+
+  const decryptedTripParticipants = await Promise.all(
+    tripParticipants.map(async (participant) => ({
+      ...participant,
+      displayName: (await decryptField(participant.displayName)) ?? '',
+      email: (await decryptField(participant.email)) ?? '',
+      inviteCode: (await decryptField(participant.inviteCode)) ?? '',
+      isLocalProfile: toBool(participant.isLocalProfile),
+    }))
+  );
+
+  const decryptedTripInvites = await Promise.all(
+    tripInvites.map(async (invite) => ({
+      ...invite,
+      email: (await decryptField(invite.email)) ?? '',
+      inviteCode: (await decryptField(invite.inviteCode)) ?? '',
+    }))
+  );
+
+  const decryptedSharedTripStates = await Promise.all(
+    sharedTripStates.map(async (state) => ({
+      ...state,
+      shareCode: (await decryptField(state.shareCode)) ?? '',
+      syncEnabled: toBool(state.syncEnabled),
+    }))
+  );
+
+  const decryptedSyncConflicts = await Promise.all(
+    syncConflicts.map(async (conflict) => ({
+      ...conflict,
+      shareCode: (await decryptField(conflict.shareCode)) ?? '',
+      summary: (await decryptField(conflict.summary)) ?? '',
+      incomingPayload: (await decryptField(conflict.incomingPayload)) ?? '',
+    }))
+  );
+
+  return {
+    trips: decryptedTrips,
+    travellers: decryptedTravellers.sort((left, right) => left.fullName.localeCompare(right.fullName)),
+    documents: decryptedDocuments,
+    packingItems: decryptedPackingItems.sort((left, right) => `${left.category}:${left.title}`.localeCompare(`${right.category}:${right.title}`)),
+    travelSegments: decryptedTravelSegments,
+    hotelStays: decryptedHotelStays,
+    itineraryEvents: decryptedItineraryEvents,
+    emergencyInfos: decryptedEmergencyInfos,
     reminderSettings: reminderSettings.map((setting) => ({
       ...setting,
       enabled: toBool(setting.enabled),
     })),
     appPreferences,
-    tripParticipants: tripParticipants.map((participant) => ({
-      ...participant,
-      isLocalProfile: toBool(participant.isLocalProfile),
-    })),
-    tripInvites,
-    sharedTripStates: sharedTripStates.map((state) => ({
-      ...state,
-      syncEnabled: toBool(state.syncEnabled),
-    })),
-    syncConflicts,
+    tripParticipants: decryptedTripParticipants,
+    tripInvites: decryptedTripInvites,
+    sharedTripStates: decryptedSharedTripStates,
+    syncConflicts: decryptedSyncConflicts,
   };
 }
 
@@ -286,6 +415,11 @@ export async function upsertTrip(input: TripDraft) {
         input.id
       )
     : null;
+  const encryptedName = (await encryptField(input.name)) ?? '';
+  const encryptedDestination = (await encryptField(input.destination)) ?? '';
+  const encryptedHeroImageRemoteUrl = await encryptField(input.heroImageRemoteUrl ?? null);
+  const encryptedNotes = (await encryptField(input.notes ?? '')) ?? '';
+  const encryptedTransferSummary = (await encryptField(input.transferSummary ?? '')) ?? '';
 
   await db.runAsync(
     `INSERT INTO trips (
@@ -306,16 +440,16 @@ export async function upsertTrip(input: TripDraft) {
        status = excluded.status,
        updatedAt = excluded.updatedAt`,
     id,
-    input.name,
-    input.destination,
+    encryptedName,
+    encryptedDestination,
     input.destinationType ?? 'unknown',
     input.startDate,
     input.endDate,
     input.coverImageUri ?? null,
-    input.heroImageRemoteUrl ?? null,
+    encryptedHeroImageRemoteUrl,
     input.heroImageStatus ?? 'idle',
-    input.notes ?? '',
-    input.transferSummary ?? '',
+    encryptedNotes,
+    encryptedTransferSummary,
     input.status,
     timestamp,
     timestamp
@@ -330,7 +464,7 @@ export async function upsertTrip(input: TripDraft) {
       tripId, shareCode, syncEnabled, syncStatus, lastSyncAt, lastExportedAt, lastImportedAt, lastKnownRemoteUpdatedAt, createdAt, updatedAt
     ) VALUES (?, ?, 0, 'local_only', NULL, NULL, NULL, NULL, ?, ?)`,
     id,
-    `PINE-${id.slice(-6).toUpperCase()}`,
+    (await encryptField(`PINE-${id.slice(-6).toUpperCase()}`)) ?? '',
     timestamp,
     timestamp
   );
@@ -338,10 +472,12 @@ export async function upsertTrip(input: TripDraft) {
   await db.runAsync(
     `INSERT OR IGNORE INTO trip_participants (
       id, tripId, displayName, email, role, avatarColor, inviteCode, isLocalProfile, createdAt, updatedAt
-    ) VALUES (?, ?, 'You', '', 'owner', '#F4B400', ?, 1, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, 'owner', '#F4B400', ?, 1, ?, ?)`,
     `participant_${id}`,
     id,
-    `PINE-${id.slice(-6).toUpperCase()}`,
+    (await encryptField('You')) ?? '',
+    '',
+    (await encryptField(`PINE-${id.slice(-6).toUpperCase()}`)) ?? '',
     timestamp,
     timestamp
   );
@@ -353,6 +489,13 @@ export async function upsertTraveller(input: TravellerDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('traveller');
+  const encryptedFullName = (await encryptField(input.fullName)) ?? '';
+  const encryptedDateOfBirth = await encryptField(input.dateOfBirth);
+  const encryptedPassportNationality = (await encryptField(input.passportNationality)) ?? '';
+  const encryptedPassportNumber = (await encryptField(input.passportNumber)) ?? '';
+  const encryptedGhicNumber = (await encryptField(input.ghicNumber)) ?? '';
+  const encryptedMedicalNote = (await encryptField(input.medicalNote)) ?? '';
+  const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
     `INSERT INTO travellers (id, tripId, fullName, dateOfBirth, passportNationality, passportNumber, ghicNumber, medicalNote, notes, avatarColor, relationshipType, createdAt, updatedAt)
@@ -371,13 +514,13 @@ export async function upsertTraveller(input: TravellerDraft) {
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
-    input.fullName,
-    input.dateOfBirth,
-    input.passportNationality,
-    input.passportNumber,
-    input.ghicNumber,
-    input.medicalNote,
-    input.notes,
+    encryptedFullName,
+    encryptedDateOfBirth,
+    encryptedPassportNationality,
+    encryptedPassportNumber,
+    encryptedGhicNumber,
+    encryptedMedicalNote,
+    encryptedNotes,
     input.avatarColor,
     input.relationshipType,
     timestamp,
@@ -403,6 +546,22 @@ export async function upsertDocument(input: DocumentDraft) {
         input.id
       )
     : null;
+  const encryptedHolderName = (await encryptField(normalized.holderName)) ?? '';
+  const encryptedDocumentNumber = (await encryptField(normalized.documentNumber)) ?? '';
+  const encryptedNotes = (await encryptField(normalized.notes)) ?? '';
+  const encryptedPassportData = await encryptField(normalized.passportData ? JSON.stringify(normalized.passportData) : null);
+  const encryptedDrivingLicenceData = await encryptField(
+    normalized.drivingLicenceData ? JSON.stringify(normalized.drivingLicenceData) : null
+  );
+  const encryptedHealthCardData = await encryptField(
+    normalized.healthCardData ? JSON.stringify(normalized.healthCardData) : null
+  );
+  const encryptedPaymentCardData = await encryptField(
+    normalized.paymentCardData ? JSON.stringify(normalized.paymentCardData) : null
+  );
+  const encryptedFormalDocumentData = await encryptField(
+    normalized.formalDocumentData ? JSON.stringify(normalized.formalDocumentData) : null
+  );
 
   await db.runAsync(
     `INSERT INTO documents (id, tripId, travellerId, holderName, documentType, documentNumber, issueDate, expiryDate, expiryReminderEnabled, expiryReminderSchedule, notes, localFileUri, previewUri, mimeType, passportData, secondaryLocalFileUri, secondaryPreviewUri, secondaryMimeType, drivingLicenceData, healthCardData, paymentCardData, formalDocumentData, sensitive, createdAt, updatedAt)
@@ -434,25 +593,25 @@ export async function upsertDocument(input: DocumentDraft) {
     id,
     normalized.tripId,
     normalized.travellerId,
-    normalized.holderName,
+    encryptedHolderName,
     normalized.documentType,
-    normalized.documentNumber,
+    encryptedDocumentNumber,
     normalized.issueDate,
     normalized.expiryDate,
     normalized.expiryReminderEnabled ? 1 : 0,
     serializeExpiryReminderSchedule(normalized.expiryReminderSchedule),
-    normalized.notes,
+    encryptedNotes,
     normalized.localFileUri,
     normalized.previewUri,
     normalized.mimeType,
-    normalized.passportData ? JSON.stringify(normalized.passportData) : null,
+    encryptedPassportData,
     normalized.secondaryLocalFileUri,
     normalized.secondaryPreviewUri,
     normalized.secondaryMimeType,
-    normalized.drivingLicenceData ? JSON.stringify(normalized.drivingLicenceData) : null,
-    normalized.healthCardData ? JSON.stringify(normalized.healthCardData) : null,
-    normalized.paymentCardData ? JSON.stringify(normalized.paymentCardData) : null,
-    normalized.formalDocumentData ? JSON.stringify(normalized.formalDocumentData) : null,
+    encryptedDrivingLicenceData,
+    encryptedHealthCardData,
+    encryptedPaymentCardData,
+    encryptedFormalDocumentData,
     normalized.sensitive ? 1 : 0,
     timestamp,
     timestamp
@@ -487,6 +646,8 @@ export async function upsertPackingItem(input: PackingItemDraft) {
   const timestamp = now();
   const id = input.id ?? createId('packing');
   const primaryTravellerId = input.travellerIds[0] ?? null;
+  const encryptedTitle = (await encryptField(input.title)) ?? '';
+  const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
     `INSERT INTO packing_items (id, tripId, travellerId, title, category, quantity, isPacked, luggageType, assignmentScope, priority, notes, createdAt, updatedAt)
@@ -506,14 +667,14 @@ export async function upsertPackingItem(input: PackingItemDraft) {
     id,
     input.tripId,
     primaryTravellerId,
-    input.title,
+    encryptedTitle,
     input.category,
     input.quantity,
     input.isPacked ? 1 : 0,
     input.luggageType,
     input.assignmentScope,
     input.priority,
-    input.notes,
+    encryptedNotes,
     timestamp,
     timestamp
   );
@@ -526,6 +687,14 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('segment');
+  const encryptedAirline = (await encryptField(input.airline)) ?? '';
+  const encryptedFlightNumber = (await encryptField(input.flightNumber)) ?? '';
+  const encryptedDepartureAirport = (await encryptField(input.departureAirport)) ?? '';
+  const encryptedArrivalAirport = (await encryptField(input.arrivalAirport)) ?? '';
+  const encryptedTerminal = (await encryptField(input.terminal)) ?? '';
+  const encryptedGate = (await encryptField(input.gate)) ?? '';
+  const encryptedBookingRef = (await encryptField(input.bookingRef)) ?? '';
+  const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
     `INSERT INTO travel_segments (id, tripId, airline, flightNumber, departureAirport, arrivalAirport, departureTime, arrivalTime, terminal, gate, bookingRef, notes, createdAt, updatedAt)
@@ -545,16 +714,16 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
-    input.airline,
-    input.flightNumber,
-    input.departureAirport,
-    input.arrivalAirport,
+    encryptedAirline,
+    encryptedFlightNumber,
+    encryptedDepartureAirport,
+    encryptedArrivalAirport,
     input.departureTime,
     input.arrivalTime,
-    input.terminal,
-    input.gate,
-    input.bookingRef,
-    input.notes,
+    encryptedTerminal,
+    encryptedGate,
+    encryptedBookingRef,
+    encryptedNotes,
     timestamp,
     timestamp
   );
@@ -566,6 +735,11 @@ export async function upsertHotelStay(input: HotelStayDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('hotel');
+  const encryptedHotelName = (await encryptField(input.hotelName)) ?? '';
+  const encryptedAddress = (await encryptField(input.address)) ?? '';
+  const encryptedPhone = (await encryptField(input.phone)) ?? '';
+  const encryptedBookingRef = (await encryptField(input.bookingRef)) ?? '';
+  const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
     `INSERT INTO hotel_stays (id, tripId, hotelName, address, phone, bookingRef, checkIn, checkOut, notes, createdAt, updatedAt)
@@ -582,13 +756,13 @@ export async function upsertHotelStay(input: HotelStayDraft) {
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
-    input.hotelName,
-    input.address,
-    input.phone,
-    input.bookingRef,
+    encryptedHotelName,
+    encryptedAddress,
+    encryptedPhone,
+    encryptedBookingRef,
     input.checkIn,
     input.checkOut,
-    input.notes,
+    encryptedNotes,
     timestamp,
     timestamp
   );
@@ -600,6 +774,10 @@ export async function upsertItineraryEvent(input: ItineraryEventDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('event');
+  const encryptedTitle = (await encryptField(input.title)) ?? '';
+  const encryptedLocation = (await encryptField(input.location)) ?? '';
+  const encryptedConfirmationNumber = (await encryptField(input.confirmationNumber)) ?? '';
+  const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
     `INSERT INTO itinerary_events (id, tripId, title, type, dateTime, location, confirmationNumber, notes, createdAt, updatedAt)
@@ -615,12 +793,12 @@ export async function upsertItineraryEvent(input: ItineraryEventDraft) {
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
-    input.title,
+    encryptedTitle,
     input.type,
     input.dateTime,
-    input.location,
-    input.confirmationNumber,
-    input.notes,
+    encryptedLocation,
+    encryptedConfirmationNumber,
+    encryptedNotes,
     timestamp,
     timestamp
   );
@@ -632,6 +810,13 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('emergency');
+  const encryptedInsurerEmergencyNumber = (await encryptField(input.insurerEmergencyNumber)) ?? '';
+  const encryptedHotelPhone = (await encryptField(input.hotelPhone)) ?? '';
+  const encryptedAirlinePhone = (await encryptField(input.airlinePhone)) ?? '';
+  const encryptedLocalEmergencyNote = (await encryptField(input.localEmergencyNote)) ?? '';
+  const encryptedEmbassyConsulateNote = (await encryptField(input.embassyConsulateNote)) ?? '';
+  const encryptedTravellerMedicalNote = (await encryptField(input.travellerMedicalNote)) ?? '';
+  const encryptedEmergencyContacts = (await encryptField(input.emergencyContacts)) ?? '';
 
   await db.runAsync(
     `INSERT INTO emergency_infos (id, tripId, insurerEmergencyNumber, hotelPhone, airlinePhone, localEmergencyNote, embassyConsulateNote, travellerMedicalNote, emergencyContacts, createdAt, updatedAt)
@@ -647,13 +832,13 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
-    input.insurerEmergencyNumber,
-    input.hotelPhone,
-    input.airlinePhone,
-    input.localEmergencyNote,
-    input.embassyConsulateNote,
-    input.travellerMedicalNote,
-    input.emergencyContacts,
+    encryptedInsurerEmergencyNumber,
+    encryptedHotelPhone,
+    encryptedAirlinePhone,
+    encryptedLocalEmergencyNote,
+    encryptedEmbassyConsulateNote,
+    encryptedTravellerMedicalNote,
+    encryptedEmergencyContacts,
     timestamp,
     timestamp
   );
@@ -693,13 +878,14 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const normalized = normalizeAppPreferences(input as any);
 
   await db.runAsync(
-    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, structuredDataProtected, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        notificationsEnabled = excluded.notificationsEnabled,
        expiryRemindersEnabled = excluded.expiryRemindersEnabled,
        expiryReminderSchedule = excluded.expiryReminderSchedule,
        expiryReminderSilent = excluded.expiryReminderSilent,
+       structuredDataProtected = excluded.structuredDataProtected,
        syncEnabled = excluded.syncEnabled,
        syncMode = excluded.syncMode,
        syncStatus = excluded.syncStatus,
@@ -712,6 +898,7 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
     normalized.expiryRemindersEnabled ? 1 : 0,
     serializeExpiryReminderSchedule(normalized.expiryReminderSchedule),
     normalized.expiryReminderSilent ? 1 : 0,
+    normalized.structuredDataProtected ? 1 : 0,
     normalized.syncEnabled ? 1 : 0,
     normalized.syncMode,
     normalized.syncStatus,
@@ -729,6 +916,9 @@ export async function upsertTripParticipant(input: TripParticipantDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('participant');
+  const encryptedDisplayName = (await encryptField(input.displayName)) ?? '';
+  const encryptedEmail = (await encryptField(input.email)) ?? '';
+  const encryptedInviteCode = (await encryptField(input.inviteCode)) ?? '';
 
   await db.runAsync(
     `INSERT INTO trip_participants (id, tripId, displayName, email, role, avatarColor, inviteCode, isLocalProfile, createdAt, updatedAt)
@@ -744,11 +934,11 @@ export async function upsertTripParticipant(input: TripParticipantDraft) {
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
-    input.displayName,
-    input.email,
+    encryptedDisplayName,
+    encryptedEmail,
     input.role,
     input.avatarColor,
-    input.inviteCode,
+    encryptedInviteCode,
     input.isLocalProfile ? 1 : 0,
     timestamp,
     timestamp
@@ -761,6 +951,8 @@ export async function upsertTripInvite(input: TripInviteDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('invite');
+  const encryptedEmail = (await encryptField(input.email)) ?? '';
+  const encryptedInviteCode = (await encryptField(input.inviteCode)) ?? '';
 
   await db.runAsync(
     `INSERT INTO trip_invites (id, tripId, email, inviteCode, role, status, createdAt, updatedAt)
@@ -774,8 +966,8 @@ export async function upsertTripInvite(input: TripInviteDraft) {
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
-    input.email,
-    input.inviteCode,
+    encryptedEmail,
+    encryptedInviteCode,
     input.role,
     input.status,
     timestamp,
@@ -788,6 +980,7 @@ export async function upsertTripInvite(input: TripInviteDraft) {
 export async function upsertSharedTripState(input: SharedTripStateDraft) {
   const db = await getDatabase();
   const timestamp = now();
+  const encryptedShareCode = (await encryptField(input.shareCode)) ?? '';
 
   await db.runAsync(
     `INSERT INTO shared_trip_states (
@@ -803,7 +996,7 @@ export async function upsertSharedTripState(input: SharedTripStateDraft) {
       lastKnownRemoteUpdatedAt = excluded.lastKnownRemoteUpdatedAt,
       updatedAt = excluded.updatedAt`,
     input.tripId,
-    input.shareCode,
+    encryptedShareCode,
     input.syncEnabled ? 1 : 0,
     input.syncStatus,
     input.lastSyncAt,
@@ -821,6 +1014,9 @@ export async function upsertSyncConflict(input: SyncConflictDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('conflict');
+  const encryptedShareCode = (await encryptField(input.shareCode)) ?? '';
+  const encryptedSummary = (await encryptField(input.summary)) ?? '';
+  const encryptedIncomingPayload = (await encryptField(input.incomingPayload)) ?? '';
 
   await db.runAsync(
     `INSERT INTO sync_conflicts (
@@ -837,11 +1033,11 @@ export async function upsertSyncConflict(input: SyncConflictDraft) {
       updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
-    input.shareCode,
-    input.summary,
+    encryptedShareCode,
+    encryptedSummary,
     input.localUpdatedAt,
     input.incomingUpdatedAt,
-    input.incomingPayload,
+    encryptedIncomingPayload,
     input.status,
     timestamp,
     timestamp

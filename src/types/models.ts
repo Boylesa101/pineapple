@@ -242,6 +242,7 @@ export interface AppPreferences {
   expiryRemindersEnabled: boolean;
   expiryReminderSchedule: ExpiryReminderSchedule;
   expiryReminderSilent: boolean;
+  structuredDataProtected: boolean;
   syncEnabled: boolean;
   syncMode: SyncMode;
   syncStatus: SyncStatus;
