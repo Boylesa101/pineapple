@@ -8,6 +8,7 @@ import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
 import { DateTimeField } from '@/components/DateTimeField';
+import { DestinationSearchField } from '@/components/DestinationSearchField';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { validateTrip, validateTraveller } from '@/utils/validation';
@@ -95,6 +96,11 @@ export default function CreateFirstTripScreen() {
       }
       setActiveTrip(tripId);
       router.replace({ pathname: '/getting-started', params: { tripId } });
+    } catch (error) {
+      Alert.alert(
+        'Trip could not be created',
+        error instanceof Error ? error.message : 'Pineapple could not finish creating that trip right now. Try again.'
+      );
     } finally {
       setSaving(false);
     }
@@ -111,11 +117,12 @@ export default function CreateFirstTripScreen() {
         <Text style={styles.heroText}>A calm start for your first holiday plan.</Text>
       </View>
       <AppCard>
-        <AppTextField
+        <DestinationSearchField
           label="Destination"
           value={destination}
           onChangeText={setDestination}
-          placeholder="Mallorca, Spain"
+          placeholder="Search town, city, or country"
+          helper="Start typing a town, city, or country so Pineapple can match the destination cleanly."
         />
         <DateTimeField label="Start date" mode="date" value={startDate} onChange={setStartDate} />
         <DateTimeField label="End date" mode="date" value={endDate} onChange={setEndDate} />

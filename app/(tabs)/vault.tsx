@@ -33,7 +33,7 @@ import { PaymentCardDocument } from '@/components/payment-card/PaymentCardDocume
 import { PinPad } from '@/components/PinPad';
 import { PassportDocument } from '@/components/passport/PassportDocument';
 import { TripPicker } from '@/components/TripPicker';
-import { colors, radii, spacing } from '@/constants/theme';
+import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { travellerAvatarColors } from '@/data/travellerOptions';
 import { recognizeDrivingLicenceScan } from '@/services/drivingLicenceOcr';
 import { recognizeFormalDocumentScan } from '@/services/formalDocumentOcr';
@@ -1096,6 +1096,358 @@ export default function VaultScreen() {
     await runFormalDocumentOcrOnDraft(editableDraft, { openEditor: true });
   }
 
+  function renderDocumentListItem(document: (typeof bundle.documents)[number]) {
+    const traveller = bundle.travellers.find((item) => item.id === document.travellerId);
+    const previewUnlocked = isVaultUnlocked || !document.sensitive;
+    const numberLabel = previewUnlocked ? document.documentNumber || 'No number saved' : maskSensitive(document.documentNumber);
+    const expiryInfo = getDocumentExpiryInfo(document.documentType, document.expiryDate);
+
+    if (document.documentType === 'passport') {
+      return (
+        <View key={document.id} style={styles.physicalDocumentCard}>
+          <PassportDocument
+            document={document}
+            traveller={traveller}
+            onPress={() => {
+              setSelectedId(document.id);
+              setPassportOpen(false);
+              setDetailVisible(true);
+            }}
+          />
+          <View style={styles.documentMetaBlock}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Passport</Text>
+              <VerificationBadge status={getPassportVerificationStatus(document, traveller)} />
+              {document.expiryDate || expiryInfo.needsExpiryPrompt ? (
+                <InfoChip label={document.expiryDate ? expiryInfo.badgeLabel : 'Add expiry date'} tone={expiryInfo.tone} />
+              ) : null}
+            </View>
+            <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+            <Text style={styles.meta}>
+              {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
+            </Text>
+            <Text style={styles.meta}>{numberLabel}</Text>
+            <View style={styles.documentActionRow}>
+              {document.localFileUri ? (
+                <Pressable onPress={() => openPrimarySource(document)} style={styles.documentActionLink}>
+                  <MaterialIcons name="visibility" size={16} color={colors.primaryBlue} />
+                  <Text style={styles.documentActionText}>View</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => {
+                  setDraft(withSpecializedDocumentData(document));
+                  setEditorVisible(true);
+                }}
+                style={styles.documentActionLink}
+              >
+                <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
+                <Text style={styles.documentActionText}>Edit</Text>
+              </Pressable>
+              <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.documentActionLink}>
+                <MaterialIcons name="delete-outline" size={16} color={colors.danger} />
+                <Text style={styles.documentActionDanger}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (document.documentType === 'driving_licence') {
+      return (
+        <View key={document.id} style={styles.physicalDocumentCard}>
+          <DrivingLicenceDocument
+            document={document}
+            traveller={traveller}
+            onPress={() => {
+              setSelectedId(document.id);
+              setDrivingLicenceOpen(false);
+              setDetailVisible(true);
+            }}
+          />
+          <View style={styles.documentMetaBlock}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Driving licence</Text>
+              <VerificationBadge status={getDrivingLicenceVerificationStatus(document, traveller)} />
+              {document.expiryDate || expiryInfo.needsExpiryPrompt ? (
+                <InfoChip label={document.expiryDate ? expiryInfo.badgeLabel : 'Add expiry date'} tone={expiryInfo.tone} />
+              ) : null}
+            </View>
+            <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+            <Text style={styles.meta}>
+              {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
+            </Text>
+            <Text style={styles.meta}>
+              {document.secondaryLocalFileUri ? 'Front and back scans saved' : document.localFileUri ? 'Front scan only' : 'Metadata only • No scans attached'}
+            </Text>
+            <View style={styles.documentActionRow}>
+              {document.localFileUri ? (
+                <Pressable onPress={() => openPrimarySource(document)} style={styles.documentActionLink}>
+                  <MaterialIcons name="visibility" size={16} color={colors.primaryBlue} />
+                  <Text style={styles.documentActionText}>Front</Text>
+                </Pressable>
+              ) : null}
+              {document.secondaryLocalFileUri ? (
+                <Pressable onPress={() => openSecondarySource(document)} style={styles.documentActionLink}>
+                  <MaterialIcons name="flip" size={16} color={colors.primaryBlue} />
+                  <Text style={styles.documentActionText}>Back</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => {
+                  setDraft(withSpecializedDocumentData(document));
+                  setEditorVisible(true);
+                }}
+                style={styles.documentActionLink}
+              >
+                <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
+                <Text style={styles.documentActionText}>Edit</Text>
+              </Pressable>
+              <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.documentActionLink}>
+                <MaterialIcons name="delete-outline" size={16} color={colors.danger} />
+                <Text style={styles.documentActionDanger}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (document.documentType === 'ghic') {
+      return (
+        <View key={document.id} style={styles.physicalDocumentCard}>
+          <HealthCardDocument
+            document={document}
+            traveller={traveller}
+            onPress={() => {
+              setSelectedId(document.id);
+              setHealthCardOpen(false);
+              setDetailVisible(true);
+            }}
+          />
+          <View style={styles.documentMetaBlock}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>GHIC / EHIC</Text>
+              <VerificationBadge status={getHealthCardVerificationStatus(document, traveller)} />
+              {document.expiryDate || expiryInfo.needsExpiryPrompt ? (
+                <InfoChip label={document.expiryDate ? expiryInfo.badgeLabel : 'Add expiry date'} tone={expiryInfo.tone} />
+              ) : null}
+            </View>
+            <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+            <Text style={styles.meta}>
+              {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
+            </Text>
+            <Text style={styles.meta}>{numberLabel}</Text>
+            <View style={styles.documentActionRow}>
+              {document.localFileUri ? (
+                <Pressable onPress={() => openPrimarySource(document)} style={styles.documentActionLink}>
+                  <MaterialIcons name="visibility" size={16} color={colors.primaryBlue} />
+                  <Text style={styles.documentActionText}>View</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => {
+                  setDraft(withSpecializedDocumentData(document));
+                  setEditorVisible(true);
+                }}
+                style={styles.documentActionLink}
+              >
+                <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
+                <Text style={styles.documentActionText}>Edit</Text>
+              </Pressable>
+              <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.documentActionLink}>
+                <MaterialIcons name="delete-outline" size={16} color={colors.danger} />
+                <Text style={styles.documentActionDanger}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (document.documentType === 'payment_card') {
+      return (
+        <View key={document.id} style={styles.physicalDocumentCard}>
+          <PaymentCardDocument
+            document={document}
+            traveller={traveller}
+            onPress={() => {
+              setSelectedId(document.id);
+              setPaymentCardOpen(false);
+              setDetailVisible(true);
+            }}
+          />
+          <View style={styles.documentMetaBlock}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Payment card</Text>
+              <VerificationBadge status={getPaymentCardVerificationStatus(document)} />
+              {document.expiryDate || expiryInfo.needsExpiryPrompt ? (
+                <InfoChip label={document.expiryDate ? expiryInfo.badgeLabel : 'Add expiry date'} tone={expiryInfo.tone} />
+              ) : null}
+            </View>
+            <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+            <Text style={styles.meta}>{maskPaymentCardNumber(document.documentNumber)}</Text>
+            <View style={styles.documentActionRow}>
+              {document.localFileUri ? (
+                <Pressable onPress={() => openPrimarySource(document)} style={styles.documentActionLink}>
+                  <MaterialIcons name="visibility" size={16} color={colors.primaryBlue} />
+                  <Text style={styles.documentActionText}>View</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => {
+                  setDraft(withSpecializedDocumentData(document));
+                  setEditorVisible(true);
+                }}
+                style={styles.documentActionLink}
+              >
+                <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
+                <Text style={styles.documentActionText}>Edit</Text>
+              </Pressable>
+              <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.documentActionLink}>
+                <MaterialIcons name="delete-outline" size={16} color={colors.danger} />
+                <Text style={styles.documentActionDanger}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (isFormalDocumentType(document.documentType)) {
+      return (
+        <View key={document.id} style={styles.physicalDocumentCard}>
+          <FormalDocumentRecord
+            document={document}
+            traveller={traveller}
+            onPress={() => {
+              setSelectedId(document.id);
+              setFormalDocumentOpen(false);
+              setDetailVisible(true);
+            }}
+            onOpenSource={() => openPrimarySource(document)}
+          />
+          <View style={styles.documentMetaBlock}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{documentLabels[document.documentType]}</Text>
+              <VerificationBadge status={getFormalDocumentVerificationStatus(document)} />
+              {document.expiryDate || expiryInfo.needsExpiryPrompt ? (
+                <InfoChip label={document.expiryDate ? expiryInfo.badgeLabel : 'Add expiry date'} tone={expiryInfo.tone} />
+              ) : null}
+            </View>
+            <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+            <Text style={styles.meta}>
+              {document.expiryDate
+                ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}`
+                : expiryInfo.needsExpiryPrompt
+                  ? 'Add expiry date to enable warnings'
+                  : 'No expiry date saved'}
+            </Text>
+            <View style={styles.documentActionRow}>
+              {document.localFileUri ? (
+                <Pressable onPress={() => openPrimarySource(document)} style={styles.documentActionLink}>
+                  <MaterialIcons name="visibility" size={16} color={colors.primaryBlue} />
+                  <Text style={styles.documentActionText}>View</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => {
+                  setDraft(withSpecializedDocumentData(document));
+                  setEditorVisible(true);
+                }}
+                style={styles.documentActionLink}
+              >
+                <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
+                <Text style={styles.documentActionText}>Edit</Text>
+              </Pressable>
+              <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.documentActionLink}>
+                <MaterialIcons name="delete-outline" size={16} color={colors.danger} />
+                <Text style={styles.documentActionDanger}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <Pressable
+        key={document.id}
+        onPress={() => {
+          setSelectedId(document.id);
+          setDetailVisible(true);
+        }}
+        style={styles.documentRow}
+      >
+        {previewUnlocked && document.previewUri ? (
+          <View style={styles.thumbnail}>
+            <ManagedFileImage uri={document.previewUri} mimeType={document.mimeType} style={styles.thumbnail} contentFit="cover" />
+          </View>
+        ) : (
+          <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
+            <MaterialIcons name="lock" size={22} color={colors.textMuted} />
+          </View>
+        )}
+        <View style={styles.copy}>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{documentLabels[document.documentType]}</Text>
+            {document.expiryDate || expiryInfo.needsExpiryPrompt ? (
+              <InfoChip label={document.expiryDate ? expiryInfo.badgeLabel : 'Add expiry date'} tone={expiryInfo.tone} />
+            ) : null}
+          </View>
+          <View style={styles.inlineRow}>
+            {traveller ? <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} size={26} /> : null}
+            <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
+          </View>
+          <Text style={styles.meta}>
+            {document.expiryDate
+              ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}`
+              : expiryInfo.needsExpiryPrompt
+                ? 'Add expiry date to enable warnings'
+                : 'No expiry date saved'}
+          </Text>
+          <Text style={styles.meta}>{numberLabel}</Text>
+          {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
+        </View>
+        <View style={styles.iconColumn}>
+          <Pressable
+            onPress={() => {
+              setDraft(withSpecializedDocumentData(document));
+              setEditorVisible(true);
+            }}
+            style={styles.iconButton}
+          >
+            <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+          </Pressable>
+          <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
+            <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+          </Pressable>
+        </View>
+      </Pressable>
+    );
+  }
+
+  function openFlightTicketArea() {
+    router.push('/flight-tickets');
+  }
+
+  function filterToPassports() {
+    setPrimaryFilter('type');
+    setTypeFilter('passport');
+    setGroupMode('flat');
+  }
+
+  function openHotelQuickAccess() {
+    if (!selectedTripId) {
+      Alert.alert('Trip needed', 'Create or select a trip first so Pineapple can open the hotel information for that journey.');
+      return;
+    }
+
+    setActiveTrip(selectedTripId);
+    router.push({ pathname: '/trip/[tripId]', params: { tripId: selectedTripId, focus: 'hotel' } });
+  }
+
   return (
     <AppScreen
       footer={<DocumentFloatingActionButton onPress={() => setAddSheetVisible(true)} />}
@@ -1113,6 +1465,21 @@ export default function VaultScreen() {
       </View>
 
       <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
+
+      <View style={styles.quickAccessRow}>
+        <Pressable onPress={openFlightTicketArea} style={styles.quickAccessButton}>
+          <MaterialIcons name="flight-takeoff" size={22} color={colors.primaryBlue} />
+          <Text style={styles.quickAccessLabel}>Flights</Text>
+        </Pressable>
+        <Pressable onPress={filterToPassports} style={styles.quickAccessButton}>
+          <MaterialIcons name="contact-page" size={22} color={colors.primaryBlue} />
+          <Text style={styles.quickAccessLabel}>Passports</Text>
+        </Pressable>
+        <Pressable onPress={openHotelQuickAccess} style={styles.quickAccessButton}>
+          <MaterialIcons name="hotel" size={22} color={colors.primaryBlue} />
+          <Text style={styles.quickAccessLabel}>Hotels</Text>
+        </Pressable>
+      </View>
 
       {!!expiryWarnings.length ? (
         <AppCard title="Expiry warnings" subtitle="Documents that need attention before travel.">
@@ -1192,289 +1559,11 @@ export default function VaultScreen() {
           </AppCard>
 
           {groupedDocuments.length ? (
-        groupedDocuments.map((group) => (
-          <AppCard key={group.title} title={group.title}>
-            {group.documents.map((document) => {
-              const traveller = bundle.travellers.find((item) => item.id === document.travellerId);
-              const previewUnlocked = isVaultUnlocked || !document.sensitive;
-              const numberLabel = previewUnlocked ? document.documentNumber || 'No number saved' : maskSensitive(document.documentNumber);
-              const expiryInfo = getDocumentExpiryInfo(document.documentType, document.expiryDate);
-
-              if (document.documentType === 'passport') {
-                return (
-                  <View key={document.id} style={styles.passportRow}>
-                    <PassportDocument
-                      document={document}
-                      traveller={traveller}
-                      onPress={() => {
-                        setSelectedId(document.id);
-                        setPassportOpen(false);
-                        setDetailVisible(true);
-                      }}
-                      compact
-                    />
-                    <View style={styles.passportMeta}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.title}>Passport</Text>
-                        <VerificationBadge status={getPassportVerificationStatus(document, traveller)} />
-                      </View>
-                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
-                      <Text style={styles.meta}>
-                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
-                      </Text>
-                      <Text style={styles.meta}>{numberLabel}</Text>
-                      {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
-                    </View>
-                    <View style={styles.iconColumn}>
-                      <Pressable
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(document));
-                          setEditorVisible(true);
-                        }}
-                        style={styles.iconButton}
-                      >
-                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                      </Pressable>
-                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
-                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              }
-
-              if (document.documentType === 'driving_licence') {
-                return (
-                  <View key={document.id} style={styles.passportRow}>
-                    <DrivingLicenceDocument
-                      document={document}
-                      traveller={traveller}
-                      onPress={() => {
-                        setSelectedId(document.id);
-                        setDrivingLicenceOpen(false);
-                        setDetailVisible(true);
-                      }}
-                      compact
-                    />
-                    <View style={styles.passportMeta}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.title}>Driving licence</Text>
-                        <VerificationBadge status={getDrivingLicenceVerificationStatus(document, traveller)} />
-                      </View>
-                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
-                      <Text style={styles.meta}>
-                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
-                      </Text>
-                      <Text style={styles.meta}>{numberLabel}</Text>
-                      <Text style={styles.meta}>
-                        {document.secondaryLocalFileUri ? 'Front and back scans saved' : document.localFileUri ? 'Front scan only' : 'Metadata only • No scans attached'}
-                      </Text>
-                    </View>
-                    <View style={styles.iconColumn}>
-                      <Pressable
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(document));
-                          setEditorVisible(true);
-                        }}
-                        style={styles.iconButton}
-                      >
-                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                      </Pressable>
-                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
-                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              }
-
-              if (document.documentType === 'ghic') {
-                return (
-                  <View key={document.id} style={styles.passportRow}>
-                    <HealthCardDocument
-                      document={document}
-                      traveller={traveller}
-                      onPress={() => {
-                        setSelectedId(document.id);
-                        setHealthCardOpen(false);
-                        setDetailVisible(true);
-                      }}
-                      compact
-                    />
-                    <View style={styles.passportMeta}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.title}>GHIC / EHIC</Text>
-                        <VerificationBadge status={getHealthCardVerificationStatus(document, traveller)} />
-                      </View>
-                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
-                      <Text style={styles.meta}>
-                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
-                      </Text>
-                      <Text style={styles.meta}>{numberLabel}</Text>
-                      {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
-                    </View>
-                    <View style={styles.iconColumn}>
-                      <Pressable
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(document));
-                          setEditorVisible(true);
-                        }}
-                        style={styles.iconButton}
-                      >
-                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                      </Pressable>
-                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
-                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              }
-
-              if (document.documentType === 'payment_card') {
-                return (
-                  <View key={document.id} style={styles.passportRow}>
-                    <PaymentCardDocument
-                      document={document}
-                      traveller={traveller}
-                      onPress={() => {
-                        setSelectedId(document.id);
-                        setPaymentCardOpen(false);
-                        setDetailVisible(true);
-                      }}
-                      compact
-                    />
-                    <View style={styles.passportMeta}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.title}>Payment card</Text>
-                        <VerificationBadge status={getPaymentCardVerificationStatus(document)} />
-                      </View>
-                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
-                      <Text style={styles.meta}>
-                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : 'Add expiry date to enable warnings'}
-                      </Text>
-                      <Text style={styles.meta}>{maskPaymentCardNumber(document.documentNumber)}</Text>
-                      {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
-                    </View>
-                    <View style={styles.iconColumn}>
-                      <Pressable
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(document));
-                          setEditorVisible(true);
-                        }}
-                        style={styles.iconButton}
-                      >
-                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                      </Pressable>
-                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
-                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              }
-
-              if (isFormalDocumentType(document.documentType)) {
-                return (
-                  <View key={document.id} style={styles.passportRow}>
-                    <FormalDocumentRecord
-                      document={document}
-                      traveller={traveller}
-                      onPress={() => {
-                        setSelectedId(document.id);
-                        setFormalDocumentOpen(false);
-                        setDetailVisible(true);
-                      }}
-                      compact
-                      onOpenSource={() => openPrimarySource(document)}
-                    />
-                    <View style={styles.passportMeta}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.title}>{documentLabels[document.documentType]}</Text>
-                        <VerificationBadge status={getFormalDocumentVerificationStatus(document)} />
-                      </View>
-                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
-                      <Text style={styles.meta}>
-                        {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : expiryInfo.needsExpiryPrompt ? 'Add expiry date to enable warnings' : 'No expiry date saved'}
-                      </Text>
-                      <Text style={styles.meta}>{numberLabel}</Text>
-                      {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
-                    </View>
-                    <View style={styles.iconColumn}>
-                      <Pressable
-                        onPress={() => {
-                          setDraft(withSpecializedDocumentData(document));
-                          setEditorVisible(true);
-                        }}
-                        style={styles.iconButton}
-                      >
-                        <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                      </Pressable>
-                      <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
-                        <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              }
-
-              return (
-                <Pressable
-                  key={document.id}
-                  onPress={() => {
-                    setSelectedId(document.id);
-                    setDetailVisible(true);
-                  }}
-                  style={styles.documentRow}
-                >
-                  {previewUnlocked && document.previewUri ? (
-                    <View style={styles.thumbnail}>
-                      <ManagedFileImage uri={document.previewUri} mimeType={document.mimeType} style={styles.thumbnail} contentFit="cover" />
-                    </View>
-                  ) : (
-                    <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-                      <MaterialIcons name="lock" size={22} color={colors.textMuted} />
-                    </View>
-                  )}
-                  <View style={styles.copy}>
-                    <View style={styles.titleRow}>
-                      <Text style={styles.title}>{documentLabels[document.documentType]}</Text>
-                      {(document.expiryDate || expiryInfo.needsExpiryPrompt) ? (
-                        <InfoChip
-                          label={document.expiryDate ? expiryInfo.badgeLabel : 'Add expiry date'}
-                          tone={expiryInfo.tone}
-                        />
-                      ) : null}
-                    </View>
-                    <View style={styles.inlineRow}>
-                      {traveller ? <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} size={26} /> : null}
-                      <Text style={styles.meta}>{document.holderName || traveller?.fullName || 'Trip-wide document'}</Text>
-                    </View>
-                    <Text style={styles.meta}>
-                      {document.expiryDate ? `${formatShortDate(document.expiryDate)} • ${expiryInfo.relativeLabel}` : expiryInfo.needsExpiryPrompt ? 'Add expiry date to enable warnings' : 'No expiry date saved'}
-                    </Text>
-                    <Text style={styles.meta}>{numberLabel}</Text>
-                    {!document.localFileUri ? <Text style={styles.meta}>Metadata only • No local file attached</Text> : null}
-                  </View>
-                  <View style={styles.iconColumn}>
-                    <Pressable
-                      onPress={() => {
-                        setDraft(withSpecializedDocumentData(document));
-                        setEditorVisible(true);
-                      }}
-                      style={styles.iconButton}
-                    >
-                      <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                    </Pressable>
-                    <Pressable onPress={() => confirmDeleteDocument(document.id)} style={styles.iconButton}>
-                      <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                    </Pressable>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </AppCard>
-        ))
+            groupedDocuments.map((group) => (
+              <AppCard key={group.title} title={group.title}>
+                {group.documents.map((document) => renderDocumentListItem(document))}
+              </AppCard>
+            ))
       ) : (
         <AppCard>
           <EmptyState
@@ -2486,6 +2575,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  quickAccessRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  quickAccessButton: {
+    flex: 1,
+    minHeight: 84,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    ...shadows.card,
+  },
+  quickAccessLabel: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
   warningList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2519,15 +2630,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primaryBlueBorder,
     backgroundColor: colors.white,
   },
-  passportRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.primaryBlueBorder,
-    backgroundColor: '#FAFCFF',
+  physicalDocumentCard: {
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   thumbnail: {
     width: 72,
@@ -2545,10 +2650,8 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
-  passportMeta: {
-    flex: 1,
+  documentMetaBlock: {
     gap: spacing.xs,
-    justifyContent: 'center',
   },
   titleRow: {
     flexDirection: 'row',
@@ -2577,6 +2680,28 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
     lineHeight: 18,
+  },
+  documentActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    alignItems: 'center',
+    paddingTop: spacing.xs,
+  },
+  documentActionLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  documentActionText: {
+    color: colors.primaryBlue,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
+  documentActionDanger: {
+    color: colors.danger,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
   },
   iconColumn: {
     gap: spacing.xs,

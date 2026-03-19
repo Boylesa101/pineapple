@@ -28,6 +28,12 @@ type WikipediaSummaryResponse = {
 
 const WIKIPEDIA_SEARCH_URL = 'https://en.wikipedia.org/w/api.php';
 const WIKIPEDIA_SUMMARY_URL = 'https://en.wikipedia.org/api/rest_v1/page/summary';
+const WIKIMEDIA_HEADERS =
+  Platform.OS === 'web'
+    ? undefined
+    : {
+        'User-Agent': 'Pineapple/1.6 travel organiser',
+      };
 
 function getDestinationQueries(destination: string, destinationType: DestinationType) {
   const normalized = normalizeDestinationLabel(destination);
@@ -39,7 +45,7 @@ function getDestinationQueries(destination: string, destinationType: Destination
   const lastSegment = segments.at(-1) ?? normalized;
 
   if (destinationType === 'country') {
-    return [normalized, firstSegment];
+    return Array.from(new Set([`${normalized} tourism`, `${normalized} travel`, normalized, firstSegment]));
   }
 
   return Array.from(
@@ -50,7 +56,19 @@ function getDestinationQueries(destination: string, destinationType: Destination
 }
 
 async function fetchJson<T>(url: string) {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: WIKIMEDIA_HEADERS,
+  });
+  if (response.status === 429) {
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    const retry = await fetch(url, {
+      headers: WIKIMEDIA_HEADERS,
+    });
+    if (!retry.ok) {
+      throw new Error(`Destination image lookup failed with ${retry.status}.`);
+    }
+    return (await retry.json()) as T;
+  }
   if (!response.ok) {
     throw new Error(`Destination image lookup failed with ${response.status}.`);
   }
@@ -75,13 +93,25 @@ async function searchWikipediaTitles(query: string) {
 
 async function fetchWikipediaImage(title: string) {
   const payload = await fetchJson<WikipediaSummaryResponse>(`${WIKIPEDIA_SUMMARY_URL}/${encodeURIComponent(title)}`);
-  return payload.originalimage?.source ?? payload.thumbnail?.source ?? null;
+  const original = payload.originalimage?.source ?? null;
+  const thumbnail = payload.thumbnail?.source ?? null;
+
+  if (original && !original.toLowerCase().includes('.svg')) {
+    return original;
+  }
+
+  if (thumbnail && !thumbnail.toLowerCase().includes('.svg')) {
+    return thumbnail;
+  }
+
+  return null;
 }
 
 function inferMimeTypeFromUrl(url: string) {
   const lower = url.toLowerCase();
   if (lower.includes('.png')) return 'image/png';
   if (lower.includes('.webp')) return 'image/webp';
+  if (lower.includes('.gif')) return 'image/gif';
   return 'image/jpeg';
 }
 

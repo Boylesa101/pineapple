@@ -119,8 +119,9 @@ const styles = StyleSheet.create({
   destination: {
     color: colors.white,
     fontFamily: 'Poppins_700Bold',
-    fontSize: 24,
-    letterSpacing: 1.6,
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: 1.8,
   },
   title: {
     color: colors.white,
@@ -165,10 +166,6 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 44,
     height: 44,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.26)',
     alignItems: 'center',
     justifyContent: 'center',
   },

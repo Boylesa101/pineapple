@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.5 - 2026-03-19
+
+- Trip creation fix: creating a trip now works reliably even if the user only enters a destination, with safer save feedback and normalized destination handling in both the main Trips flow and the first-trip setup flow
+- Destination search + hero-image fix: trip destination entry now uses a lightweight searchable town/city/country field, and the destination-image service was hardened so Wikipedia lookups stop failing on `429` responses and cache cleanly after the first successful fetch
+- Trip-card polish: trip cards keep the premium image-led layout, remove the boxed styling around the flight/hotel/transfer shortcuts, and fall back to a clean gradient state instead of appearing blank when an image is unavailable
+- Home action-row alignment: `Travel Status`, `Document Vault`, and `SOS` now render as matching cards with `SOS` pinned at the far right
+- Vault cleanup: the Vault now leads with a quick-access row for flights, passports, and hotels, and its main document list now presents the physical-style passport, driving-licence, health-card, payment-card, and formal-document components as the primary items instead of bulky generic rows
+- Honest limitation: Google Wallet deep-linking for flight tickets is still not implemented, so Pineapple now routes that quick-access shortcut into an internal flight-tickets screen that explains the current limitation and opens the trip travel area instead
+
 ## 1.6.4 - 2026-03-18
 
 - Security hardening pass: upgraded current PIN protection to a stronger PBKDF2-based hash, persisted failed-attempt lockout state across app restarts, and reset cooldown state safely after valid PIN or biometric unlock

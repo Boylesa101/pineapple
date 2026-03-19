@@ -14,7 +14,6 @@ import { normalizeExpiryReminderSchedule } from './documentExpiry';
 
 export function validateTrip(input: TripDraft) {
   const errors: string[] = [];
-  if (!input.name.trim()) errors.push('Trip name is required.');
   if (!input.destination.trim()) errors.push('Destination is required.');
   if (!input.startDate) errors.push('Start date is required.');
   if (!input.endDate) errors.push('End date is required.');

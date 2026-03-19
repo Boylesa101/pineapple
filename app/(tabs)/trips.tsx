@@ -8,6 +8,7 @@ import { AppCard } from '@/components/AppCard';
 import { AppModal } from '@/components/AppModal';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
+import { DestinationSearchField } from '@/components/DestinationSearchField';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { EmptyState } from '@/components/EmptyState';
@@ -72,6 +73,11 @@ export default function TripsScreen() {
       setVisible(false);
       setDraft(emptyTripDraft);
       setTemplateId('none');
+    } catch (error) {
+      Alert.alert(
+        'Trip could not be saved',
+        error instanceof Error ? error.message : 'Pineapple could not save that trip right now. Try again.'
+      );
     } finally {
       setSaving(false);
     }
@@ -134,8 +140,27 @@ export default function TripsScreen() {
       <AppButton label="Add trip" onPress={openNewTrip} />
 
       <AppModal visible={visible} title={draft.id ? 'Edit trip' : 'Create trip'} onClose={() => setVisible(false)}>
-        <AppTextField label="Trip name" value={draft.name} onChangeText={(value) => setDraft((current) => ({ ...current, name: value }))} placeholder="Summer in Lisbon" />
-        <AppTextField label="Destination" value={draft.destination} onChangeText={(value) => setDraft((current) => ({ ...current, destination: value }))} placeholder="Lisbon, Portugal" />
+        <AppTextField
+          label="Trip name"
+          value={draft.name}
+          onChangeText={(value) => setDraft((current) => ({ ...current, name: value }))}
+          placeholder="Optional custom trip name"
+          helper="Leave this blank if you want Pineapple to use the destination as the trip title."
+        />
+        <DestinationSearchField
+          label="Destination"
+          value={draft.destination}
+          onChangeText={(value) => setDraft((current) => ({ ...current, destination: value }))}
+          onSelectSuggestion={(suggestion) =>
+            setDraft((current) => ({
+              ...current,
+              destination: suggestion.label,
+              name: current.name.trim() ? current.name : suggestion.label,
+            }))
+          }
+          placeholder="Search town, city, or country"
+          helper="Start typing a town, city, or country to improve image lookup and trip matching."
+        />
         <DateTimeField label="Start date" mode="date" value={draft.startDate} onChange={(value) => setDraft((current) => ({ ...current, startDate: value }))} />
         <DateTimeField label="End date" mode="date" value={draft.endDate} onChange={(value) => setDraft((current) => ({ ...current, endDate: value }))} />
         <View style={styles.statusField}>

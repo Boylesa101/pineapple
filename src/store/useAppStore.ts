@@ -443,10 +443,14 @@ export const useAppStore = create<StoreState>((set, get) => ({
   },
   saveTrip: async (draft) => {
     const existingTrip = draft.id ? get().data.trips.find((trip) => trip.id === draft.id) ?? null : null;
+    const normalizedDestination = normalizeDestinationLabel(draft.destination);
+    const normalizedName = draft.name.trim() || normalizedDestination || existingTrip?.name || 'Trip';
     const nextDestinationType = resolveDestinationType(draft.destination);
     const shouldRefreshHero = destinationNeedsHeroRefresh(draft, existingTrip);
     const preparedDraft: TripDraft = {
       ...draft,
+      name: normalizedName,
+      destination: normalizedDestination,
       destinationType: nextDestinationType,
       heroImageRemoteUrl: shouldRefreshHero ? null : draft.heroImageRemoteUrl ?? existingTrip?.heroImageRemoteUrl ?? null,
       heroImageStatus: shouldRefreshHero ? 'loading' : draft.heroImageStatus ?? existingTrip?.heroImageStatus ?? 'idle',

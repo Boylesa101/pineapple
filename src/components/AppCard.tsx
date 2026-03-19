@@ -1,5 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 
@@ -7,11 +7,12 @@ type Props = PropsWithChildren<{
   title?: string;
   subtitle?: string;
   right?: ReactNode;
+  style?: StyleProp<ViewStyle>;
 }>;
 
-export function AppCard({ title, subtitle, right, children }: Props) {
+export function AppCard({ title, subtitle, right, children, style }: Props) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, style]}>
       {(title || subtitle || right) && (
         <View style={styles.header}>
           <View style={styles.headerCopy}>

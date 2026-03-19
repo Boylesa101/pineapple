@@ -43,7 +43,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Optional biometric unlock when the device supports it
 - Auto-lock after inactivity, persistent PIN cooldown after repeated failures, and best-effort privacy overlay for the app switcher
 - Mockup-matched blue/white shell with a safe-area-aware bottom nav for Home, Account, Vault, Trips, and SOS
-- Trip CRUD with automatic destination hero imagery, local cached trip covers, and per-trip transfer / pickup notes
+- Trip CRUD with searchable destination entry, automatic destination hero imagery, local cached trip covers, and per-trip transfer / pickup notes
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
@@ -58,6 +58,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Document intake now leads with OCR-first actions in this order: `Scan document`, `Add photo for OCR`, then `Enter manually`
 - Live camera scan capture is now available for document intake, with OCR-supported types flowing straight into editable review when possible
 - The Vault now uses a floating blue add action with a cleaner add/import sheet for passport, driving-licence, health-card, payment-card, formal-document, and PDF/image intake
+- The Vault now includes a quick-access row for flights, passports, and hotel info under the main header, with an honest internal placeholder for future Google Wallet flight-ticket linking
 - Guided scan/import flow now shows framed capture guidance, animated processing states, and calmer OCR review messaging before Pineapple opens the editable fields view
 - Native camera scans now use a live document-scanner module on supported Android/iOS native builds, with a fallback to the plain camera flow only if the scanner is unavailable
 - Metadata-only document entries for cases where you want reminders and document numbers before attaching a file

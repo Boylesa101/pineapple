@@ -137,31 +137,44 @@ export default function HomeScreen() {
 
       <View style={styles.section}>
         <SectionHeader title="Travel status" right={alertCount ? `${alertCount} alert${alertCount === 1 ? '' : 's'}` : 'All clear'} />
-        <AppCard>
-          <View style={styles.travelStatusGrid}>
-            <View style={styles.actionCell}>
-              <MiniActionCard
-                icon={<MaterialIcons name="folder" size={26} color={colors.primaryBlue} />}
-                title="Document Vault"
-                description={`${bundle.documents.length || 0} document records ready for travel.`}
-                onPress={openVault}
-              />
-            </View>
-            <View style={styles.actionCell}>
-              <MiniActionCard
-                icon={<MaterialIcons name="sos" size={26} color={colors.dangerRed} />}
-                title="SOS"
-                description="Open emergency tools, embassy notes, and support info."
-                onPress={() => router.push('/sos')}
-              />
-            </View>
+        <View style={styles.travelStatusGrid}>
+          <View style={styles.actionCell}>
+            <MiniActionCard
+              style={styles.equalActionCard}
+              icon={<MaterialIcons name="travel-explore" size={26} color={colors.primaryBlue} />}
+              title="Travel Status"
+              description={
+                nextEvent
+                  ? `Next event live · ${countdownLabel(dashboardTrip?.startDate ?? new Date().toISOString())}`
+                  : `${expiryOverview.expiredCount + expiryOverview.expiringCount} doc alerts to review`
+              }
+              onPress={() => router.push('/warnings')}
+            />
           </View>
-          <View style={styles.chipRow}>
-            <InfoChip label={`${expiryOverview.expiredCount} expired`} tone={expiryOverview.expiredCount ? 'coral' : 'blue'} />
-            <InfoChip label={`${expiryOverview.expiringCount} expiring soon`} tone={expiryOverview.expiringCount ? 'gold' : 'blue'} />
-            <InfoChip label={nextEvent ? 'Itinerary live' : 'No next event'} tone="blue" />
+          <View style={styles.actionCell}>
+            <MiniActionCard
+              style={styles.equalActionCard}
+              icon={<MaterialIcons name="folder" size={26} color={colors.primaryBlue} />}
+              title="Document Vault"
+              description={`${bundle.documents.length || 0} document records ready for travel.`}
+              onPress={openVault}
+            />
           </View>
-        </AppCard>
+          <View style={styles.actionCell}>
+            <MiniActionCard
+              style={styles.equalActionCard}
+              icon={<MaterialIcons name="sos" size={26} color={colors.dangerRed} />}
+              title="SOS"
+              description="Open emergency tools, embassy notes, and support info."
+              onPress={() => router.push('/sos')}
+            />
+          </View>
+        </View>
+        <View style={styles.chipRow}>
+          <InfoChip label={`${expiryOverview.expiredCount} expired`} tone={expiryOverview.expiredCount ? 'coral' : 'blue'} />
+          <InfoChip label={`${expiryOverview.expiringCount} expiring soon`} tone={expiryOverview.expiringCount ? 'gold' : 'blue'} />
+          <InfoChip label={nextEvent ? 'Itinerary live' : 'No next event'} tone="blue" />
+        </View>
       </View>
 
       {dashboardTrip ? (
@@ -250,12 +263,15 @@ const styles = StyleSheet.create({
   travelStatusGrid: {
     flexDirection: 'row',
     gap: spacing.sm,
+    alignItems: 'stretch',
   },
   actionCell: {
     flex: 1,
   },
+  equalActionCard: {
+    minHeight: 142,
+  },
   chipRow: {
-    marginTop: spacing.sm,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
