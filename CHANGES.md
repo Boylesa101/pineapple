@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.6 - 2026-03-19
+
+- Trip-creation crash fix: traced the Android device failure to `saveTrip -> upsertTrip -> createId`, where Pineapple was using `expo-crypto`'s `randomUUID()` for local record IDs and hitting the runtime error `Native crypto module could not be used to get secure random number`
+- Runtime-safe ID generation: local record IDs for trips, travellers, documents, reminders, invites, conflicts, and related records now use one shared app-local ID generator instead of relying on the native crypto UUID path
+- Secure randomness cleanup: genuine security-sensitive paths now share one explicit secure-random helper for PIN salts, encrypted-file keys, structured-data keys, and backup salt/IV generation instead of mixing `randomUUID()`, `getRandomValues()`, and `CryptoJS` randomness
+- Cleaner save failures: trip creation and first-trip setup now translate low-level runtime errors into safer Pineapple user copy instead of exposing raw crypto/runtime wording to end users
+- Regression coverage: added ID-generation and secure-random error-message tests so local record creation can keep working even if a runtime lacks the broken UUID path
+
 ## 1.6.5 - 2026-03-19
 
 - Trip creation fix: creating a trip now works reliably even if the user only enters a destination, with safer save feedback and normalized destination handling in both the main Trips flow and the first-trip setup flow

@@ -5,6 +5,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 
 import type { PinLength, StoredSecurityConfig } from '@/types/models';
+import { getSecureRandomHex } from '@/utils/random';
 
 const SECURITY_KEY = 'pineapple.security';
 const PIN_PBKDF2_ITERATIONS = 150000;
@@ -24,12 +25,6 @@ export const defaultSecurityConfig: StoredSecurityConfig = {
   failedUnlockAttempts: 0,
   unlockBlockedUntil: null,
 };
-
-function bytesToHex(bytes: Uint8Array) {
-  return Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
 
 async function sha256(value: string) {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, value);
@@ -120,7 +115,7 @@ export async function clearSecurityConfig() {
 }
 
 export async function createPinConfig(pin: string, pinLength: PinLength) {
-  const salt = bytesToHex(Crypto.getRandomBytes(16));
+  const salt = getSecureRandomHex(16);
   const hash = await hashPinV3(pin, salt);
 
   return {

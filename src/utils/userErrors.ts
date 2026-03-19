@@ -36,6 +36,9 @@ export function toUserMessage(error: unknown, fallback: string) {
       return 'Pineapple could not open that stored document securely. Re-import the document if the problem continues.';
     case 'Secure document access is unavailable on this platform.':
       return 'Secure document access is not available in this runtime. Use the Android app build to open that document.';
+    case 'Secure random bytes are unavailable on this platform.':
+    case 'Secure random bytes are unavailable on this device build.':
+      return 'Pineapple could not generate a secure local key on this device build. Reinstall or update the app if this keeps happening.';
     default:
       return message.length > 160 ? fallback : message;
   }

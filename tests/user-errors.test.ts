@@ -16,6 +16,10 @@ test('backup and shared-trip errors are translated to user-friendly copy', () =>
     toUserMessage(new Error('Secure document decryption failed.'), 'Fallback'),
     'Pineapple could not open that stored document securely. Re-import the document if the problem continues.'
   );
+  assert.equal(
+    toUserMessage(new Error('Secure random bytes are unavailable on this device build.'), 'Fallback'),
+    'Pineapple could not generate a secure local key on this device build. Reinstall or update the app if this keeps happening.'
+  );
   assert.equal(toUserMessage(new Error('Trip not found.'), 'Fallback'), 'That trip is no longer available locally.');
 });
 

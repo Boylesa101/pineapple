@@ -116,6 +116,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Vault-managed document attachments are encrypted at rest in Pineapple storage on-device
 - Pineapple only materializes encrypted local sensitive files into a temporary readable cache when viewing or OCR needs access, and clears that cache when the app locks or backgrounds
 - Trip hero images are now stored in the same encrypted-at-rest local format as Vault attachments; non-Vault exports still remain normal app-managed files unless they are inside an encrypted backup
+- Local record IDs no longer rely on `expo-crypto` UUID generation; Pineapple now uses a runtime-safe app-local ID utility for trips, travellers, documents, reminders, invites, and similar records, while keeping true secure-random generation only for keys, salts, and IVs
 - Pineapple still uses `expo-sqlite` for structured local records, so whole-database engine encryption is not yet in place; instead, Pineapple encrypts sensitive text fields before they are written, while keeping IDs, timestamps, routing fields, and expiry dates plaintext where the app needs them for queries and navigation
 - Transient picker/cache copies are removed after import so scans are not left duplicated in common temp locations unnecessarily
 - OCR-generated temporary images are cleaned up after use

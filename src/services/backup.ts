@@ -12,6 +12,7 @@ import type {
   StoredSecurityConfig,
 } from '@/types/models';
 import { getManagedFileInfo, getManagedFolder, readManagedBase64File, writeBase64File, writeUtf8File } from '@/utils/fileStorage';
+import { getSecureRandomHex } from '@/utils/random';
 
 type ExportBackupArgs = {
   data: AppDataSnapshot;
@@ -87,8 +88,8 @@ export async function exportEncryptedBackup({ data, security, password }: Export
     attachments,
   };
 
-  const salt = CryptoJS.lib.WordArray.random(16);
-  const iv = CryptoJS.lib.WordArray.random(16);
+  const salt = CryptoJS.enc.Hex.parse(getSecureRandomHex(16));
+  const iv = CryptoJS.enc.Hex.parse(getSecureRandomHex(16));
   const keyMaterial = CryptoJS.PBKDF2(password, salt, {
     keySize: 512 / 32,
     iterations: BACKUP_PBKDF2_ITERATIONS,

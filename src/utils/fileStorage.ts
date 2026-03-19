@@ -1,10 +1,10 @@
 import { Platform } from 'react-native';
 import CryptoJS from 'crypto-js';
-import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 
 import { createId } from './ids';
+import { getSecureRandomHex } from './random';
 
 export type ManagedFolder = 'trips' | 'vault' | 'exports' | 'backups';
 
@@ -57,12 +57,6 @@ function canUseWebStorage() {
   return Platform.OS === 'web' && typeof window !== 'undefined' && 'localStorage' in window;
 }
 
-function bytesToHex(bytes: Uint8Array) {
-  return Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 function getFileName(uri: string) {
   return sanitizeFileName(uri.split('/').pop() || 'attachment.bin');
 }
@@ -109,7 +103,7 @@ async function loadOrCreateFileEncryptionKey() {
       return existing;
     }
 
-    const next = bytesToHex(globalThis.crypto.getRandomValues(new Uint8Array(64)));
+    const next = getSecureRandomHex(64);
     window.localStorage.setItem(FILE_ENCRYPTION_KEY, next);
     return next;
   }
@@ -119,7 +113,7 @@ async function loadOrCreateFileEncryptionKey() {
     return existing;
   }
 
-  const next = bytesToHex(Crypto.getRandomBytes(64));
+  const next = getSecureRandomHex(64);
   await SecureStore.setItemAsync(FILE_ENCRYPTION_KEY, next);
   return next;
 }
@@ -155,7 +149,7 @@ async function encryptBase64(base64: string, mimeType: string | null | undefined
     return null;
   }
 
-  const iv = CryptoJS.lib.WordArray.random(16);
+  const iv = CryptoJS.enc.Hex.parse(getSecureRandomHex(16));
   const { encryptionKey, macKey } = createCipherKeys(keyHex);
   const ciphertext = CryptoJS.AES.encrypt(base64, encryptionKey, {
     iv,

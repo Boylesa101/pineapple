@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import CryptoJS from 'crypto-js';
-import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import { getSecureRandomHex } from '@/utils/random';
 
 const STRUCTURED_DATA_KEY = 'pineapple.structured-data-key';
 const ENCRYPTED_TEXT_PREFIX = 'pineapple-secure:v1:';
@@ -16,12 +16,6 @@ type TextEnvelope = {
 
 function canUseWebStorage() {
   return Platform.OS === 'web' && typeof window !== 'undefined' && 'localStorage' in window;
-}
-
-function bytesToHex(bytes: Uint8Array) {
-  return Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
 }
 
 function createCipherKeys(rawKeyHex: string) {
@@ -42,7 +36,7 @@ async function loadOrCreateStructuredDataKey() {
       return existing;
     }
 
-    const next = bytesToHex(globalThis.crypto.getRandomValues(new Uint8Array(64)));
+    const next = getSecureRandomHex(64);
     window.localStorage.setItem(STRUCTURED_DATA_KEY, next);
     return next;
   }
@@ -52,7 +46,7 @@ async function loadOrCreateStructuredDataKey() {
     return existing;
   }
 
-  const next = bytesToHex(Crypto.getRandomBytes(64));
+  const next = getSecureRandomHex(64);
   await SecureStore.setItemAsync(STRUCTURED_DATA_KEY, next);
   return next;
 }
@@ -95,7 +89,7 @@ export async function encryptStructuredValue(value: string | null | undefined) {
     throw new Error('Structured data encryption is unavailable on this platform.');
   }
 
-  const iv = CryptoJS.lib.WordArray.random(16);
+  const iv = CryptoJS.enc.Hex.parse(getSecureRandomHex(16));
   const { encryptionKey, macKey } = createCipherKeys(keyHex);
   const ciphertext = CryptoJS.AES.encrypt(value, encryptionKey, {
     iv,

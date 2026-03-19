@@ -18,6 +18,7 @@ import { packingTemplates, type PackingTemplateId } from '@/data/packingTemplate
 import { useAppStore } from '@/store/useAppStore';
 import type { TripDraft, TripStatus } from '@/types/models';
 import { tripDateRange } from '@/utils/format';
+import { toUserMessage } from '@/utils/userErrors';
 import { validateTrip } from '@/utils/validation';
 
 const emptyTripDraft: TripDraft = {
@@ -76,7 +77,7 @@ export default function TripsScreen() {
     } catch (error) {
       Alert.alert(
         'Trip could not be saved',
-        error instanceof Error ? error.message : 'Pineapple could not save that trip right now. Try again.'
+        toUserMessage(error, 'Pineapple could not save that trip right now. Try again.')
       );
     } finally {
       setSaving(false);

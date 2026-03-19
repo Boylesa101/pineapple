@@ -11,6 +11,7 @@ import { DateTimeField } from '@/components/DateTimeField';
 import { DestinationSearchField } from '@/components/DestinationSearchField';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
+import { toUserMessage } from '@/utils/userErrors';
 import { validateTrip, validateTraveller } from '@/utils/validation';
 
 export default function CreateFirstTripScreen() {
@@ -99,7 +100,7 @@ export default function CreateFirstTripScreen() {
     } catch (error) {
       Alert.alert(
         'Trip could not be created',
-        error instanceof Error ? error.message : 'Pineapple could not finish creating that trip right now. Try again.'
+        toUserMessage(error, 'Pineapple could not finish creating that trip right now. Try again.')
       );
     } finally {
       setSaving(false);
