@@ -8,6 +8,7 @@ import { AppModal } from '@/components/AppModal';
 import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import type { Trip } from '@/types/models';
+import { daysUntil } from '@/utils/date';
 
 type Props = {
   trip: Trip;
@@ -35,9 +36,23 @@ function statusLabel(trip: Trip) {
     return 'Finding destination view';
   }
   if (trip.heroImageStatus === 'failed') {
-    return 'Showing default trip background';
+    return 'Showing default Pineapple image';
   }
   return null;
+}
+
+function daysTillTripLabel(trip: Trip) {
+  const days = daysUntil(trip.startDate);
+  if (days < 0) {
+    return 'Trip started';
+  }
+  if (days === 0) {
+    return 'Today';
+  }
+  if (days === 1) {
+    return '1 day';
+  }
+  return `${days} days`;
 }
 
 function buildAttributionRows(trip: Trip) {
@@ -80,7 +95,7 @@ function buildAttributionRows(trip: Trip) {
 
   return {
     title: 'Image attribution',
-    rows: ['Default trip background'],
+    rows: ['Default Pineapple image'],
     linkLabel: null,
     linkUrl: null,
   };
@@ -115,19 +130,22 @@ export function TripHeroCard({
               <Text style={styles.title}>{trip.name}</Text>
               <Text style={styles.subtitle}>{subtitle}</Text>
               <Text style={styles.meta}>{meta}</Text>
-              {badgeLabel ? <Text style={styles.badge}>{badgeLabel}</Text> : null}
+              <View style={styles.badgeRow}>
+                {badgeLabel ? <Text style={styles.badge}>{badgeLabel}</Text> : null}
+                <Text style={styles.badgeSecondary}>Days till trip {daysTillTripLabel(trip)}</Text>
+              </View>
               {fallbackLabel ? <Text style={styles.helper}>{fallbackLabel}</Text> : null}
             </View>
 
             <View style={styles.actions}>
               <Pressable onPress={onOpenFlights} disabled={!onOpenFlights} style={styles.iconButton}>
-                <MaterialIcons name="flight" size={20} color={colors.white} />
+                <MaterialIcons name="flight" size={22} color={colors.white} />
               </Pressable>
               <Pressable onPress={onOpenHotel} disabled={!onOpenHotel} style={styles.iconButton}>
-                <MaterialIcons name="hotel" size={20} color={colors.white} />
+                <MaterialIcons name="hotel" size={22} color={colors.white} />
               </Pressable>
               <Pressable onPress={onOpenTransfers} disabled={!onOpenTransfers} style={styles.iconButton}>
-                <MaterialIcons name="swap-horiz" size={20} color={colors.white} />
+                <MaterialIcons name="swap-horiz" size={22} color={colors.white} />
               </Pressable>
             </View>
           </View>
@@ -146,7 +164,7 @@ export function TripHeroCard({
       </Pressable>
 
       <AppModal visible={attributionVisible} title={attributionContent.title} onClose={() => setAttributionVisible(false)}>
-        <Text style={styles.modalLead}>{trip.attributionText || 'Default trip background'}</Text>
+        <Text style={styles.modalLead}>{trip.attributionText || 'Default Pineapple image'}</Text>
         <View style={styles.modalRows}>
           {attributionContent.rows.map((row) => (
             <Text key={row} style={styles.modalRow}>
@@ -228,8 +246,23 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignSelf: 'flex-start',
-    marginTop: spacing.xs,
     backgroundColor: 'rgba(255,255,255,0.18)',
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  badgeSecondary: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     color: colors.white,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,

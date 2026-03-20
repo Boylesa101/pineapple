@@ -42,7 +42,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Direct-to-unlock auth flow with rotating multilingual greetings and 100 short etiquette facts to keep the lock screen polished without adding extra taps
 - Optional biometric unlock when the device supports it
 - Auto-lock after inactivity, persistent PIN cooldown after repeated failures, and best-effort privacy overlay for the app switcher
-- Mockup-matched blue/white shell with a safe-area-aware bottom nav for Home, Account, Vault, Trips, and SOS
+- Mockup-matched blue/white shell with a safe-area-aware bottom nav for Home, Vault, and SOS, while trip-specific navigation now lives inside the trip flow itself
 - Trip CRUD with searchable destination entry, automatic destination hero imagery, local cached trip covers, and per-trip transfer / pickup notes
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
@@ -67,11 +67,13 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Home alerts now live behind the bell icon instead of taking over the dashboard, with a red-dot badge only when something needs attention
 - Reusable document expiry status system for passports, visas, GHIC / EHIC, travel insurance, driving licences, ID cards, and custom docs with expiry dates
 - Packing lists grouped by category with multi-traveller assignment, templates, duplicate action, and priority flags
-- Flight / travel segment management
-- Hotel stay management with automatic free image lookup and offline cache after the first successful fetch
+- Flight / train segment management with outbound/return direction support, searchable airline/operator selection, stored provider codes, and safe airline-logo fallback handling
+- Hotel stay management with free OpenStreetMap/Nominatim address search, editable address normalization, automatic free image lookup, and offline cache after the first successful fetch
+- Structured transfer/pickup management with provider, method, location, time, and notes stored directly on the trip
 - Automatic trip-card destination images that resolve from country or place text, cache locally after the first fetch, and fall back cleanly when offline or unresolved
 - Trip-card destination imagery now prefers Pexels when an optional `EXPO_PUBLIC_PEXELS_API_KEY` is supplied at build time, falls back to Wikimedia Commons otherwise, caches the chosen image locally, and exposes source attribution through a small in-card info action
 - Flight entry now includes a built-in searchable airport picker with stored IATA codes for cleaner travel records
+- Trip detail now uses a contextual footer for `Packing`, `Itinerary`, `Flight`, and `Hotel`, keeping those sections in the trip flow instead of the global footer
 - Chronological itinerary timeline
 - Emergency reference storage per trip
 - High-contrast Travel Mode with family overview, traveller tabs/swipe, quick copy actions, and temporary sensitive reveal
@@ -118,6 +120,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Vault-managed document attachments are encrypted at rest in Pineapple storage on-device
 - Pineapple only materializes encrypted local sensitive files into a temporary readable cache when viewing or OCR needs access, and clears that cache when the app locks or backgrounds
 - Trip hero images are now stored in the same encrypted-at-rest local format as Vault attachments; non-Vault exports still remain normal app-managed files unless they are inside an encrypted backup
+- Vault PIN unlock now uses the same real lockout-aware verification path as the main app unlock flow instead of a weaker raw PIN check
 - Local record IDs no longer rely on `expo-crypto` UUID generation; Pineapple now uses a runtime-safe app-local ID utility for trips, travellers, documents, reminders, invites, and similar records, while keeping true secure-random generation only for keys, salts, and IVs
 - Pineapple still uses `expo-sqlite` for structured local records, so whole-database engine encryption is not yet in place; instead, Pineapple encrypts sensitive text fields before they are written, while keeping IDs, timestamps, routing fields, and expiry dates plaintext where the app needs them for queries and navigation
 - Transient picker/cache copies are removed after import so scans are not left duplicated in common temp locations unnecessarily

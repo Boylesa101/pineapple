@@ -128,6 +128,7 @@ type StoreState = {
   ) => Promise<void>;
   unlockWithPin: (pin: string) => Promise<boolean>;
   confirmPin: (pin: string) => Promise<boolean>;
+  unlockVaultWithPin: (pin: string) => Promise<boolean>;
   unlockWithBiometrics: (scope?: 'app' | 'vault') => Promise<boolean>;
   lockApp: () => void;
   unlockVault: (seconds?: number) => void;
@@ -392,6 +393,13 @@ export const useAppStore = create<StoreState>((set, get) => ({
     }
   },
   confirmPin: async (pin) => verifyPin(pin, get().security),
+  unlockVaultWithPin: async (pin) => {
+    const unlocked = await get().unlockWithPin(pin);
+    if (unlocked) {
+      get().unlockVault();
+    }
+    return unlocked;
+  },
   unlockWithBiometrics: async (scope = 'app') => {
     try {
       const enabled = await canUseBiometrics();
@@ -471,8 +479,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
       existingTrip?.heroImageRemoteUrl ??
       null;
     const preservedAttribution =
-      draft.attributionMeta ?? existingTrip?.attributionMeta ?? { source: 'fallback' as const, sourceLabel: 'Default trip background' };
-    const preservedAttributionText = draft.attributionText ?? existingTrip?.attributionText ?? 'Default trip background';
+      draft.attributionMeta ?? existingTrip?.attributionMeta ?? { source: 'fallback' as const, sourceLabel: 'Default Pineapple image' };
+    const preservedAttributionText = draft.attributionText ?? existingTrip?.attributionText ?? 'Default Pineapple image';
     const preparedDraft: TripDraft = {
       ...draft,
       name: normalizedName,
@@ -481,12 +489,17 @@ export const useAppStore = create<StoreState>((set, get) => ({
       destinationImageLocalPath: shouldRefreshHero ? null : preservedLocalPath,
       destinationImageRemoteUrl: shouldRefreshHero ? null : preservedRemoteUrl,
       destinationImageSource: shouldRefreshHero ? 'fallback' : draft.destinationImageSource ?? existingTrip?.destinationImageSource ?? 'fallback',
-      attributionText: shouldRefreshHero ? 'Default trip background' : preservedAttributionText,
-      attributionMeta: shouldRefreshHero ? { source: 'fallback', sourceLabel: 'Default trip background' } : preservedAttribution,
+      attributionText: shouldRefreshHero ? 'Default Pineapple image' : preservedAttributionText,
+      attributionMeta: shouldRefreshHero ? { source: 'fallback', sourceLabel: 'Default Pineapple image' } : preservedAttribution,
       heroImageRemoteUrl: shouldRefreshHero ? null : preservedRemoteUrl,
       heroImageStatus: shouldRefreshHero ? 'loading' : draft.heroImageStatus ?? existingTrip?.heroImageStatus ?? 'idle',
       coverImageUri: shouldRefreshHero ? null : preservedLocalPath,
       transferSummary: draft.transferSummary ?? existingTrip?.transferSummary ?? '',
+      transferProvider: draft.transferProvider ?? existingTrip?.transferProvider ?? '',
+      transferMethod: draft.transferMethod ?? existingTrip?.transferMethod ?? '',
+      transferLocation: draft.transferLocation ?? existingTrip?.transferLocation ?? '',
+      transferTime: draft.transferTime ?? existingTrip?.transferTime ?? null,
+      transferNotes: draft.transferNotes ?? existingTrip?.transferNotes ?? '',
     };
 
     const id = await upsertTrip(preparedDraft);
@@ -566,6 +579,10 @@ export const useAppStore = create<StoreState>((set, get) => ({
   saveTravelSegment: async (draft) => {
     const id = await upsertTravelSegment({
       ...draft,
+      transportType: draft.transportType ?? 'flight',
+      travelDirection: draft.travelDirection ?? 'other',
+      providerCode: draft.providerCode ?? '',
+      providerLogoUrl: draft.providerLogoUrl ?? null,
       departureAirportCode: draft.departureAirportCode ?? '',
       arrivalAirportCode: draft.arrivalAirportCode ?? '',
     });
@@ -579,6 +596,10 @@ export const useAppStore = create<StoreState>((set, get) => ({
     const preparedDraft = {
       ...draft,
       id,
+      city: draft.city ?? existingHotel?.city ?? '',
+      country: draft.country ?? existingHotel?.country ?? '',
+      latitude: draft.latitude ?? existingHotel?.latitude ?? null,
+      longitude: draft.longitude ?? existingHotel?.longitude ?? null,
       hotelImageLocalPath: existingHotel?.hotelImageLocalPath ?? draft.hotelImageLocalPath ?? null,
       hotelImageRemoteUrl: existingHotel?.hotelImageRemoteUrl ?? draft.hotelImageRemoteUrl ?? null,
       hotelImageSource: existingHotel?.hotelImageSource ?? draft.hotelImageSource ?? 'fallback',

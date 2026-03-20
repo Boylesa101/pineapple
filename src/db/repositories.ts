@@ -269,6 +269,11 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         attributionMeta: await decryptField(trip.attributionMeta),
         notes: (await decryptField(trip.notes)) ?? '',
         transferSummary: (await decryptField(trip.transferSummary)) ?? '',
+        transferProvider: (await decryptField(trip.transferProvider)) ?? '',
+        transferMethod: (await decryptField(trip.transferMethod)) ?? '',
+        transferLocation: (await decryptField(trip.transferLocation)) ?? '',
+        transferTime: trip.transferTime ?? null,
+        transferNotes: (await decryptField(trip.transferNotes)) ?? '',
       })
     )
   );
@@ -321,7 +326,12 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
   const decryptedTravelSegments = await Promise.all(
     travelSegments.map(async (segment) => ({
       ...segment,
+      transportType: segment.transportType === 'train' ? 'train' : 'flight',
+      travelDirection:
+        segment.travelDirection === 'outbound' || segment.travelDirection === 'return' ? segment.travelDirection : 'other',
       airline: (await decryptField(segment.airline)) ?? '',
+      providerCode: (await decryptField(segment.providerCode)) ?? '',
+      providerLogoUrl: await decryptField(segment.providerLogoUrl),
       flightNumber: (await decryptField(segment.flightNumber)) ?? '',
       departureAirport: (await decryptField(segment.departureAirport)) ?? '',
       departureAirportCode: (await decryptField(segment.departureAirportCode)) ?? '',
@@ -340,6 +350,10 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         ...hotel,
         hotelName: (await decryptField(hotel.hotelName)) ?? '',
         address: (await decryptField(hotel.address)) ?? '',
+        city: (await decryptField(hotel.city)) ?? '',
+        country: (await decryptField(hotel.country)) ?? '',
+        latitude: typeof hotel.latitude === 'number' ? hotel.latitude : hotel.latitude ? Number(hotel.latitude) : null,
+        longitude: typeof hotel.longitude === 'number' ? hotel.longitude : hotel.longitude ? Number(hotel.longitude) : null,
         hotelImageLocalPath: hotel.hotelImageLocalPath ?? null,
         hotelImageRemoteUrl: await decryptField(hotel.hotelImageRemoteUrl),
         hotelImageAttributionText: await decryptField(hotel.hotelImageAttributionText),
@@ -449,12 +463,16 @@ export async function upsertTrip(input: TripDraft) {
   const encryptedAttributionMeta = await encryptField(input.attributionMeta ? JSON.stringify(input.attributionMeta) : null);
   const encryptedNotes = (await encryptField(input.notes ?? '')) ?? '';
   const encryptedTransferSummary = (await encryptField(input.transferSummary ?? '')) ?? '';
+  const encryptedTransferProvider = (await encryptField(input.transferProvider ?? '')) ?? '';
+  const encryptedTransferMethod = (await encryptField(input.transferMethod ?? '')) ?? '';
+  const encryptedTransferLocation = (await encryptField(input.transferLocation ?? '')) ?? '';
+  const encryptedTransferNotes = (await encryptField(input.transferNotes ?? '')) ?? '';
 
   await db.runAsync(
     `INSERT INTO trips (
-      id, name, destination, destinationType, startDate, endDate, destinationImageLocalPath, destinationImageRemoteUrl, destinationImageSource, attributionText, attributionMeta, coverImageUri, heroImageRemoteUrl, heroImageStatus, notes, transferSummary, status, createdAt, updatedAt
+      id, name, destination, destinationType, startDate, endDate, destinationImageLocalPath, destinationImageRemoteUrl, destinationImageSource, attributionText, attributionMeta, coverImageUri, heroImageRemoteUrl, heroImageStatus, notes, transferSummary, transferProvider, transferMethod, transferLocation, transferTime, transferNotes, status, createdAt, updatedAt
     )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        destination = excluded.destination,
@@ -471,6 +489,11 @@ export async function upsertTrip(input: TripDraft) {
        heroImageStatus = excluded.heroImageStatus,
        notes = excluded.notes,
        transferSummary = excluded.transferSummary,
+       transferProvider = excluded.transferProvider,
+       transferMethod = excluded.transferMethod,
+       transferLocation = excluded.transferLocation,
+       transferTime = excluded.transferTime,
+       transferNotes = excluded.transferNotes,
        status = excluded.status,
        updatedAt = excluded.updatedAt`,
     id,
@@ -489,6 +512,11 @@ export async function upsertTrip(input: TripDraft) {
     input.heroImageStatus ?? 'idle',
     encryptedNotes,
     encryptedTransferSummary,
+    encryptedTransferProvider,
+    encryptedTransferMethod,
+    encryptedTransferLocation,
+    input.transferTime ?? null,
+    encryptedTransferNotes,
     input.status,
     timestamp,
     timestamp
@@ -730,6 +758,8 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
   const timestamp = now();
   const id = input.id ?? createId('segment');
   const encryptedAirline = (await encryptField(input.airline)) ?? '';
+  const encryptedProviderCode = (await encryptField(input.providerCode ?? '')) ?? '';
+  const encryptedProviderLogoUrl = await encryptField(input.providerLogoUrl ?? null);
   const encryptedFlightNumber = (await encryptField(input.flightNumber)) ?? '';
   const encryptedDepartureAirport = (await encryptField(input.departureAirport)) ?? '';
   const encryptedDepartureAirportCode = (await encryptField(input.departureAirportCode)) ?? '';
@@ -741,11 +771,15 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
   const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
-    `INSERT INTO travel_segments (id, tripId, airline, flightNumber, departureAirport, departureAirportCode, arrivalAirport, arrivalAirportCode, departureTime, arrivalTime, terminal, gate, bookingRef, notes, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO travel_segments (id, tripId, transportType, travelDirection, airline, providerCode, providerLogoUrl, flightNumber, departureAirport, departureAirportCode, arrivalAirport, arrivalAirportCode, departureTime, arrivalTime, terminal, gate, bookingRef, notes, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
+       transportType = excluded.transportType,
+       travelDirection = excluded.travelDirection,
        airline = excluded.airline,
+       providerCode = excluded.providerCode,
+       providerLogoUrl = excluded.providerLogoUrl,
        flightNumber = excluded.flightNumber,
        departureAirport = excluded.departureAirport,
        departureAirportCode = excluded.departureAirportCode,
@@ -760,7 +794,11 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
        updatedAt = excluded.updatedAt`,
     id,
     input.tripId,
+    input.transportType ?? 'flight',
+    input.travelDirection ?? 'other',
     encryptedAirline,
+    encryptedProviderCode,
+    encryptedProviderLogoUrl,
     encryptedFlightNumber,
     encryptedDepartureAirport,
     encryptedDepartureAirportCode,
@@ -789,6 +827,8 @@ export async function upsertHotelStay(input: HotelStayDraft) {
   );
   const encryptedHotelName = (await encryptField(input.hotelName)) ?? '';
   const encryptedAddress = (await encryptField(input.address)) ?? '';
+  const encryptedCity = (await encryptField(input.city ?? '')) ?? '';
+  const encryptedCountry = (await encryptField(input.country ?? '')) ?? '';
   const encryptedHotelImageRemoteUrl = (await encryptField(input.hotelImageRemoteUrl)) ?? null;
   const encryptedHotelImageAttributionText = (await encryptField(input.hotelImageAttributionText)) ?? null;
   const encryptedHotelImageAttributionMeta = (await encryptField(JSON.stringify(input.hotelImageAttributionMeta ?? null))) ?? null;
@@ -797,12 +837,16 @@ export async function upsertHotelStay(input: HotelStayDraft) {
   const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
-    `INSERT INTO hotel_stays (id, tripId, hotelName, address, hotelImageLocalPath, hotelImageRemoteUrl, hotelImageSource, hotelImageAttributionText, hotelImageAttributionMeta, hotelImageStatus, phone, bookingRef, checkIn, checkOut, notes, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO hotel_stays (id, tripId, hotelName, address, city, country, latitude, longitude, hotelImageLocalPath, hotelImageRemoteUrl, hotelImageSource, hotelImageAttributionText, hotelImageAttributionMeta, hotelImageStatus, phone, bookingRef, checkIn, checkOut, notes, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        hotelName = excluded.hotelName,
        address = excluded.address,
+       city = excluded.city,
+       country = excluded.country,
+       latitude = excluded.latitude,
+       longitude = excluded.longitude,
        hotelImageLocalPath = excluded.hotelImageLocalPath,
        hotelImageRemoteUrl = excluded.hotelImageRemoteUrl,
        hotelImageSource = excluded.hotelImageSource,
@@ -819,6 +863,10 @@ export async function upsertHotelStay(input: HotelStayDraft) {
     input.tripId,
     encryptedHotelName,
     encryptedAddress,
+    encryptedCity,
+    encryptedCountry,
+    input.latitude ?? null,
+    input.longitude ?? null,
     input.hotelImageLocalPath ?? null,
     encryptedHotelImageRemoteUrl,
     input.hotelImageSource,

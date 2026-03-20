@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 15;
+const DATABASE_VERSION = 16;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS trips (
   heroImageStatus TEXT NOT NULL DEFAULT 'idle',
   notes TEXT NOT NULL DEFAULT '',
   transferSummary TEXT NOT NULL DEFAULT '',
+  transferProvider TEXT NOT NULL DEFAULT '',
+  transferMethod TEXT NOT NULL DEFAULT '',
+  transferLocation TEXT NOT NULL DEFAULT '',
+  transferTime TEXT,
+  transferNotes TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
@@ -96,7 +101,11 @@ CREATE TABLE IF NOT EXISTS packing_item_travellers (
 CREATE TABLE IF NOT EXISTS travel_segments (
   id TEXT PRIMARY KEY NOT NULL,
   tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  transportType TEXT NOT NULL DEFAULT 'flight',
+  travelDirection TEXT NOT NULL DEFAULT 'other',
   airline TEXT NOT NULL,
+  providerCode TEXT NOT NULL DEFAULT '',
+  providerLogoUrl TEXT,
   flightNumber TEXT NOT NULL DEFAULT '',
   departureAirport TEXT NOT NULL,
   departureAirportCode TEXT NOT NULL DEFAULT '',
@@ -117,6 +126,10 @@ CREATE TABLE IF NOT EXISTS hotel_stays (
   tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   hotelName TEXT NOT NULL,
   address TEXT NOT NULL,
+  city TEXT NOT NULL DEFAULT '',
+  country TEXT NOT NULL DEFAULT '',
+  latitude REAL,
+  longitude REAL,
   hotelImageLocalPath TEXT,
   hotelImageRemoteUrl TEXT,
   hotelImageSource TEXT NOT NULL DEFAULT 'fallback',
@@ -346,7 +359,7 @@ async function runPhaseFourteenMigration(db: SQLiteDatabase) {
       WHEN attributionText IS NULL OR attributionText = '' THEN
         CASE
           WHEN coverImageUri IS NOT NULL THEN 'Existing destination image'
-          ELSE 'Default trip background'
+          ELSE 'Default Pineapple image'
         END
       ELSE attributionText
     END;
@@ -372,6 +385,24 @@ async function runPhaseFifteenMigration(db: SQLiteDatabase) {
     SET hotelImageAttributionText = COALESCE(NULLIF(hotelImageAttributionText, ''), 'Default hotel background')
     WHERE hotelImageAttributionText IS NULL OR hotelImageAttributionText = '';
   `);
+}
+
+async function runPhaseSixteenMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'trips', 'transferProvider', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'trips', 'transferMethod', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'trips', 'transferLocation', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'trips', 'transferTime', 'TEXT');
+  await ensureColumn(db, 'trips', 'transferNotes', "TEXT NOT NULL DEFAULT ''");
+
+  await ensureColumn(db, 'travel_segments', 'transportType', "TEXT NOT NULL DEFAULT 'flight'");
+  await ensureColumn(db, 'travel_segments', 'travelDirection', "TEXT NOT NULL DEFAULT 'other'");
+  await ensureColumn(db, 'travel_segments', 'providerCode', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'travel_segments', 'providerLogoUrl', 'TEXT');
+
+  await ensureColumn(db, 'hotel_stays', 'city', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'hotel_stays', 'country', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'hotel_stays', 'latitude', 'REAL');
+  await ensureColumn(db, 'hotel_stays', 'longitude', 'REAL');
 }
 
 async function runPhaseThreeMigration(db: SQLiteDatabase) {
@@ -495,6 +526,10 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   if (version < 15) {
     await runPhaseFifteenMigration(db);
+  }
+
+  if (version < 16) {
+    await runPhaseSixteenMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

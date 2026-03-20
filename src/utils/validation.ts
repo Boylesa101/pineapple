@@ -74,11 +74,17 @@ export function validatePackingItem(input: PackingItemDraft) {
 
 export function validateTravelSegment(input: TravelSegmentDraft) {
   const errors: string[] = [];
-  if (!input.airline.trim()) errors.push('Airline is required.');
-  if (!input.departureAirport.trim()) errors.push('Departure airport is required.');
-  if (!input.arrivalAirport.trim()) errors.push('Arrival airport is required.');
+  const providerLabel = input.transportType === 'train' ? 'Train operator' : 'Airline';
+  const departureLabel = input.transportType === 'train' ? 'Departure station' : 'Departure airport';
+  const arrivalLabel = input.transportType === 'train' ? 'Arrival station' : 'Arrival airport';
+  if (!input.airline.trim()) errors.push(`${providerLabel} is required.`);
+  if (!input.departureAirport.trim()) errors.push(`${departureLabel} is required.`);
+  if (!input.arrivalAirport.trim()) errors.push(`${arrivalLabel} is required.`);
   if (!input.departureTime) errors.push('Departure time is required.');
   if (!input.arrivalTime) errors.push('Arrival time is required.');
+  if (input.arrivalTime && input.departureTime && input.arrivalTime < input.departureTime) {
+    errors.push('Arrival time must be after departure time.');
+  }
   return errors;
 }
 
@@ -88,6 +94,9 @@ export function validateHotelStay(input: HotelStayDraft) {
   if (!input.address.trim()) errors.push('Address is required.');
   if (!input.checkIn) errors.push('Check-in date is required.');
   if (!input.checkOut) errors.push('Check-out date is required.');
+  if (input.checkIn && input.checkOut && input.checkOut < input.checkIn) {
+    errors.push('Check-out must be after check-in.');
+  }
   return errors;
 }
 

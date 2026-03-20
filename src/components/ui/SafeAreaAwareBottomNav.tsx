@@ -20,6 +20,7 @@ export function SafeAreaAwareBottomNav({ state, descriptors, navigation }: Botto
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8);
 
   const visibleRoutes = state.routes.filter((route) => (descriptors[route.key]?.options as { href?: unknown } | undefined)?.href !== null);
+  const isCompact = visibleRoutes.length <= 3;
 
   return (
     <View style={[styles.outer, { paddingBottom: bottomInset, paddingHorizontal: 12 }]}>
@@ -37,12 +38,12 @@ export function SafeAreaAwareBottomNav({ state, descriptors, navigation }: Botto
           <Pressable
             key={route.key}
             onPress={() => navigation.navigate(route.name)}
-            style={[styles.item, itemStyle]}
+            style={[styles.item, isCompact ? styles.itemCompact : null, itemStyle]}
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
           >
-            <MaterialIcons name={iconName} size={26} color={tint} style={{ opacity: labelOpacity }} />
-            <Text style={[styles.label, { color: tint, opacity: labelOpacity }]}>{label}</Text>
+            <MaterialIcons name={iconName} size={isCompact ? 30 : 26} color={tint} style={{ opacity: labelOpacity }} />
+            <Text style={[styles.label, isCompact ? styles.labelCompact : null, { color: tint, opacity: labelOpacity }]}>{label}</Text>
           </Pressable>
         );
       })}
@@ -71,9 +72,16 @@ const styles = StyleSheet.create({
   itemActive: {
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
+  itemCompact: {
+    minHeight: 72,
+    gap: 6,
+  },
   label: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 11,
     textAlign: 'center',
+  },
+  labelCompact: {
+    fontSize: 12,
   },
 });

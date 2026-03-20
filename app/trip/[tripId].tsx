@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,9 +15,12 @@ import { AvatarBadge } from '@/components/AvatarBadge';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { EmptyState } from '@/components/EmptyState';
+import { HotelAddressSearchField } from '@/components/HotelAddressSearchField';
 import { InfoChip } from '@/components/InfoChip';
 import { ListRow } from '@/components/ListRow';
 import { ManagedFileImage } from '@/components/ManagedFileImage';
+import { ProviderLogoBadge } from '@/components/ProviderLogoBadge';
+import { TransportProviderSearchField } from '@/components/TransportProviderSearchField';
 import { colors, spacing } from '@/constants/theme';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
@@ -30,6 +33,7 @@ import type {
   ReminderKind,
   ReminderLeadTime,
   ReminderSettingDraft,
+  TransportType,
   TravelSegmentDraft,
   TripInviteDraft,
   TravellerDraft,
@@ -42,7 +46,15 @@ import { getMissingInfoPrompts, getTripBundle, getUpcomingTimeline } from '@/uti
 import { toUserMessage } from '@/utils/userErrors';
 import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, validateTraveller } from '@/utils/validation';
 
-type ModalKind = 'traveller' | 'segment' | 'hotel' | 'emergency' | 'export' | 'invite' | null;
+type ModalKind = 'traveller' | 'segment' | 'hotel' | 'transfer' | 'emergency' | 'export' | 'invite' | null;
+type TripSection = 'overview' | 'travel' | 'hotel' | 'transfer' | 'packing' | 'itinerary';
+type TransferDraft = {
+  provider: string;
+  method: string;
+  location: string;
+  time: string | null;
+  notes: string;
+};
 
 const reminderMeta: Record<Exclude<ReminderKind, 'passport_expiry' | 'ghic_expiry'>, { label: string; leadTimeDays: ReminderLeadTime }> = {
   packing_incomplete: { label: 'Packing incomplete warning', leadTimeDays: 1 },
@@ -83,6 +95,7 @@ export default function TripDetailScreen() {
   const {
     data,
     setActiveTrip,
+    saveTrip,
     saveTraveller,
     saveTravelSegment,
     saveHotelStay,
@@ -102,9 +115,11 @@ export default function TripDetailScreen() {
   const [travellerDraft, setTravellerDraft] = useState<TravellerDraft | null>(null);
   const [segmentDraft, setSegmentDraft] = useState<TravelSegmentDraft | null>(null);
   const [hotelDraft, setHotelDraft] = useState<HotelStayDraft | null>(null);
+  const [transferDraft, setTransferDraft] = useState<TransferDraft | null>(null);
   const [emergencyDraft, setEmergencyDraft] = useState<EmergencyInfoDraft | null>(null);
   const [exportOptions, setExportOptions] = useState<PdfExportOptions>(defaultExportOptions);
   const [inviteDraft, setInviteDraft] = useState<TripInviteDraft | null>(null);
+  const [activeSection, setActiveSection] = useState<TripSection>('overview');
 
   const summary = useMemo(
     () => ({
@@ -119,6 +134,26 @@ export default function TripDetailScreen() {
     () => getTripDocumentWarningSummary(bundle.documents, bundle.travellers),
     [bundle.documents, bundle.travellers]
   );
+  const orderedTravelSegments = useMemo(
+    () =>
+      [...bundle.travelSegments].sort((left, right) => {
+        const leftOrder = left.travelDirection === 'outbound' ? 0 : left.travelDirection === 'return' ? 1 : 2;
+        const rightOrder = right.travelDirection === 'outbound' ? 0 : right.travelDirection === 'return' ? 1 : 2;
+        if (leftOrder !== rightOrder) {
+          return leftOrder - rightOrder;
+        }
+        return left.departureTime.localeCompare(right.departureTime);
+      }),
+    [bundle.travelSegments]
+  );
+
+  useEffect(() => {
+    if (focus === 'travel' || focus === 'hotel' || focus === 'transfer') {
+      setActiveSection(focus);
+      return;
+    }
+    setActiveSection('overview');
+  }, [focus]);
 
   if (!bundle.trip) {
     return (
@@ -158,9 +193,13 @@ export default function TripDetailScreen() {
 
   function openSegmentEditor(current?: TravelSegmentDraft) {
     setSegmentDraft(
-        current ?? {
+      current ?? {
         tripId,
+        transportType: 'flight',
+        travelDirection: bundle.travelSegments.length ? 'return' : 'outbound',
         airline: '',
+        providerCode: '',
+        providerLogoUrl: null,
         flightNumber: '',
         departureAirport: '',
         departureAirportCode: '',
@@ -179,10 +218,14 @@ export default function TripDetailScreen() {
 
   function openHotelEditor(current?: HotelStayDraft) {
     setHotelDraft(
-        current ?? {
+      current ?? {
         tripId,
         hotelName: '',
         address: '',
+        city: '',
+        country: '',
+        latitude: null,
+        longitude: null,
         hotelImageLocalPath: null,
         hotelImageRemoteUrl: null,
         hotelImageSource: 'fallback',
@@ -197,6 +240,17 @@ export default function TripDetailScreen() {
       }
     );
     setModalKind('hotel');
+  }
+
+  function openTransferEditor() {
+    setTransferDraft({
+      provider: trip.transferProvider,
+      method: trip.transferMethod,
+      location: trip.transferLocation,
+      time: trip.transferTime,
+      notes: trip.transferNotes || trip.transferSummary,
+    });
+    setModalKind('transfer');
   }
 
   function openEmergencyEditor() {
@@ -264,6 +318,30 @@ export default function TripDetailScreen() {
         setModalKind(null);
       } catch (error) {
         Alert.alert('Hotel could not be saved', toUserMessage(error, 'Unable to save that hotel right now.'));
+      }
+      return;
+    }
+
+    if (modalKind === 'transfer' && transferDraft) {
+      if (!transferDraft.provider.trim() && !transferDraft.location.trim() && !transferDraft.notes.trim()) {
+        Alert.alert('Transfer details needed', 'Add at least a pickup provider, location, or notes before saving.');
+        return;
+      }
+      try {
+        await saveTrip({
+          ...trip,
+          transferSummary: [transferDraft.provider, transferDraft.method, transferDraft.location, transferDraft.notes]
+            .filter(Boolean)
+            .join(' · '),
+          transferProvider: transferDraft.provider,
+          transferMethod: transferDraft.method,
+          transferLocation: transferDraft.location,
+          transferTime: transferDraft.time,
+          transferNotes: transferDraft.notes,
+        });
+        setModalKind(null);
+      } catch (error) {
+        Alert.alert('Transfer details could not be saved', toUserMessage(error, 'Unable to save that transfer right now.'));
       }
       return;
     }
@@ -348,7 +426,50 @@ export default function TripDetailScreen() {
   }
 
   return (
-    <AppScreen title={trip.name} subtitle={tripDateRange(trip.startDate, trip.endDate)}>
+    <AppScreen
+      title={trip.name}
+      subtitle={tripDateRange(trip.startDate, trip.endDate)}
+      footer={
+        <View style={styles.tripFooterNav}>
+          <Pressable
+            onPress={() => {
+              setActiveTrip(tripId);
+              setActiveSection('packing');
+              router.push('/packing');
+            }}
+            style={[styles.tripFooterButton, activeSection === 'packing' ? styles.tripFooterButtonActive : null]}
+          >
+            <MaterialIcons name="checkroom" size={22} color={colors.white} />
+            <Text style={styles.tripFooterLabel}>Packing</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setActiveTrip(tripId);
+              setActiveSection('itinerary');
+              router.push('/itinerary');
+            }}
+            style={[styles.tripFooterButton, activeSection === 'itinerary' ? styles.tripFooterButtonActive : null]}
+          >
+            <MaterialIcons name="event-note" size={22} color={colors.white} />
+            <Text style={styles.tripFooterLabel}>Itinerary</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setActiveSection('travel')}
+            style={[styles.tripFooterButton, activeSection === 'travel' ? styles.tripFooterButtonActive : null]}
+          >
+            <MaterialIcons name="flight" size={22} color={colors.white} />
+            <Text style={styles.tripFooterLabel}>Flight</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setActiveSection('hotel')}
+            style={[styles.tripFooterButton, activeSection === 'hotel' ? styles.tripFooterButtonActive : null]}
+          >
+            <MaterialIcons name="hotel" size={22} color={colors.white} />
+            <Text style={styles.tripFooterLabel}>Hotel</Text>
+          </Pressable>
+        </View>
+      }
+    >
       {trip.coverImageUri ? <ManagedFileImage uri={trip.coverImageUri} style={styles.cover} /> : null}
 
       <AppCard>
@@ -381,21 +502,6 @@ export default function TripDetailScreen() {
           {trip.notes || (trip.status === 'completed' ? 'This trip is complete and kept locally for reference.' : 'Add notes, reminders, and local context for the trip.')}
         </Text>
       </AppCard>
-
-      {focus ? (
-        <AppCard title="Focused area">
-          <InfoChip
-            label={
-              focus === 'travel'
-                ? 'Flight Info Centre'
-                : focus === 'hotel'
-                  ? 'Hotel Info'
-                  : 'Transfers / pickup information'
-            }
-            tone="blue"
-          />
-        </AppCard>
-      ) : null}
 
       <AppCard title="Trip overview">
         <View style={styles.metrics}>
@@ -477,71 +583,6 @@ export default function TripDetailScreen() {
         )}
       </AppCard>
 
-      <AppCard title="Sharing and participants" subtitle="Optional manual-share sync with participant roles and conflict review.">
-        <View style={styles.chipRow}>
-          <InfoChip label={`Share code ${bundle.sharedTripState?.shareCode ?? 'Pending'}`} tone="blue" />
-          <InfoChip label={`Sync ${bundle.sharedTripState?.syncStatus.replaceAll('_', ' ') ?? 'local only'}`} tone={bundle.sharedTripState?.syncStatus === 'conflict' ? 'coral' : 'gold'} />
-        </View>
-        <View style={styles.participantList}>
-          {bundle.participants.map((participant) => (
-            <View key={participant.id} style={styles.participantItem}>
-              <View style={styles.travellerIdentity}>
-                <AvatarBadge label={participant.displayName} color={participant.avatarColor} size={38} />
-                <View style={styles.travellerCopy}>
-                  <Text style={styles.travellerName}>{participant.displayName}</Text>
-                  <Text style={styles.notes}>{participant.role}{participant.email ? ` • ${participant.email}` : ''}</Text>
-                </View>
-              </View>
-              {!participant.isLocalProfile ? (
-                <Pressable onPress={() => deleteRecord('trip_participants', participant.id)}>
-                  <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                </Pressable>
-              ) : null}
-            </View>
-          ))}
-          {bundle.invites.map((invite) => (
-            <View key={invite.id} style={styles.participantItem}>
-              <View style={styles.travellerCopy}>
-                <Text style={styles.travellerName}>{invite.email || 'Pending invite'}</Text>
-                <Text style={styles.notes}>{invite.role} • {invite.status} • code {invite.inviteCode}</Text>
-              </View>
-              <Pressable onPress={() => deleteRecord('trip_invites', invite.id)}>
-                <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
-        <View style={styles.buttonWrap}>
-          <AppButton label="Invite by email / code" tone="secondary" onPress={openInviteEditor} />
-          <AppButton label="Export shared trip" onPress={handleExportShare} />
-          <AppButton label="Import update" tone="secondary" onPress={handleImportShare} />
-        </View>
-        {bundle.conflicts.length ? (
-          <View style={styles.conflictList}>
-            {bundle.conflicts
-              .filter((conflict) => conflict.status === 'open')
-              .map((conflict) => (
-                <View key={conflict.id} style={styles.conflictCard}>
-                  <Text style={styles.travellerName}>{conflict.summary}</Text>
-                  <Text style={styles.notes}>Local: {formatDateTime(conflict.localUpdatedAt)}</Text>
-                  <Text style={styles.notes}>Incoming: {formatDateTime(conflict.incomingUpdatedAt)}</Text>
-                  <View style={styles.buttonWrap}>
-                    <AppButton
-                      label="Keep local"
-                      tone="secondary"
-                      onPress={() => resolveSyncConflictChoice(conflict.id, 'resolved_keep_local')}
-                    />
-                    <AppButton
-                      label="Use incoming"
-                      onPress={() => resolveSyncConflictChoice(conflict.id, 'resolved_use_incoming')}
-                    />
-                  </View>
-                </View>
-              ))}
-          </View>
-        ) : null}
-      </AppCard>
-
       <AppCard title="Documents" subtitle="Secure vault for passports, GHIC, insurance, tickets, and PDFs">
         <ListRow
           title={`${bundle.documents.length} document(s)`}
@@ -578,34 +619,60 @@ export default function TripDetailScreen() {
         />
       </AppCard>
 
-      <AppCard title="Flight Info Centre" right={<AppButton label="Add" tone="secondary" onPress={() => openSegmentEditor()} />}>
-        {bundle.travelSegments.length ? (
-          bundle.travelSegments.map((segment) => (
-            <ListRow
-              key={segment.id}
-              title={`${segment.airline} ${segment.flightNumber}`.trim()}
-              subtitle={`${formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} → ${formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)} • ${formatDateTime(segment.departureTime)}`}
-              right={
-                <View style={styles.iconRow}>
-                  <Pressable onPress={() => openSegmentEditor(segment)}>
-                    <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                  </Pressable>
-                  <Pressable onPress={() => deleteRecord('travel_segments', segment.id)}>
-                    <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                  </Pressable>
+      <AppCard
+        title="Flight and train info"
+        subtitle="Add outbound, return, or rail travel with provider branding and booking details."
+        right={<AppButton label="Add" tone="secondary" onPress={() => openSegmentEditor()} />}
+        style={activeSection === 'travel' ? styles.highlightedCard : null}
+      >
+        {orderedTravelSegments.length ? (
+          orderedTravelSegments.map((segment) => (
+            <View key={segment.id} style={styles.transportRow}>
+              <ProviderLogoBadge
+                name={segment.airline || (segment.transportType === 'train' ? 'Train' : 'Flight')}
+                code={segment.providerCode}
+                logoUrl={segment.providerLogoUrl}
+              />
+              <View style={styles.transportCopy}>
+                <View style={styles.transportHeader}>
+                  <Text style={styles.transportTitle}>
+                    {segment.transportType === 'train' ? 'Train' : 'Flight'} · {segment.travelDirection}
+                  </Text>
+                  <InfoChip label={segment.transportType === 'train' ? 'Train' : 'Flight'} tone="blue" />
                 </View>
-              }
-            />
+                <Text style={styles.transportMeta}>
+                  {[segment.airline, segment.flightNumber].filter(Boolean).join(' ')}
+                </Text>
+                <Text style={styles.transportMeta}>
+                  {formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} →{' '}
+                  {formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}
+                </Text>
+                <Text style={styles.transportMeta}>{formatDateTime(segment.departureTime)}</Text>
+              </View>
+              <View style={styles.iconRow}>
+                <Pressable onPress={() => openSegmentEditor(segment)}>
+                  <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+                </Pressable>
+                <Pressable onPress={() => deleteRecord('travel_segments', segment.id)}>
+                  <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                </Pressable>
+              </View>
+            </View>
           ))
         ) : (
           <EmptyState
-            title="No flights saved"
-            description="Add airline, flight number, airports, timings, terminal, gate, booking ref, and notes."
+            title="No transport saved"
+            description="Add outbound and return flights, or save train travel with times, stations, booking reference, and notes."
           />
         )}
       </AppCard>
 
-      <AppCard title="Hotel Info" right={<AppButton label="Add" tone="secondary" onPress={() => openHotelEditor()} />}>
+      <AppCard
+        title="Hotel info"
+        subtitle="Search or enter the stay address, then keep the details and image together."
+        right={<AppButton label="Add" tone="secondary" onPress={() => openHotelEditor()} />}
+        style={activeSection === 'hotel' ? styles.highlightedCard : null}
+      >
         {bundle.hotelStays.length ? (
           bundle.hotelStays.map((hotel) => (
             <View key={hotel.id} style={styles.hotelRow}>
@@ -638,23 +705,56 @@ export default function TripDetailScreen() {
         ) : (
           <EmptyState
             title="No hotel saved"
-            description="Add hotel name, address, phone number, booking ref, dates, and notes."
+            description="Search by hotel name or address, then review and save the stay details."
           />
         )}
       </AppCard>
 
-      <AppCard title="Transfers / pickup">
-        {trip.transferSummary ? (
-          <Text style={styles.notes}>{trip.transferSummary}</Text>
+      <AppCard
+        title="Transfers and pickup"
+        subtitle="Airport pickup, rail transfer, local ride, or handoff details."
+        right={<AppButton label={trip.transferProvider || trip.transferLocation ? 'Edit' : 'Add'} tone="secondary" onPress={openTransferEditor} />}
+        style={activeSection === 'transfer' ? styles.highlightedCard : null}
+      >
+        {trip.transferProvider || trip.transferLocation || trip.transferNotes ? (
+          <View style={styles.transferCard}>
+            <View style={styles.transferRow}>
+              <InfoChip label={trip.transferMethod || 'Transfer'} tone="blue" />
+              {trip.transferTime ? <InfoChip label={formatDateTime(trip.transferTime)} tone="gold" /> : null}
+            </View>
+            <Text style={styles.transportTitle}>{trip.transferProvider || 'Transfer provider not set'}</Text>
+            <Text style={styles.transportMeta}>{trip.transferLocation || 'Pickup location not set'}</Text>
+            {trip.transferNotes ? <Text style={styles.notes}>{trip.transferNotes}</Text> : null}
+            <View style={styles.transferActions}>
+              <Pressable onPress={openTransferEditor}>
+                <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  void saveTrip({
+                    ...trip,
+                    transferSummary: '',
+                    transferProvider: '',
+                    transferMethod: '',
+                    transferLocation: '',
+                    transferTime: null,
+                    transferNotes: '',
+                  })
+                }
+              >
+                <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+              </Pressable>
+            </View>
+          </View>
         ) : (
           <EmptyState
             title="No transfer details saved"
-            description="Add airport pickup, car hire handoff, or transfer notes in the trip editor so they are easy to reach from the trip card."
+            description="Add pickup company, time, location, method, and notes so they are easy to reach from the trip card."
           />
         )}
       </AppCard>
 
-      <AppCard title="Packing" subtitle="Category-based list with traveller assignment, templates, and priority flags.">
+      <AppCard title="Packing" subtitle="Category-based list with traveller assignment, templates, and priority flags." style={activeSection === 'packing' ? styles.highlightedCard : null}>
         <ListRow title={`${bundle.packingItems.length} item(s)`} subtitle="Track packed vs unpacked and per-traveller progress." />
         <AppButton
           label="Open packing"
@@ -665,7 +765,7 @@ export default function TripDetailScreen() {
         />
       </AppCard>
 
-      <AppCard title="Itinerary" subtitle="Chronological timeline for excursions, meals, reminders, and tickets.">
+      <AppCard title="Itinerary" subtitle="Chronological timeline for excursions, meals, reminders, and tickets." style={activeSection === 'itinerary' ? styles.highlightedCard : null}>
         <ListRow title={`${bundle.itineraryEvents.length} itinerary item(s)`} subtitle="Everything in one timeline view." />
         <AppButton
           label="Open itinerary"
@@ -712,6 +812,79 @@ export default function TripDetailScreen() {
             />
           );
         })}
+      </AppCard>
+
+      <AppCard title="Sharing and participants" subtitle="Optional manual-share sync with participant roles and conflict review.">
+        <View style={styles.chipRow}>
+          <InfoChip label={`Share code ${bundle.sharedTripState?.shareCode ?? 'Pending'}`} tone="blue" />
+          <InfoChip
+            label={`Sync ${bundle.sharedTripState?.syncStatus.replaceAll('_', ' ') ?? 'local only'}`}
+            tone={bundle.sharedTripState?.syncStatus === 'conflict' ? 'coral' : 'gold'}
+          />
+        </View>
+        <View style={styles.participantList}>
+          {bundle.participants.map((participant) => (
+            <View key={participant.id} style={styles.participantItem}>
+              <View style={styles.travellerIdentity}>
+                <AvatarBadge label={participant.displayName} color={participant.avatarColor} size={38} />
+                <View style={styles.travellerCopy}>
+                  <Text style={styles.travellerName}>{participant.displayName}</Text>
+                  <Text style={styles.notes}>
+                    {participant.role}
+                    {participant.email ? ` • ${participant.email}` : ''}
+                  </Text>
+                </View>
+              </View>
+              {!participant.isLocalProfile ? (
+                <Pressable onPress={() => deleteRecord('trip_participants', participant.id)}>
+                  <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                </Pressable>
+              ) : null}
+            </View>
+          ))}
+          {bundle.invites.map((invite) => (
+            <View key={invite.id} style={styles.participantItem}>
+              <View style={styles.travellerCopy}>
+                <Text style={styles.travellerName}>{invite.email || 'Pending invite'}</Text>
+                <Text style={styles.notes}>
+                  {invite.role} • {invite.status} • code {invite.inviteCode}
+                </Text>
+              </View>
+              <Pressable onPress={() => deleteRecord('trip_invites', invite.id)}>
+                <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+        <View style={styles.buttonWrap}>
+          <AppButton label="Invite by email / code" tone="secondary" onPress={openInviteEditor} />
+          <AppButton label="Export shared trip" onPress={handleExportShare} />
+          <AppButton label="Import update" tone="secondary" onPress={handleImportShare} />
+        </View>
+        {bundle.conflicts.length ? (
+          <View style={styles.conflictList}>
+            {bundle.conflicts
+              .filter((conflict) => conflict.status === 'open')
+              .map((conflict) => (
+                <View key={conflict.id} style={styles.conflictCard}>
+                  <Text style={styles.travellerName}>{conflict.summary}</Text>
+                  <Text style={styles.notes}>Local: {formatDateTime(conflict.localUpdatedAt)}</Text>
+                  <Text style={styles.notes}>Incoming: {formatDateTime(conflict.incomingUpdatedAt)}</Text>
+                  <View style={styles.buttonWrap}>
+                    <AppButton
+                      label="Keep local"
+                      tone="secondary"
+                      onPress={() => resolveSyncConflictChoice(conflict.id, 'resolved_keep_local')}
+                    />
+                    <AppButton
+                      label="Use incoming"
+                      onPress={() => resolveSyncConflictChoice(conflict.id, 'resolved_use_incoming')}
+                    />
+                  </View>
+                </View>
+              ))}
+          </View>
+        ) : null}
       </AppCard>
 
       <AppModal
@@ -812,62 +985,148 @@ export default function TripDetailScreen() {
       >
         {segmentDraft ? (
           <>
-            <AppTextField
-              label="Airline"
-              value={segmentDraft.airline}
-              onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, airline: value } : current))}
+            <Text style={styles.label}>Transport type</Text>
+            <ChoiceChips<TransportType>
+              value={segmentDraft.transportType}
+              onChange={(value) =>
+                setSegmentDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        transportType: value,
+                        airline: '',
+                        providerCode: '',
+                        providerLogoUrl: null,
+                        departureAirportCode: value === 'train' ? '' : current.departureAirportCode,
+                        arrivalAirportCode: value === 'train' ? '' : current.arrivalAirportCode,
+                      }
+                    : current
+                )
+              }
+              options={[
+                { label: 'Flight', value: 'flight' },
+                { label: 'Train', value: 'train' },
+              ]}
             />
+            <Text style={styles.label}>Direction</Text>
+            <ChoiceChips<TravelSegmentDraft['travelDirection']>
+              value={segmentDraft.travelDirection}
+              onChange={(value) => setSegmentDraft((current) => (current ? { ...current, travelDirection: value } : current))}
+              options={[
+                { label: 'Outbound', value: 'outbound' },
+                { label: 'Return', value: 'return' },
+                { label: 'Other', value: 'other' },
+              ]}
+            />
+            <TransportProviderSearchField
+              label={segmentDraft.transportType === 'train' ? 'Train operator' : 'Airline'}
+              transportType={segmentDraft.transportType}
+              value={segmentDraft.airline}
+              onChangeText={(value) =>
+                setSegmentDraft((current) =>
+                  current ? { ...current, airline: value, providerCode: '', providerLogoUrl: null } : current
+                )
+              }
+              onSelectProvider={(provider) =>
+                setSegmentDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        airline: provider.name,
+                        providerCode: provider.code,
+                        providerLogoUrl: provider.logoUrl,
+                      }
+                    : current
+                )
+              }
+              placeholder={segmentDraft.transportType === 'train' ? 'Search train operator' : 'Search airline'}
+              helper={
+                segmentDraft.transportType === 'train'
+                  ? 'Pick a train operator or type one manually.'
+                  : 'Pick an airline to keep the code and logo tidy.'
+              }
+            />
+            {segmentDraft.providerLogoUrl || segmentDraft.providerCode ? (
+              <View style={styles.providerPreview}>
+                <ProviderLogoBadge
+                  name={segmentDraft.airline || (segmentDraft.transportType === 'train' ? 'Train' : 'Flight')}
+                  code={segmentDraft.providerCode}
+                  logoUrl={segmentDraft.providerLogoUrl}
+                />
+                <Text style={styles.providerPreviewText}>
+                  {segmentDraft.providerCode ? `${segmentDraft.providerCode} · ` : ''}
+                  {segmentDraft.airline || 'Provider'}
+                </Text>
+              </View>
+            ) : null}
             <AppTextField
-              label="Flight number"
+              label={segmentDraft.transportType === 'train' ? 'Service number' : 'Flight number'}
               value={segmentDraft.flightNumber}
               onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, flightNumber: value } : current))}
             />
-            <AirportSearchField
-              label="Departure airport"
-              value={segmentDraft.departureAirport}
-              airportCode={segmentDraft.departureAirportCode}
-              onChangeText={(value) =>
-                setSegmentDraft((current) =>
-                  current
-                    ? {
-                        ...current,
-                        departureAirport: value,
-                        departureAirportCode: current.departureAirport === value ? current.departureAirportCode : '',
-                      }
-                    : current
-                )
-              }
-              onSelectAirport={(airport) =>
-                setSegmentDraft((current) =>
-                  current ? { ...current, departureAirport: airport.name, departureAirportCode: airport.code } : current
-                )
-              }
-              placeholder="Search by city, airport, or IATA"
-              helper="Type a place like London, Newcastle, or JFK."
-            />
-            <AirportSearchField
-              label="Arrival airport"
-              value={segmentDraft.arrivalAirport}
-              airportCode={segmentDraft.arrivalAirportCode}
-              onChangeText={(value) =>
-                setSegmentDraft((current) =>
-                  current
-                    ? {
-                        ...current,
-                        arrivalAirport: value,
-                        arrivalAirportCode: current.arrivalAirport === value ? current.arrivalAirportCode : '',
-                      }
-                    : current
-                )
-              }
-              onSelectAirport={(airport) =>
-                setSegmentDraft((current) =>
-                  current ? { ...current, arrivalAirport: airport.name, arrivalAirportCode: airport.code } : current
-                )
-              }
-              placeholder="Search by city, airport, or IATA"
-              helper="Pick the right airport and Pineapple keeps the IATA code."
-            />
+            {segmentDraft.transportType === 'flight' ? (
+              <>
+                <AirportSearchField
+                  label="Departure airport"
+                  value={segmentDraft.departureAirport}
+                  airportCode={segmentDraft.departureAirportCode}
+                  onChangeText={(value) =>
+                    setSegmentDraft((current) =>
+                      current
+                        ? {
+                            ...current,
+                            departureAirport: value,
+                            departureAirportCode: current.departureAirport === value ? current.departureAirportCode : '',
+                          }
+                        : current
+                    )
+                  }
+                  onSelectAirport={(airport) =>
+                    setSegmentDraft((current) =>
+                      current ? { ...current, departureAirport: airport.name, departureAirportCode: airport.code } : current
+                    )
+                  }
+                  placeholder="Search by city, airport, or IATA"
+                  helper="Type a place like London, Newcastle, or JFK."
+                />
+                <AirportSearchField
+                  label="Arrival airport"
+                  value={segmentDraft.arrivalAirport}
+                  airportCode={segmentDraft.arrivalAirportCode}
+                  onChangeText={(value) =>
+                    setSegmentDraft((current) =>
+                      current
+                        ? {
+                            ...current,
+                            arrivalAirport: value,
+                            arrivalAirportCode: current.arrivalAirport === value ? current.arrivalAirportCode : '',
+                          }
+                        : current
+                    )
+                  }
+                  onSelectAirport={(airport) =>
+                    setSegmentDraft((current) =>
+                      current ? { ...current, arrivalAirport: airport.name, arrivalAirportCode: airport.code } : current
+                    )
+                  }
+                  placeholder="Search by city, airport, or IATA"
+                  helper="Pick the right airport and Pineapple keeps the IATA code."
+                />
+              </>
+            ) : (
+              <>
+                <AppTextField
+                  label="Departure station"
+                  value={segmentDraft.departureAirport}
+                  onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, departureAirport: value } : current))}
+                />
+                <AppTextField
+                  label="Arrival station"
+                  value={segmentDraft.arrivalAirport}
+                  onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, arrivalAirport: value } : current))}
+                />
+              </>
+            )}
             <DateTimeField
               label="Departure time"
               mode="datetime"
@@ -881,12 +1140,12 @@ export default function TripDetailScreen() {
               onChange={(value) => setSegmentDraft((current) => (current ? { ...current, arrivalTime: value } : current))}
             />
             <AppTextField
-              label="Terminal"
+              label={segmentDraft.transportType === 'train' ? 'Platform / carriage' : 'Terminal'}
               value={segmentDraft.terminal}
               onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, terminal: value } : current))}
             />
             <AppTextField
-              label="Gate"
+              label={segmentDraft.transportType === 'train' ? 'Seat / platform note' : 'Gate'}
               value={segmentDraft.gate}
               onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, gate: value } : current))}
             />
@@ -901,7 +1160,7 @@ export default function TripDetailScreen() {
               onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, notes: value } : current))}
               multiline
             />
-            <AppButton label="Save flight" onPress={saveCurrentModal} />
+            <AppButton label={`Save ${segmentDraft.transportType === 'train' ? 'train' : 'flight'}`} onPress={saveCurrentModal} />
           </>
         ) : null}
       </AppModal>
@@ -909,6 +1168,28 @@ export default function TripDetailScreen() {
       <AppModal visible={modalKind === 'hotel'} title={hotelDraft?.id ? 'Edit hotel' : 'Add hotel'} onClose={() => setModalKind(null)}>
         {hotelDraft ? (
           <>
+            <HotelAddressSearchField
+              label="Hotel search"
+              value={hotelDraft.address}
+              onChangeText={(value) => setHotelDraft((current) => (current ? { ...current, address: value } : current))}
+              onSelectResult={(result) =>
+                setHotelDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        hotelName: current.hotelName.trim() ? current.hotelName : result.hotelName,
+                        address: result.address,
+                        city: result.city,
+                        country: result.country,
+                        latitude: result.latitude,
+                        longitude: result.longitude,
+                      }
+                    : current
+                )
+              }
+              placeholder="Search hotel name or address"
+              helper="Uses OpenStreetMap search. You can edit any result before saving."
+            />
             <AppTextField
               label="Hotel name"
               value={hotelDraft.hotelName}
@@ -920,6 +1201,22 @@ export default function TripDetailScreen() {
               onChangeText={(value) => setHotelDraft((current) => (current ? { ...current, address: value } : current))}
               multiline
             />
+            <View style={styles.inlineFields}>
+              <View style={styles.inlineField}>
+                <AppTextField
+                  label="City"
+                  value={hotelDraft.city}
+                  onChangeText={(value) => setHotelDraft((current) => (current ? { ...current, city: value } : current))}
+                />
+              </View>
+              <View style={styles.inlineField}>
+                <AppTextField
+                  label="Country"
+                  value={hotelDraft.country}
+                  onChangeText={(value) => setHotelDraft((current) => (current ? { ...current, country: value } : current))}
+                />
+              </View>
+            </View>
             {hotelDraft.hotelImageLocalPath || hotelDraft.hotelImageRemoteUrl ? (
               <View style={styles.hotelPreviewCard}>
                 <ManagedFileImage uri={hotelDraft.hotelImageLocalPath ?? hotelDraft.hotelImageRemoteUrl} style={styles.hotelPreviewImage} />
@@ -958,6 +1255,42 @@ export default function TripDetailScreen() {
               multiline
             />
             <AppButton label="Save hotel" onPress={saveCurrentModal} />
+          </>
+        ) : null}
+      </AppModal>
+
+      <AppModal visible={modalKind === 'transfer'} title="Transfers and pickup" onClose={() => setModalKind(null)}>
+        {transferDraft ? (
+          <>
+            <AppTextField
+              label="Pickup person or company"
+              value={transferDraft.provider}
+              onChangeText={(value) => setTransferDraft((current) => (current ? { ...current, provider: value } : current))}
+            />
+            <AppTextField
+              label="Transfer method"
+              value={transferDraft.method}
+              onChangeText={(value) => setTransferDraft((current) => (current ? { ...current, method: value } : current))}
+              helper="Examples: taxi, shuttle, private driver, rail transfer."
+            />
+            <DateTimeField
+              label="Pickup time"
+              mode="datetime"
+              value={transferDraft.time}
+              onChange={(value) => setTransferDraft((current) => (current ? { ...current, time: value } : current))}
+            />
+            <AppTextField
+              label="Pickup location"
+              value={transferDraft.location}
+              onChangeText={(value) => setTransferDraft((current) => (current ? { ...current, location: value } : current))}
+            />
+            <AppTextField
+              label="Notes"
+              value={transferDraft.notes}
+              onChangeText={(value) => setTransferDraft((current) => (current ? { ...current, notes: value } : current))}
+              multiline
+            />
+            <AppButton label="Save transfer" onPress={saveCurrentModal} />
           </>
         ) : null}
       </AppModal>
@@ -1076,6 +1409,29 @@ export default function TripDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  tripFooterNav: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    backgroundColor: colors.primaryBlue,
+    borderRadius: 20,
+    padding: spacing.xs,
+  },
+  tripFooterButton: {
+    flex: 1,
+    minHeight: 64,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  tripFooterButtonActive: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  tripFooterLabel: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+  },
   cover: {
     width: '100%',
     height: 200,
@@ -1122,6 +1478,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
   },
+  highlightedCard: {
+    borderColor: '#9FC6FF',
+    shadowColor: 'rgba(13,110,253,0.16)',
+  },
   travellerCard: {
     gap: spacing.sm,
     paddingVertical: spacing.sm,
@@ -1151,6 +1511,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     alignItems: 'center',
+  },
+  transportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  transportCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  transportHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  transportTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+  },
+  transportMeta: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
   },
   hotelRow: {
     flexDirection: 'row',
@@ -1221,6 +1610,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
+  transferCard: {
+    gap: spacing.sm,
+  },
+  transferRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  transferActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.md,
+  },
   participantList: {
     gap: spacing.sm,
   },
@@ -1251,6 +1653,27 @@ const styles = StyleSheet.create({
   },
   field: {
     gap: spacing.xs,
+  },
+  providerPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 16,
+    backgroundColor: colors.primaryBlueTint,
+  },
+  providerPreviewText: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
+  inlineFields: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  inlineField: {
+    flex: 1,
   },
   label: {
     color: colors.nightNavy,

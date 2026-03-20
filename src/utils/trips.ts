@@ -59,6 +59,11 @@ export function normalizeTripRecord(record: Partial<Trip> & Pick<Trip, 'id' | 'n
     heroImageStatus: normalizeHeroImageStatus(record.heroImageStatus),
     notes: record.notes ?? '',
     transferSummary: record.transferSummary ?? '',
+    transferProvider: record.transferProvider ?? '',
+    transferMethod: record.transferMethod ?? '',
+    transferLocation: record.transferLocation ?? '',
+    transferTime: record.transferTime ?? null,
+    transferNotes: record.transferNotes ?? '',
   };
 }
 

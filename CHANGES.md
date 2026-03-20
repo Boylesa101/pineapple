@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0 - 2026-03-20
+
+- Travel-flow rebuild: trip detail now supports outbound/return transport entries with a real flight/train switch, searchable airline/operator selection, provider-logo rendering with safe fallback, and a cleaner contextual trip footer for `Packing`, `Itinerary`, `Flight`, and `Hotel`
+- Hotel search upgrade: hotel stays can now be found with a lightweight OpenStreetMap / Nominatim lookup, then reviewed and corrected before save while still keeping the existing free hotel-image pipeline and local cache behavior
+- Transfer flow fix: trip transfers are no longer a dead summary field; Pineapple now saves pickup provider, method, location, time, and notes as structured trip data with add/edit/clear support
+- Shell simplification: the bottom nav now only exposes `Home`, `Vault`, and `SOS`, while `Trips`, `Packing`, and `Itinerary` move into clearer in-flow trip navigation instead of lingering as half-global tabs
+- Home and trip-card routing polish: account now sits left of notifications in the home header, notifications stay on the far right, trip-card shortcut icons are larger, and the card now shows `Days till trip` beside the key-doc state
+- Vault unlock and ordering fix: vault PIN unlock now uses the real lockout-aware auth path, biometric vault unlock closes cleanly, and the vault overview now renders in a stable order of passport, driving licence, health card, flights, train, transfer, hotel, then other travel docs
+- Honest limitation: airline logos currently come from a lightweight mapped remote-logo source with safe initials fallback rather than a bundled official asset library, and Google Wallet flight handoff still remains an internal Pineapple route rather than a live wallet deep link
+
 ## 1.6.9 - 2026-03-20
 
 - Destination picker reliability fix: trip destination suggestions now stay tappable while the keyboard is open, with safer focus/blur timing so selecting places like `Bali, Indonesia` actually applies the choice instead of dismissing the list

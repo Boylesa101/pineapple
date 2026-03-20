@@ -47,6 +47,10 @@ export function normalizeHotelStayRecord(
 ): HotelStay {
   return {
     ...record,
+    city: record.city ?? '',
+    country: record.country ?? '',
+    latitude: typeof record.latitude === 'number' ? record.latitude : null,
+    longitude: typeof record.longitude === 'number' ? record.longitude : null,
     hotelImageLocalPath: record.hotelImageLocalPath ?? null,
     hotelImageRemoteUrl: record.hotelImageRemoteUrl ?? null,
     hotelImageSource: normalizeImageSource(record.hotelImageSource),

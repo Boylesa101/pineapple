@@ -42,7 +42,8 @@ import { isLiveDocumentScannerAvailable, scanDocumentWithLiveEdges } from '@/ser
 import { recognizePassportScan } from '@/services/passportOcr';
 import { useAppStore } from '@/store/useAppStore';
 import type { DocumentDraft, DocumentType, ExpiryReminderLeadTime } from '@/types/models';
-import { formatShortDate } from '@/utils/date';
+import { formatDateTime, formatShortDate } from '@/utils/date';
+import { formatAirportDisplay } from '@/utils/airports';
 import {
   buildDocumentDraftDefaults,
   documentTypeNeedsExpiryPrompt,
@@ -150,9 +151,8 @@ export default function VaultScreen() {
     saveDocument,
     deleteRecord,
     security,
-    confirmPin,
+    unlockVaultWithPin,
     unlockWithBiometrics,
-    unlockVault,
     vaultUnlockedUntil,
   } = useAppStore();
   const [editorVisible, setEditorVisible] = useState(false);
@@ -404,6 +404,51 @@ export default function VaultScreen() {
       }))
       .filter((group) => group.documents.length);
   }, [bundle.travellers, filteredDocuments, groupMode]);
+
+  const orderedVaultSections = useMemo(() => {
+    const documentGroups = [
+      { key: 'passport', title: 'Passports', documents: bundle.documents.filter((document) => document.documentType === 'passport') },
+      {
+        key: 'driving_licence',
+        title: 'Driving licences',
+        documents: bundle.documents.filter((document) => document.documentType === 'driving_licence'),
+      },
+      { key: 'ghic', title: 'Health cards', documents: bundle.documents.filter((document) => document.documentType === 'ghic') },
+    ].filter((group) => group.documents.length);
+    const otherDocuments = bundle.documents.filter(
+      (document) => !['passport', 'driving_licence', 'ghic'].includes(document.documentType)
+    );
+
+    const flights = [...bundle.travelSegments]
+      .filter((segment) => segment.transportType === 'flight')
+      .sort((left, right) => left.departureTime.localeCompare(right.departureTime));
+    const trains = [...bundle.travelSegments]
+      .filter((segment) => segment.transportType === 'train')
+      .sort((left, right) => left.departureTime.localeCompare(right.departureTime));
+    const transfers =
+      bundle.trip && (bundle.trip.transferProvider || bundle.trip.transferLocation || bundle.trip.transferNotes)
+        ? [
+            {
+              id: `${bundle.trip.id}:transfer`,
+              provider: bundle.trip.transferProvider,
+              method: bundle.trip.transferMethod,
+              location: bundle.trip.transferLocation,
+              time: bundle.trip.transferTime,
+              notes: bundle.trip.transferNotes,
+            },
+          ]
+        : [];
+    const hotels = [...bundle.hotelStays].sort((left, right) => left.checkIn.localeCompare(right.checkIn));
+
+    return {
+      documentGroups,
+      flights,
+      trains,
+      transfers,
+      hotels,
+      otherDocuments,
+    };
+  }, [bundle.documents, bundle.hotelStays, bundle.travelSegments, bundle.trip]);
 
   if (!data.trips.length) {
     return (
@@ -726,13 +771,12 @@ export default function VaultScreen() {
   }
 
   async function handleVaultUnlock() {
-    const valid = await confirmPin(pin);
+    const valid = await unlockVaultWithPin(pin);
     if (!valid) {
       Alert.alert('Incorrect PIN', 'Try again.');
       setPin('');
       return;
     }
-    unlockVault();
     setPinPromptVisible(false);
     setPin('');
   }
@@ -746,6 +790,28 @@ export default function VaultScreen() {
         onPress: () => deleteRecord('documents', documentId),
       },
     ]);
+  }
+
+  function renderTravelVaultCard(props: {
+    key: string;
+    icon: keyof typeof MaterialIcons.glyphMap;
+    title: string;
+    subtitle: string;
+    description?: string;
+    onPress: () => void;
+  }) {
+    return (
+      <Pressable key={props.key} onPress={props.onPress} style={styles.travelVaultCard}>
+        <View style={styles.travelVaultBadge}>
+          <MaterialIcons name={props.icon} size={22} color={colors.primaryBlue} />
+        </View>
+        <View style={styles.travelVaultCopy}>
+          <Text style={styles.travelVaultTitle}>{props.title}</Text>
+          <Text style={styles.travelVaultSubtitle}>{props.subtitle}</Text>
+          {props.description ? <Text style={styles.travelVaultMeta}>{props.description}</Text> : null}
+        </View>
+      </Pressable>
+    );
   }
 
   async function handleSaveSetupTraveller() {
@@ -1429,13 +1495,22 @@ export default function VaultScreen() {
   }
 
   function openFlightTicketArea() {
+    if (selectedTripId) {
+      setActiveTrip(selectedTripId);
+      router.push({ pathname: '/trip/[tripId]', params: { tripId: selectedTripId, focus: 'travel' } });
+      return;
+    }
     router.push('/flight-tickets');
   }
 
   function filterToPassports() {
-    setPrimaryFilter('type');
-    setTypeFilter('passport');
-    setGroupMode('flat');
+    const passport = bundle.documents.find((document) => document.documentType === 'passport');
+    if (!passport) {
+      Alert.alert('No passport saved', 'Add a passport and it will appear here for quick access.');
+      return;
+    }
+    setSelectedId(passport.id);
+    setDetailVisible(true);
   }
 
   function openHotelQuickAccess() {
@@ -1472,7 +1547,7 @@ export default function VaultScreen() {
           <Text style={styles.quickAccessLabel}>Flights</Text>
         </Pressable>
         <Pressable onPress={filterToPassports} style={styles.quickAccessButton}>
-          <MaterialIcons name="contact-page" size={22} color={colors.primaryBlue} />
+          <MaterialIcons name="badge" size={22} color={colors.primaryBlue} />
           <Text style={styles.quickAccessLabel}>Passports</Text>
         </Pressable>
         <Pressable onPress={openHotelQuickAccess} style={styles.quickAccessButton}>
@@ -1515,63 +1590,88 @@ export default function VaultScreen() {
         />
       ) : (
         <>
-          <AppCard title="Filters">
-            <ChoiceChips<PrimaryFilter>
-              value={primaryFilter}
-              onChange={setPrimaryFilter}
-              options={[
-                { label: 'All', value: 'all' },
-                { label: 'Traveller', value: 'traveller' },
-                { label: 'Document type', value: 'type' },
-              ]}
-            />
-            {primaryFilter === 'traveller' ? (
-              <ChoiceChips<string>
-                value={travellerFilter}
-                onChange={setTravellerFilter}
-                options={[
-                  { label: 'All travellers', value: 'all' },
-                  { label: 'Trip-wide', value: 'trip' },
-                  ...bundle.travellers.map((traveller) => ({ label: traveller.fullName, value: traveller.id })),
-                ]}
-              />
-            ) : null}
-            {primaryFilter === 'type' ? (
-              <ChoiceChips<string>
-                value={typeFilter}
-                onChange={(value) => setTypeFilter(value as DocumentType | 'all')}
-                options={[
-                  { label: 'All types', value: 'all' },
-                  ...Object.entries(documentLabels).map(([value, label]) => ({ value, label })),
-                ]}
-              />
-            ) : null}
-            <Text style={styles.label}>Grouped view</Text>
-            <ChoiceChips<GroupMode>
-              value={groupMode}
-              onChange={setGroupMode}
-              options={[
-                { label: 'Flat', value: 'flat' },
-                { label: 'By traveller', value: 'traveller' },
-                { label: 'By type', value: 'type' },
-              ]}
-            />
+          {orderedVaultSections.documentGroups.map((group) => (
+            <AppCard key={group.key} title={group.title} subtitle="Tap a document to open the full detail view.">
+              {group.documents.map((document) => renderDocumentListItem(document))}
+            </AppCard>
+          ))}
+
+          <AppCard title="Flights" subtitle="Boarding and flight movement details for this trip.">
+            {orderedVaultSections.flights.length ? (
+              orderedVaultSections.flights.map((segment) =>
+                renderTravelVaultCard({
+                  key: segment.id,
+                  icon: 'flight-takeoff',
+                  title: [segment.airline, segment.flightNumber].filter(Boolean).join(' ') || 'Flight',
+                  subtitle: `${formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} → ${formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}`,
+                  description: formatDateTime(segment.departureTime),
+                  onPress: () => router.push({ pathname: '/trip/[tripId]', params: { tripId: segment.tripId, focus: 'travel' } }),
+                })
+              )
+            ) : (
+              <EmptyState title="No flights yet" description="Saved outbound and return flights will appear here in a cleaner travel-card style." />
+            )}
           </AppCard>
 
-          {groupedDocuments.length ? (
-            groupedDocuments.map((group) => (
-              <AppCard key={group.title} title={group.title}>
-                {group.documents.map((document) => renderDocumentListItem(document))}
-              </AppCard>
-            ))
-      ) : (
-        <AppCard>
-          <EmptyState
-            title="No documents match this view"
-            description="Try clearing a filter or add another travel document."
-          />
-        </AppCard>
-          )}
+          <AppCard title="Train" subtitle="Rail travel saved for this trip.">
+            {orderedVaultSections.trains.length ? (
+              orderedVaultSections.trains.map((segment) =>
+                renderTravelVaultCard({
+                  key: segment.id,
+                  icon: 'train',
+                  title: [segment.airline, segment.flightNumber].filter(Boolean).join(' ') || 'Train service',
+                  subtitle: `${segment.departureAirport} → ${segment.arrivalAirport}`,
+                  description: formatDateTime(segment.departureTime),
+                  onPress: () => router.push({ pathname: '/trip/[tripId]', params: { tripId: segment.tripId, focus: 'travel' } }),
+                })
+              )
+            ) : (
+              <EmptyState title="No train travel yet" description="Rail details will appear here once they are saved in the trip." />
+            )}
+          </AppCard>
+
+          <AppCard title="Transfer" subtitle="Pickup, shuttle, taxi, and handoff details.">
+            {orderedVaultSections.transfers.length ? (
+              orderedVaultSections.transfers.map((transfer) =>
+                renderTravelVaultCard({
+                  key: transfer.id,
+                  icon: 'swap-horiz',
+                  title: transfer.provider || 'Transfer details',
+                  subtitle: transfer.location || transfer.method || 'Pickup details saved',
+                  description: transfer.time ? formatDateTime(transfer.time) : transfer.notes,
+                  onPress: () =>
+                    selectedTripId
+                      ? router.push({ pathname: '/trip/[tripId]', params: { tripId: selectedTripId, focus: 'transfer' } })
+                      : undefined,
+                })
+              )
+            ) : (
+              <EmptyState title="No transfers yet" description="Pickup and transfer details will appear here once they are added to the trip." />
+            )}
+          </AppCard>
+
+          <AppCard title="Hotel" subtitle="Stay details and hotel cards for this trip.">
+            {orderedVaultSections.hotels.length ? (
+              orderedVaultSections.hotels.map((hotel) =>
+                renderTravelVaultCard({
+                  key: hotel.id,
+                  icon: 'hotel',
+                  title: hotel.hotelName,
+                  subtitle: hotel.address,
+                  description: `${formatShortDate(hotel.checkIn)} to ${formatShortDate(hotel.checkOut)}`,
+                  onPress: () => router.push({ pathname: '/trip/[tripId]', params: { tripId: hotel.tripId, focus: 'hotel' } }),
+                })
+              )
+            ) : (
+              <EmptyState title="No hotel stay yet" description="Hotel details saved in the trip flow will appear here." />
+            )}
+          </AppCard>
+
+          {orderedVaultSections.otherDocuments.length ? (
+            <AppCard title="Other travel documents" subtitle="Cards, bookings, insurance, and supporting paperwork.">
+              {orderedVaultSections.otherDocuments.map((document) => renderDocumentListItem(document))}
+            </AppCard>
+          ) : null}
         </>
       )}
 
@@ -2189,7 +2289,17 @@ export default function VaultScreen() {
         <PinPad value={pin} pinLength={security.pinLength} onChange={setPin} />
         <AppButton label="Unlock with PIN" onPress={handleVaultUnlock} />
         {security.biometricEnabled ? (
-          <AppButton label="Use biometrics" tone="secondary" onPress={() => unlockWithBiometrics('vault')} />
+          <AppButton
+            label="Use biometrics"
+            tone="secondary"
+            onPress={async () => {
+              const unlocked = await unlockWithBiometrics('vault');
+              if (unlocked) {
+                setPinPromptVisible(false);
+                setPin('');
+              }
+            }}
+          />
         ) : null}
       </AppModal>
 
@@ -2596,6 +2706,43 @@ const styles = StyleSheet.create({
     color: colors.primaryBlueText,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
+  },
+  travelVaultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  travelVaultBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: colors.primaryBlueTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  travelVaultCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  travelVaultTitle: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+  },
+  travelVaultSubtitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  travelVaultMeta: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
   },
   warningList: {
     flexDirection: 'row',

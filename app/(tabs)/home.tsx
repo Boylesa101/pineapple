@@ -80,12 +80,12 @@ export default function HomeScreen() {
           </Text>
         </View>
         <View style={styles.topActions}>
-          <Pressable onPress={() => router.push('/warnings')} style={styles.bellButton} accessibilityLabel="Open alerts">
-            <MaterialIcons name="notifications-none" size={24} color={colors.primaryBlue} />
-            {alertCount > 0 ? <View style={styles.bellDot} /> : null}
+          <Pressable onPress={() => router.push('/account')} style={styles.topIconButton} accessibilityLabel="Open account">
+            <MaterialIcons name="person-outline" size={25} color={colors.primaryBlue} />
           </Pressable>
-          <Pressable onPress={() => router.push('/account')} style={styles.bellButton} accessibilityLabel="Open account">
-            <MaterialIcons name="person-outline" size={24} color={colors.primaryBlue} />
+          <Pressable onPress={() => router.push('/warnings')} style={styles.topIconButton} accessibilityLabel="Open alerts">
+            <MaterialIcons name="notifications-none" size={25} color={colors.primaryBlue} />
+            {alertCount > 0 ? <View style={styles.bellDot} /> : null}
           </Pressable>
         </View>
       </View>
@@ -202,20 +202,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  bellButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#D6E7FF',
-    backgroundColor: colors.primaryBlueSurface,
+  topIconButton: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bellDot: {
     position: 'absolute',
-    top: 9,
-    right: 9,
+    top: 2,
+    right: 1,
     width: 10,
     height: 10,
     borderRadius: 5,

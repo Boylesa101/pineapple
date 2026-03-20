@@ -2,6 +2,8 @@ export type TripStatus = 'upcoming' | 'active' | 'completed';
 export type DestinationType = 'country' | 'place' | 'unknown';
 export type HeroImageStatus = 'idle' | 'loading' | 'ready' | 'failed';
 export type DestinationImageSource = 'curated' | 'pexels' | 'wikimedia' | 'fallback';
+export type TransportType = 'flight' | 'train';
+export type TravelDirection = 'outbound' | 'return' | 'other';
 export type DocumentType =
   | 'passport'
   | 'ghic'
@@ -66,6 +68,11 @@ export interface Trip {
   heroImageStatus: HeroImageStatus;
   notes: string;
   transferSummary: string;
+  transferProvider: string;
+  transferMethod: string;
+  transferLocation: string;
+  transferTime: string | null;
+  transferNotes: string;
   status: TripStatus;
   createdAt: string;
   updatedAt: string;
@@ -188,7 +195,11 @@ export interface PackingItem {
 export interface TravelSegment {
   id: string;
   tripId: string;
+  transportType: TransportType;
+  travelDirection: TravelDirection;
   airline: string;
+  providerCode: string;
+  providerLogoUrl: string | null;
   flightNumber: string;
   departureAirport: string;
   departureAirportCode: string;
@@ -209,6 +220,10 @@ export interface HotelStay {
   tripId: string;
   hotelName: string;
   address: string;
+  city: string;
+  country: string;
+  latitude: number | null;
+  longitude: number | null;
   hotelImageLocalPath: string | null;
   hotelImageRemoteUrl: string | null;
   hotelImageSource: DestinationImageSource;

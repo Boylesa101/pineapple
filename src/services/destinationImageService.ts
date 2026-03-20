@@ -88,7 +88,7 @@ const curatedDestinationImages: CuratedDestinationImage[] = [];
 function createFallbackAttribution(): DestinationImageAttribution {
   return {
     source: 'fallback',
-    sourceLabel: 'Default trip background',
+    sourceLabel: 'Default Pineapple image',
   };
 }
 
@@ -98,7 +98,7 @@ function buildFallbackResult(destinationType: DestinationType): DestinationImage
     localPath: null,
     remoteUrl: null,
     source: 'fallback',
-    attributionText: 'Default trip background',
+    attributionText: 'Default Pineapple image',
     attribution: createFallbackAttribution(),
     heroImageStatus: 'failed',
   };
