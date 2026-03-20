@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   LayoutAnimation,
   PanResponder,
   Platform,
@@ -31,8 +32,8 @@ type Props = {
 };
 
 const CARD_HEIGHT = 228;
-const STACK_OFFSETS = [0, 28, 56, 84];
-const STACK_SCALES = [1, 0.985, 0.97, 0.955];
+const STACK_OFFSETS = [0, 42, 84, 126];
+const STACK_SCALES = [1, 0.988, 0.974, 0.96];
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -49,7 +50,21 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
   }, [currentIndex, items.length]);
 
   function animateToIndex(nextIndex: number) {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    LayoutAnimation.configureNext({
+      duration: 280,
+      create: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+      update: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        springDamping: 0.82,
+      },
+      delete: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+    });
     setCurrentIndex(nextIndex);
   }
 
@@ -63,7 +78,8 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
     const toValue = direction === 'next' ? -CARD_HEIGHT * 0.55 : CARD_HEIGHT * 0.55;
     Animated.timing(dragY, {
       toValue,
-      duration: 180,
+      duration: 240,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
       useNativeDriver: true,
     }).start(() => {
       dragY.setValue(0);
@@ -87,17 +103,29 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
             completeSwipe('previous');
             return;
           }
-          Animated.spring(dragY, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
+          Animated.spring(dragY, {
+            toValue: 0,
+            useNativeDriver: true,
+            damping: 18,
+            stiffness: 180,
+            mass: 0.9,
+          }).start();
         },
         onPanResponderTerminate: () => {
-          Animated.spring(dragY, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
+          Animated.spring(dragY, {
+            toValue: 0,
+            useNativeDriver: true,
+            damping: 18,
+            stiffness: 180,
+            mass: 0.9,
+          }).start();
         },
       }),
     [currentIndex, dragY, items.length]
   );
 
   const visibleItems = items.slice(currentIndex, currentIndex + 4);
-  const stackHeight = CARD_HEIGHT + Math.max(0, Math.min(items.length - currentIndex - 1, 3)) * 28;
+  const stackHeight = CARD_HEIGHT + Math.max(0, Math.min(items.length - currentIndex - 1, 3)) * 42;
 
   return (
     <View style={[styles.stackWrap, { height: stackHeight }]}>
@@ -124,7 +152,7 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
                         {
                           rotate: dragY.interpolate({
                             inputRange: [-180, 0, 180],
-                            outputRange: ['-1.3deg', '0deg', '1.3deg'],
+                            outputRange: ['-1deg', '0deg', '1deg'],
                           }),
                         },
                       ]
@@ -173,7 +201,7 @@ const styles = StyleSheet.create({
   },
   peekTapTarget: {
     ...StyleSheet.absoluteFillObject,
-    top: 150,
+    top: 118,
     zIndex: 1,
   },
   hint: {

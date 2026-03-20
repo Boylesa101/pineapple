@@ -122,7 +122,7 @@ export function TripHeroCard({
         <View style={styles.card}>
           {imageUri ? <ManagedFileImage uri={imageUri} style={styles.image} /> : null}
           <LinearGradient colors={fallbackGradient(trip.destinationType)} style={styles.fallback} />
-          <LinearGradient colors={['rgba(10, 28, 44, 0.18)', 'rgba(10, 28, 44, 0.82)']} style={styles.overlay} />
+          <LinearGradient colors={['rgba(10, 28, 44, 0.14)', 'rgba(10, 28, 44, 0.74)']} style={styles.overlay} />
 
           <View style={styles.content}>
             <View style={styles.copy}>

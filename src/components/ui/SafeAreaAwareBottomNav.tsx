@@ -7,12 +7,8 @@ import { colors, radii, spacing } from '@/constants/theme';
 
 const iconMap = {
   home: 'home',
-  account: 'person',
   vault: 'folder',
-  trips: 'luggage',
   sos: 'sos',
-  packing: 'checkroom',
-  itinerary: 'event-note',
 } satisfies Record<string, keyof typeof MaterialIcons.glyphMap>;
 
 export function SafeAreaAwareBottomNav({ state, descriptors, navigation }: BottomTabBarProps) {
