@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.4 - 2026-03-20
+
+- Home refinement pass: lightened the trip-card image overlay so more of each destination shows through without losing readability
+- Stacked deck polish: increased the visible peek of the lower trip cards, smoothed the swipe/tap transition timing, and kept the layered Pineapple card look intact
+- Footer cleanup: the main app footer remains limited to `Home`, `Vault`, and `SOS`, while the `New trip` floating action now sits tighter to the footer for better thumb reach
+
 ## 1.7.3 - 2026-03-20
 
 - Vibes proxy prep: Pineapple no longer expects a Tripadvisor key inside the APK for the `Vibes` screen, and the Cloudflare Pages deployment now includes a `/api/vibes` server-side proxy route designed for the `pinapple-dev.pages.dev` allowlisted domain
