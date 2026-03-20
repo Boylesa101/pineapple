@@ -62,9 +62,7 @@ async function fetchTripadvisorCategory(area, vibeCategory, apiKey, allowedDomai
     }));
 }
 
-export const onRequestOptions = async () => json({}, 204);
-
-export const onRequestGet = async ({ env, request }) => {
+async function handleVibes(request, env) {
   const apiKey = env.TRIPADVISOR_API_KEY?.trim();
   const allowedDomain = env.TRIPADVISOR_ALLOWED_DOMAIN?.trim() || 'pinapple-dev.pages.dev';
 
@@ -116,4 +114,20 @@ export const onRequestGet = async ({ env, request }) => {
 
     return json({ error: 'Unable to load live Vibes suggestions right now.' }, 502);
   }
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (request.method === 'OPTIONS' && url.pathname === '/api/vibes') {
+      return json({}, 204);
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/vibes') {
+      return handleVibes(request, env);
+    }
+
+    return env.ASSETS.fetch(request);
+  },
 };

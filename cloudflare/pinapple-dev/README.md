@@ -4,7 +4,7 @@ Static Cloudflare Pages download page for the latest Pineapple Android test APK.
 
 Deployment shape:
 - Pages hosts the HTML and icon assets
-- Pages Functions now also host the `GET /api/vibes` Tripadvisor proxy
+- A root Pages Worker now also hosts the `GET /api/vibes` Tripadvisor proxy
 - R2 stores the APK itself
 
 Manual update flow:
