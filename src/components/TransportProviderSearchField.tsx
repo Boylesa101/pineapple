@@ -75,7 +75,14 @@ export function TransportProviderSearchField({
               onPress={() => handleSelect(provider)}
               style={({ pressed }) => [styles.suggestionRow, pressed ? styles.suggestionRowPressed : null]}
             >
-              <ProviderLogoBadge name={provider.name} code={provider.code} logoUrl={provider.logoUrl} size={34} />
+              <ProviderLogoBadge
+                name={provider.name}
+                code={provider.code}
+                logoXml={provider.logoXml}
+                logoUrl={provider.logoUrl}
+                accentColor={provider.accentColor}
+                size={34}
+              />
               <View style={styles.suggestionCopy}>
                 <Text style={styles.suggestionLabel}>{provider.name}</Text>
                 <Text style={styles.suggestionMeta}>{provider.code || provider.type.toUpperCase()}</Text>

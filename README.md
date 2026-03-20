@@ -43,6 +43,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Optional biometric unlock when the device supports it
 - Auto-lock after inactivity, persistent PIN cooldown after repeated failures, and best-effort privacy overlay for the app switcher
 - Mockup-matched blue/white shell with a safe-area-aware bottom nav for Home, SOS, and Vault, while trip-specific navigation now lives inside the trip flow itself
+- Home now uses a minimal header plus a stacked trip-card deck, with a single floating `New trip` action instead of the older hero and summary blocks
 - Trip CRUD with searchable destination entry, automatic destination hero imagery, local cached trip covers, and per-trip transfer / pickup notes
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
@@ -68,11 +69,13 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Reusable document expiry status system for passports, visas, GHIC / EHIC, travel insurance, driving licences, ID cards, and custom docs with expiry dates
 - Packing lists grouped by category with multi-traveller assignment, templates, duplicate action, and priority flags
 - Flight / train segment management with outbound/return direction support, searchable airline/operator selection, stored provider codes, and safe airline-logo fallback handling
+- The flight provider picker now bundles 50 common airline brand marks locally so transport selection does not depend on remote logo URLs at runtime
 - Hotel stay management with free OpenStreetMap/Nominatim address search, editable address normalization, automatic free image lookup, and offline cache after the first successful fetch
 - Structured transfer/pickup management with provider, method, location, time, and notes stored directly on the trip
 - Automatic trip-card destination images that resolve from country or place text, cache locally after the first fetch, and fall back cleanly when offline or unresolved
 - Trip-card destination imagery now prefers Pexels when an optional `EXPO_PUBLIC_PEXELS_API_KEY` is supplied at build time, falls back to Wikimedia Commons otherwise, caches the chosen image locally, and exposes source attribution through a small in-card info action
 - Flight entry now includes a built-in searchable airport picker with stored IATA codes for cleaner travel records
+- Date-of-birth entry now uses direct typed `DD / MM / YYYY` input in traveller, passport, and driving-licence flows instead of the calendar picker
 - Trip detail now uses a contextual footer for `Packing`, `Vibes`, `Flight`, and `Hotel`, keeping those sections in the trip flow instead of the global footer
 - `Vibes` can fetch live top picks for places to eat, visit, and do from Tripadvisor and add them directly into the itinerary when `EXPO_PUBLIC_TRIPADVISOR_API_KEY` is provided at build time
 - Chronological itinerary timeline

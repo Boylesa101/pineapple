@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.2 - 2026-03-20
+
+- Home-screen cleanup: removed the blue hero banner, removed the traveller summary block, removed the Home document CTA, stripped the top header down to `Hello Andrew` plus account/notification icons, and made the trip area the only main dashboard content again
+- Stacked trip deck: Home now renders trips as a vertically stacked image-led deck sorted by departure date, with lower cards peeking from the bottom, swipe up/down navigation, and tap-to-bring-forward behavior for the visible lower cards
+- Floating create action: Home now uses a single blue floating `New trip` button above the footer instead of multiple trip/document CTAs
+- DOB entry change: traveller and document date-of-birth fields now use direct typed `DD / MM / YYYY` entry instead of the calendar picker so older birth years are faster to enter on-device
+- Flight-branding pass: Pineapple now bundles 50 common airline brand marks for transport selection and trip travel rows, using stored official logo SVGs where available and local branded monogram fallbacks for carriers without a clean portable source
+- Honest limitation: not all 50 airline entries have a redistributable standalone official logo source in the same format, so some less-portable carriers currently use bundled branded monogram marks rather than the full airline logo
+
 ## 1.7.1 - 2026-03-20
 
 - Trip-card polish: restored the cleaner image-led trip-card treatment, increased the right-side shortcut icons again, and changed `Days till trip` from a second pill into plain white text sitting beside the key-doc status badge

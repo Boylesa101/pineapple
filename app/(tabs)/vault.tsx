@@ -32,6 +32,7 @@ import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { PaymentCardDocument } from '@/components/payment-card/PaymentCardDocument';
 import { PinPad } from '@/components/PinPad';
 import { PassportDocument } from '@/components/passport/PassportDocument';
+import { TypedDateField } from '@/components/TypedDateField';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import { travellerAvatarColors } from '@/data/travellerOptions';
@@ -1869,9 +1870,8 @@ export default function VaultScreen() {
                     )
                   }
                 />
-                <DateTimeField
+                <TypedDateField
                   label="Date of birth"
-                  mode="date"
                   value={draft.passportData.dateOfBirth}
                   onChange={(value) =>
                     setDraft((current) =>
@@ -1942,9 +1942,8 @@ export default function VaultScreen() {
                   }
                   multiline
                 />
-                <DateTimeField
+                <TypedDateField
                   label="Date of birth"
-                  mode="date"
                   value={draft.drivingLicenceData.dateOfBirth}
                   onChange={(value) =>
                     setDraft((current) =>

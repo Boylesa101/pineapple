@@ -22,9 +22,11 @@ import { ListRow } from '@/components/ListRow';
 import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { ProviderLogoBadge } from '@/components/ProviderLogoBadge';
 import { TransportProviderSearchField } from '@/components/TransportProviderSearchField';
+import { TypedDateField } from '@/components/TypedDateField';
 import { colors, spacing } from '@/constants/theme';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
+import { findTransportProvider } from '@/data/transportProviders';
 import { useAppStore } from '@/store/useAppStore';
 import type {
   EmergencyInfoDraft,
@@ -645,39 +647,44 @@ export default function TripDetailScreen() {
         style={activeSection === 'travel' ? styles.highlightedCard : null}
       >
         {orderedTravelSegments.length ? (
-          orderedTravelSegments.map((segment) => (
-            <View key={segment.id} style={styles.transportRow}>
-              <ProviderLogoBadge
-                name={segment.airline || (segment.transportType === 'train' ? 'Train' : 'Flight')}
-                code={segment.providerCode}
-                logoUrl={segment.providerLogoUrl}
-              />
-              <View style={styles.transportCopy}>
-                <View style={styles.transportHeader}>
-                  <Text style={styles.transportTitle}>
-                    {segment.transportType === 'train' ? 'Train' : 'Flight'} · {segment.travelDirection}
+          orderedTravelSegments.map((segment) => {
+            const providerBrand = findTransportProvider(segment.providerCode, segment.transportType);
+            return (
+              <View key={segment.id} style={styles.transportRow}>
+                <ProviderLogoBadge
+                  name={segment.airline || (segment.transportType === 'train' ? 'Train' : 'Flight')}
+                  code={segment.providerCode}
+                  logoXml={providerBrand?.logoXml ?? null}
+                  logoUrl={segment.providerLogoUrl}
+                  accentColor={providerBrand?.accentColor ?? null}
+                />
+                <View style={styles.transportCopy}>
+                  <View style={styles.transportHeader}>
+                    <Text style={styles.transportTitle}>
+                      {segment.transportType === 'train' ? 'Train' : 'Flight'} · {segment.travelDirection}
+                    </Text>
+                    <InfoChip label={segment.transportType === 'train' ? 'Train' : 'Flight'} tone="blue" />
+                  </View>
+                  <Text style={styles.transportMeta}>
+                    {[segment.airline, segment.flightNumber].filter(Boolean).join(' ')}
                   </Text>
-                  <InfoChip label={segment.transportType === 'train' ? 'Train' : 'Flight'} tone="blue" />
+                  <Text style={styles.transportMeta}>
+                    {formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} →{' '}
+                    {formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}
+                  </Text>
+                  <Text style={styles.transportMeta}>{formatDateTime(segment.departureTime)}</Text>
                 </View>
-                <Text style={styles.transportMeta}>
-                  {[segment.airline, segment.flightNumber].filter(Boolean).join(' ')}
-                </Text>
-                <Text style={styles.transportMeta}>
-                  {formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} →{' '}
-                  {formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}
-                </Text>
-                <Text style={styles.transportMeta}>{formatDateTime(segment.departureTime)}</Text>
+                <View style={styles.iconRow}>
+                  <Pressable onPress={() => openSegmentEditor(segment)}>
+                    <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+                  </Pressable>
+                  <Pressable onPress={() => deleteRecord('travel_segments', segment.id)}>
+                    <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                  </Pressable>
+                </View>
               </View>
-              <View style={styles.iconRow}>
-                <Pressable onPress={() => openSegmentEditor(segment)}>
-                  <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                </Pressable>
-                <Pressable onPress={() => deleteRecord('travel_segments', segment.id)}>
-                  <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                </Pressable>
-              </View>
-            </View>
-          ))
+            );
+          })
         ) : (
           <EmptyState
             title="No transport saved"
@@ -918,9 +925,8 @@ export default function TripDetailScreen() {
               value={travellerDraft.fullName}
               onChangeText={(value) => setTravellerDraft((current) => (current ? { ...current, fullName: value } : current))}
             />
-            <DateTimeField
+            <TypedDateField
               label="Date of birth"
-              mode="date"
               value={travellerDraft.dateOfBirth}
               onChange={(value) => setTravellerDraft((current) => (current ? { ...current, dateOfBirth: value } : current))}
             />
@@ -1065,19 +1071,24 @@ export default function TripDetailScreen() {
                   : 'Pick an airline to keep the code and logo tidy.'
               }
             />
-            {segmentDraft.providerLogoUrl || segmentDraft.providerCode ? (
-              <View style={styles.providerPreview}>
-                <ProviderLogoBadge
-                  name={segmentDraft.airline || (segmentDraft.transportType === 'train' ? 'Train' : 'Flight')}
-                  code={segmentDraft.providerCode}
-                  logoUrl={segmentDraft.providerLogoUrl}
-                />
-                <Text style={styles.providerPreviewText}>
-                  {segmentDraft.providerCode ? `${segmentDraft.providerCode} · ` : ''}
-                  {segmentDraft.airline || 'Provider'}
-                </Text>
-              </View>
-            ) : null}
+            {(() => {
+              const providerBrand = findTransportProvider(segmentDraft.providerCode, segmentDraft.transportType);
+              return segmentDraft.providerLogoUrl || segmentDraft.providerCode ? (
+                <View style={styles.providerPreview}>
+                  <ProviderLogoBadge
+                    name={segmentDraft.airline || (segmentDraft.transportType === 'train' ? 'Train' : 'Flight')}
+                    code={segmentDraft.providerCode}
+                    logoXml={providerBrand?.logoXml ?? null}
+                    logoUrl={segmentDraft.providerLogoUrl}
+                    accentColor={providerBrand?.accentColor ?? null}
+                  />
+                  <Text style={styles.providerPreviewText}>
+                    {segmentDraft.providerCode ? `${segmentDraft.providerCode} · ` : ''}
+                    {segmentDraft.airline || 'Provider'}
+                  </Text>
+                </View>
+              ) : null;
+            })()}
             <AppTextField
               label={segmentDraft.transportType === 'train' ? 'Service number' : 'Flight number'}
               value={segmentDraft.flightNumber}
