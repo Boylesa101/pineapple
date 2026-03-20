@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppButton } from '@/components/AppButton';
@@ -9,7 +8,6 @@ import { AppModal } from '@/components/AppModal';
 import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import type { Trip } from '@/types/models';
-import { defaultTripCardFallbackImageSource } from '@/services/destinationImageService';
 
 type Props = {
   trip: Trip;
@@ -82,7 +80,7 @@ function buildAttributionRows(trip: Trip) {
 
   return {
     title: 'Image attribution',
-    rows: ['Default Pineapple image'],
+    rows: ['Default trip background'],
     linkLabel: null,
     linkUrl: null,
   };
@@ -107,33 +105,32 @@ export function TripHeroCard({
     <>
       <Pressable onPress={onPress} disabled={!onPress} style={styles.pressable}>
         <View style={styles.card}>
-          <Image source={defaultTripCardFallbackImageSource} style={styles.image} contentFit="cover" />
           {imageUri ? <ManagedFileImage uri={imageUri} style={styles.image} /> : null}
-        <LinearGradient colors={fallbackGradient(trip.destinationType)} style={styles.fallback} />
-        <LinearGradient colors={['rgba(10, 28, 44, 0.18)', 'rgba(10, 28, 44, 0.82)']} style={styles.overlay} />
+          <LinearGradient colors={fallbackGradient(trip.destinationType)} style={styles.fallback} />
+          <LinearGradient colors={['rgba(10, 28, 44, 0.18)', 'rgba(10, 28, 44, 0.82)']} style={styles.overlay} />
 
-        <View style={styles.content}>
-          <View style={styles.copy}>
-            <Text style={styles.destination}>{trip.destination.toUpperCase()}</Text>
-            <Text style={styles.title}>{trip.name}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
-            <Text style={styles.meta}>{meta}</Text>
-            {badgeLabel ? <Text style={styles.badge}>{badgeLabel}</Text> : null}
-            {fallbackLabel ? <Text style={styles.helper}>{fallbackLabel}</Text> : null}
-          </View>
+          <View style={styles.content}>
+            <View style={styles.copy}>
+              <Text style={styles.destination}>{trip.destination.toUpperCase()}</Text>
+              <Text style={styles.title}>{trip.name}</Text>
+              <Text style={styles.subtitle}>{subtitle}</Text>
+              <Text style={styles.meta}>{meta}</Text>
+              {badgeLabel ? <Text style={styles.badge}>{badgeLabel}</Text> : null}
+              {fallbackLabel ? <Text style={styles.helper}>{fallbackLabel}</Text> : null}
+            </View>
 
-          <View style={styles.actions}>
-            <Pressable onPress={onOpenFlights} disabled={!onOpenFlights} style={styles.iconButton}>
-              <MaterialIcons name="flight" size={20} color={colors.white} />
-            </Pressable>
-            <Pressable onPress={onOpenHotel} disabled={!onOpenHotel} style={styles.iconButton}>
-              <MaterialIcons name="hotel" size={20} color={colors.white} />
-            </Pressable>
-            <Pressable onPress={onOpenTransfers} disabled={!onOpenTransfers} style={styles.iconButton}>
-              <MaterialIcons name="swap-horiz" size={20} color={colors.white} />
-            </Pressable>
+            <View style={styles.actions}>
+              <Pressable onPress={onOpenFlights} disabled={!onOpenFlights} style={styles.iconButton}>
+                <MaterialIcons name="flight" size={20} color={colors.white} />
+              </Pressable>
+              <Pressable onPress={onOpenHotel} disabled={!onOpenHotel} style={styles.iconButton}>
+                <MaterialIcons name="hotel" size={20} color={colors.white} />
+              </Pressable>
+              <Pressable onPress={onOpenTransfers} disabled={!onOpenTransfers} style={styles.iconButton}>
+                <MaterialIcons name="swap-horiz" size={20} color={colors.white} />
+              </Pressable>
+            </View>
           </View>
-        </View>
           <Pressable
             onPress={(event) => {
               event.stopPropagation?.();
@@ -149,7 +146,7 @@ export function TripHeroCard({
       </Pressable>
 
       <AppModal visible={attributionVisible} title={attributionContent.title} onClose={() => setAttributionVisible(false)}>
-        <Text style={styles.modalLead}>{trip.attributionText || 'Default Pineapple image'}</Text>
+        <Text style={styles.modalLead}>{trip.attributionText || 'Default trip background'}</Text>
         <View style={styles.modalRows}>
           {attributionContent.rows.map((row) => (
             <Text key={row} style={styles.modalRow}>

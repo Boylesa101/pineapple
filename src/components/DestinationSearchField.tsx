@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
@@ -33,19 +33,27 @@ export function DestinationSearchField({
   helper,
 }: Props) {
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<TextInput | null>(null);
+  const selectingRef = useRef(false);
   const suggestions = useMemo(() => searchDestinations(value), [value]);
   const showSuggestions = focused && suggestions.length > 0;
 
   function handleSelect(suggestion: DestinationSuggestion) {
+    selectingRef.current = true;
     onChangeText(suggestion.label);
     onSelectSuggestion?.(suggestion);
     setFocused(false);
+    inputRef.current?.blur();
+    setTimeout(() => {
+      selectingRef.current = false;
+    }, 0);
   }
 
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         value={value}
         onChangeText={onChangeText}
@@ -53,7 +61,14 @@ export function DestinationSearchField({
         placeholderTextColor={colors.textLight}
         onFocus={() => setFocused(true)}
         onBlur={() => {
-          setTimeout(() => setFocused(false), 120);
+          if (selectingRef.current) {
+            return;
+          }
+          setTimeout(() => {
+            if (!selectingRef.current) {
+              setFocused(false);
+            }
+          }, 180);
         }}
         autoCorrect={false}
         autoCapitalize="words"
@@ -64,6 +79,7 @@ export function DestinationSearchField({
           {suggestions.map((suggestion) => (
             <Pressable
               key={`${suggestion.type}:${suggestion.label}`}
+              onPressIn={() => handleSelect(suggestion)}
               onPress={() => handleSelect(suggestion)}
               style={({ pressed }) => [styles.suggestionRow, pressed ? styles.suggestionRowPressed : null]}
             >

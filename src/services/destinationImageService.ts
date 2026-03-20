@@ -85,12 +85,10 @@ const WIKIMEDIA_HEADERS =
       };
 const curatedDestinationImages: CuratedDestinationImage[] = [];
 
-export const defaultTripCardFallbackImageSource = require('../../assets/logo/pineapple-round-source.png');
-
 function createFallbackAttribution(): DestinationImageAttribution {
   return {
     source: 'fallback',
-    sourceLabel: 'Pineapple',
+    sourceLabel: 'Default trip background',
   };
 }
 
@@ -100,7 +98,7 @@ function buildFallbackResult(destinationType: DestinationType): DestinationImage
     localPath: null,
     remoteUrl: null,
     source: 'fallback',
-    attributionText: 'Default Pineapple image',
+    attributionText: 'Default trip background',
     attribution: createFallbackAttribution(),
     heroImageStatus: 'failed',
   };

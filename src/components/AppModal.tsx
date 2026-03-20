@@ -26,7 +26,9 @@ export function AppModal({ visible, title, onClose, children }: Props) {
             <MaterialIcons name="close" size={20} color={colors.primaryBlueText} />
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {children}
+        </ScrollView>
       </SafeAreaView>
     </Modal>
   );
