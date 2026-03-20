@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.9 - 2026-03-20
+
+- Destination picker reliability fix: trip destination suggestions now stay tappable while the keyboard is open, with safer focus/blur timing so selecting places like `Bali, Indonesia` actually applies the choice instead of dismissing the list
+- Home-screen cleanup: removed the old `Travel Status` / `Document Vault` / `SOS` action band from the dashboard so the top of the app is cleaner and less repetitive
+- Shell navigation adjustment: `Account` now moves out of the bottom nav and into the home top-right action row beside notifications, while the bottom nav keeps the simpler `Home`, `Vault`, `Trips`, and `SOS` layout
+- Footer polish: enlarged the remaining bottom-nav icons and labels slightly so they read more clearly on-device without reintroducing the old white container treatment
+
 ## 1.6.8 - 2026-03-20
 
 - Flight entry upgrade: travel segments now use a bundled searchable airport picker with IATA-code suggestions, so typing places like London, Newcastle, or New York resolves real airports even when the phone is offline

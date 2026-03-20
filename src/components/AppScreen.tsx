@@ -48,7 +48,12 @@ export function AppScreen({
       ) : null}
       {!hideBackgroundDecor ? <View style={styles.topWash} /> : null}
       {scroll ? (
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
           {content}
         </ScrollView>
       ) : (

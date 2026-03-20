@@ -8,9 +8,7 @@ import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { EmptyState } from '@/components/EmptyState';
-import { InfoChip } from '@/components/InfoChip';
 import { HeroCard } from '@/components/ui/HeroCard';
-import { MiniActionCard } from '@/components/ui/MiniActionCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { TripHeroCard } from '@/components/ui/TripHeroCard';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -81,10 +79,15 @@ export default function HomeScreen() {
               : 'Start a trip, add your travel documents, and keep everything local to this device.'}
           </Text>
         </View>
-        <Pressable onPress={() => router.push('/warnings')} style={styles.bellButton} accessibilityLabel="Open alerts">
-          <MaterialIcons name="notifications-none" size={24} color={colors.primaryBlue} />
-          {alertCount > 0 ? <View style={styles.bellDot} /> : null}
-        </Pressable>
+        <View style={styles.topActions}>
+          <Pressable onPress={() => router.push('/warnings')} style={styles.bellButton} accessibilityLabel="Open alerts">
+            <MaterialIcons name="notifications-none" size={24} color={colors.primaryBlue} />
+            {alertCount > 0 ? <View style={styles.bellDot} /> : null}
+          </Pressable>
+          <Pressable onPress={() => router.push('/account')} style={styles.bellButton} accessibilityLabel="Open account">
+            <MaterialIcons name="person-outline" size={24} color={colors.primaryBlue} />
+          </Pressable>
+        </View>
       </View>
 
       <HeroCard
@@ -133,48 +136,6 @@ export default function HomeScreen() {
             <AppButton label="Create your first trip" onPress={goToTrips} />
           </AppCard>
         )}
-      </View>
-
-      <View style={styles.section}>
-        <SectionHeader title="Travel status" right={alertCount ? `${alertCount} alert${alertCount === 1 ? '' : 's'}` : 'All clear'} />
-        <View style={styles.travelStatusGrid}>
-          <View style={styles.actionCell}>
-            <MiniActionCard
-              style={styles.equalActionCard}
-              icon={<MaterialIcons name="travel-explore" size={26} color={colors.primaryBlue} />}
-              title="Travel Status"
-              description={
-                nextEvent
-                  ? `Next event live · ${countdownLabel(dashboardTrip?.startDate ?? new Date().toISOString())}`
-                  : `${expiryOverview.expiredCount + expiryOverview.expiringCount} doc alerts to review`
-              }
-              onPress={() => router.push('/warnings')}
-            />
-          </View>
-          <View style={styles.actionCell}>
-            <MiniActionCard
-              style={styles.equalActionCard}
-              icon={<MaterialIcons name="folder" size={26} color={colors.primaryBlue} />}
-              title="Document Vault"
-              description={`${bundle.documents.length || 0} document records ready for travel.`}
-              onPress={openVault}
-            />
-          </View>
-          <View style={styles.actionCell}>
-            <MiniActionCard
-              style={styles.equalActionCard}
-              icon={<MaterialIcons name="sos" size={26} color={colors.dangerRed} />}
-              title="SOS"
-              description="Open emergency tools, embassy notes, and support info."
-              onPress={() => router.push('/sos')}
-            />
-          </View>
-        </View>
-        <View style={styles.chipRow}>
-          <InfoChip label={`${expiryOverview.expiredCount} expired`} tone={expiryOverview.expiredCount ? 'coral' : 'blue'} />
-          <InfoChip label={`${expiryOverview.expiringCount} expiring soon`} tone={expiryOverview.expiringCount ? 'gold' : 'blue'} />
-          <InfoChip label={nextEvent ? 'Itinerary live' : 'No next event'} tone="blue" />
-        </View>
       </View>
 
       {dashboardTrip ? (
@@ -236,6 +197,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     maxWidth: 280,
   },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   bellButton: {
     width: 44,
     height: 44,
@@ -259,22 +225,6 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.sm,
-  },
-  travelStatusGrid: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'stretch',
-  },
-  actionCell: {
-    flex: 1,
-  },
-  equalActionCard: {
-    minHeight: 142,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
   },
   travellerRow: {
     flexDirection: 'row',

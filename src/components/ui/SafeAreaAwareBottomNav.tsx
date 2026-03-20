@@ -41,7 +41,7 @@ export function SafeAreaAwareBottomNav({ state, descriptors, navigation }: Botto
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
           >
-            <MaterialIcons name={iconName} size={22} color={tint} style={{ opacity: labelOpacity }} />
+            <MaterialIcons name={iconName} size={26} color={tint} style={{ opacity: labelOpacity }} />
             <Text style={[styles.label, { color: tint, opacity: labelOpacity }]}>{label}</Text>
           </Pressable>
         );
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    minHeight: 58,
+    minHeight: 62,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 10,
+    fontSize: 11,
     textAlign: 'center',
   },
 });

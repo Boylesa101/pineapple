@@ -36,7 +36,7 @@ export function DestinationSearchField({
   const inputRef = useRef<TextInput | null>(null);
   const selectingRef = useRef(false);
   const suggestions = useMemo(() => searchDestinations(value), [value]);
-  const showSuggestions = focused && suggestions.length > 0;
+  const showSuggestions = focused && value.trim().length > 0 && suggestions.length > 0;
 
   function handleSelect(suggestion: DestinationSuggestion) {
     selectingRef.current = true;
@@ -46,7 +46,7 @@ export function DestinationSearchField({
     inputRef.current?.blur();
     setTimeout(() => {
       selectingRef.current = false;
-    }, 0);
+    }, 120);
   }
 
   return (
@@ -79,7 +79,6 @@ export function DestinationSearchField({
           {suggestions.map((suggestion) => (
             <Pressable
               key={`${suggestion.type}:${suggestion.label}`}
-              onPressIn={() => handleSelect(suggestion)}
               onPress={() => handleSelect(suggestion)}
               style={({ pressed }) => [styles.suggestionRow, pressed ? styles.suggestionRowPressed : null]}
             >
@@ -98,6 +97,7 @@ export function DestinationSearchField({
 const styles = StyleSheet.create({
   wrapper: {
     gap: spacing.xs,
+    zIndex: 24,
   },
   label: {
     color: colors.nightNavy,
@@ -122,6 +122,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   suggestionCard: {
+    position: 'relative',
     borderRadius: radii.md,
     backgroundColor: colors.white,
     borderWidth: 1,
