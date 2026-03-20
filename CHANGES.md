@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.7 - 2026-03-20
+
+- Destination image system upgrade: trip cards now resolve imagery through a stricter pipeline with optional Pexels-first lookup, Wikimedia Commons fallback, encrypted local caching, and a guaranteed Pineapple fallback image so cards never render blank
+- Root-cause image fix: the trip-card overlay stack was still painting an opaque fallback gradient over successful image results, so destination images were being hidden even when lookup succeeded; the card now keeps the readability overlay without blocking the photo itself
+- Attribution UI: each trip card now includes a small `i` icon that opens Pineapple-styled attribution details for Pexels, Wikimedia Commons, or the bundled fallback image
+- Data-model and migration update: trips now persist destination-image source, local cache path, remote source URL, attribution text, and attribution metadata without breaking older trips
+- Runtime parity: native and web snapshot repositories now preserve the same destination-image fields, and first-trip/demo/test fixtures were updated so the new image pipeline stays consistent across onboarding and regression checks
+
 ## 1.6.6 - 2026-03-19
 
 - Trip-creation crash fix: traced the Android device failure to `saveTrip -> upsertTrip -> createId`, where Pineapple was using `expo-crypto`'s `randomUUID()` for local record IDs and hitting the runtime error `Native crypto module could not be used to get secure random number`

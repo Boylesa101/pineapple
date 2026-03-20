@@ -1,6 +1,7 @@
 export type TripStatus = 'upcoming' | 'active' | 'completed';
 export type DestinationType = 'country' | 'place' | 'unknown';
 export type HeroImageStatus = 'idle' | 'loading' | 'ready' | 'failed';
+export type DestinationImageSource = 'curated' | 'pexels' | 'wikimedia' | 'fallback';
 export type DocumentType =
   | 'passport'
   | 'ghic'
@@ -55,6 +56,11 @@ export interface Trip {
   destinationType: DestinationType;
   startDate: string;
   endDate: string;
+  destinationImageLocalPath: string | null;
+  destinationImageRemoteUrl: string | null;
+  destinationImageSource: DestinationImageSource;
+  attributionText: string | null;
+  attributionMeta: DestinationImageAttribution | null;
   coverImageUri: string | null;
   heroImageRemoteUrl: string | null;
   heroImageStatus: HeroImageStatus;
@@ -63,6 +69,17 @@ export interface Trip {
   status: TripStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DestinationImageAttribution {
+  source: DestinationImageSource;
+  photographer?: string;
+  photographerUrl?: string;
+  title?: string;
+  author?: string;
+  license?: string;
+  sourceUrl?: string;
+  sourceLabel?: string;
 }
 
 export interface Traveller {

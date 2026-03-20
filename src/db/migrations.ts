@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 13;
+const DATABASE_VERSION = 14;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -12,6 +12,11 @@ CREATE TABLE IF NOT EXISTS trips (
   destinationType TEXT NOT NULL DEFAULT 'unknown',
   startDate TEXT NOT NULL,
   endDate TEXT NOT NULL,
+  destinationImageLocalPath TEXT,
+  destinationImageRemoteUrl TEXT,
+  destinationImageSource TEXT NOT NULL DEFAULT 'fallback',
+  attributionText TEXT,
+  attributionMeta TEXT,
   coverImageUri TEXT,
   heroImageRemoteUrl TEXT,
   heroImageStatus TEXT NOT NULL DEFAULT 'idle',
@@ -302,6 +307,44 @@ async function runPhaseThirteenMigration(db: SQLiteDatabase) {
   `);
 }
 
+async function runPhaseFourteenMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'trips', 'destinationImageLocalPath', 'TEXT');
+  await ensureColumn(db, 'trips', 'destinationImageRemoteUrl', 'TEXT');
+  await ensureColumn(db, 'trips', 'destinationImageSource', "TEXT NOT NULL DEFAULT 'fallback'");
+  await ensureColumn(db, 'trips', 'attributionText', 'TEXT');
+  await ensureColumn(db, 'trips', 'attributionMeta', 'TEXT');
+
+  await db.execAsync(`
+    UPDATE trips
+    SET destinationImageLocalPath = COALESCE(destinationImageLocalPath, coverImageUri)
+    WHERE destinationImageLocalPath IS NULL;
+
+    UPDATE trips
+    SET destinationImageRemoteUrl = COALESCE(destinationImageRemoteUrl, heroImageRemoteUrl)
+    WHERE destinationImageRemoteUrl IS NULL;
+
+    UPDATE trips
+    SET destinationImageSource = CASE
+      WHEN destinationImageSource IS NULL OR destinationImageSource = '' THEN
+        CASE
+          WHEN coverImageUri IS NOT NULL THEN 'wikimedia'
+          ELSE 'fallback'
+        END
+      ELSE destinationImageSource
+    END;
+
+    UPDATE trips
+    SET attributionText = CASE
+      WHEN attributionText IS NULL OR attributionText = '' THEN
+        CASE
+          WHEN coverImageUri IS NOT NULL THEN 'Existing destination image'
+          ELSE 'Default Pineapple image'
+        END
+      ELSE attributionText
+    END;
+  `);
+}
+
 async function runPhaseThreeMigration(db: SQLiteDatabase) {
   await db.execAsync(`
     INSERT OR IGNORE INTO app_preferences (
@@ -415,6 +458,10 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   if (version < 13) {
     await runPhaseThirteenMigration(db);
+  }
+
+  if (version < 14) {
+    await runPhaseFourteenMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

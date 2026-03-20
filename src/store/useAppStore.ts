@@ -26,7 +26,7 @@ import {
 } from '@/db/repositories';
 import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup';
 import { protectStoredFilesAtRest } from '@/services/documentProtection';
-import { resolveTripHeroImage } from '@/services/destinationImageService';
+import { resolveDestinationImage } from '@/services/destinationImageService';
 import { queueNotificationRefresh } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
 import { protectStructuredDataAtRest } from '@/services/structuredDataProtection';
@@ -168,10 +168,19 @@ function logStoreError(context: string, error: unknown) {
   }
 }
 
-function destinationNeedsHeroRefresh(current: TripDraft, previous?: { destination: string; coverImageUri: string | null } | null) {
+function destinationNeedsHeroRefresh(
+  current: TripDraft,
+  previous?:
+    | {
+        destination: string;
+        coverImageUri: string | null;
+        destinationImageLocalPath?: string | null;
+      }
+    | null
+) {
   const nextDestination = normalizeDestinationLabel(current.destination);
   const previousDestination = normalizeDestinationLabel(previous?.destination ?? '');
-  return nextDestination !== previousDestination || !previous?.coverImageUri;
+  return nextDestination !== previousDestination || !(previous?.destinationImageLocalPath ?? previous?.coverImageUri);
 }
 
 export const useAppStore = create<StoreState>((set, get) => ({
@@ -447,14 +456,34 @@ export const useAppStore = create<StoreState>((set, get) => ({
     const normalizedName = draft.name.trim() || normalizedDestination || existingTrip?.name || 'Trip';
     const nextDestinationType = resolveDestinationType(draft.destination);
     const shouldRefreshHero = destinationNeedsHeroRefresh(draft, existingTrip);
+    const preservedLocalPath =
+      draft.destinationImageLocalPath ??
+      draft.coverImageUri ??
+      existingTrip?.destinationImageLocalPath ??
+      existingTrip?.coverImageUri ??
+      null;
+    const preservedRemoteUrl =
+      draft.destinationImageRemoteUrl ??
+      draft.heroImageRemoteUrl ??
+      existingTrip?.destinationImageRemoteUrl ??
+      existingTrip?.heroImageRemoteUrl ??
+      null;
+    const preservedAttribution =
+      draft.attributionMeta ?? existingTrip?.attributionMeta ?? { source: 'fallback' as const, sourceLabel: 'Pineapple' };
+    const preservedAttributionText = draft.attributionText ?? existingTrip?.attributionText ?? 'Default Pineapple image';
     const preparedDraft: TripDraft = {
       ...draft,
       name: normalizedName,
       destination: normalizedDestination,
       destinationType: nextDestinationType,
-      heroImageRemoteUrl: shouldRefreshHero ? null : draft.heroImageRemoteUrl ?? existingTrip?.heroImageRemoteUrl ?? null,
+      destinationImageLocalPath: shouldRefreshHero ? null : preservedLocalPath,
+      destinationImageRemoteUrl: shouldRefreshHero ? null : preservedRemoteUrl,
+      destinationImageSource: shouldRefreshHero ? 'fallback' : draft.destinationImageSource ?? existingTrip?.destinationImageSource ?? 'fallback',
+      attributionText: shouldRefreshHero ? 'Default Pineapple image' : preservedAttributionText,
+      attributionMeta: shouldRefreshHero ? { source: 'fallback', sourceLabel: 'Pineapple' } : preservedAttribution,
+      heroImageRemoteUrl: shouldRefreshHero ? null : preservedRemoteUrl,
       heroImageStatus: shouldRefreshHero ? 'loading' : draft.heroImageStatus ?? existingTrip?.heroImageStatus ?? 'idle',
-      coverImageUri: shouldRefreshHero ? null : draft.coverImageUri ?? existingTrip?.coverImageUri ?? null,
+      coverImageUri: shouldRefreshHero ? null : preservedLocalPath,
       transferSummary: draft.transferSummary ?? existingTrip?.transferSummary ?? '',
     };
 
@@ -464,22 +493,27 @@ export const useAppStore = create<StoreState>((set, get) => ({
 
     if (shouldRefreshHero) {
       void (async () => {
-        const resolved = await resolveTripHeroImage(draft.destination);
+        const resolved = await resolveDestinationImage(normalizedDestination, id);
         const latestTrip = get().data.trips.find((trip) => trip.id === id);
-        if (!latestTrip || normalizeDestinationLabel(latestTrip.destination) !== normalizeDestinationLabel(draft.destination)) {
+        if (!latestTrip || normalizeDestinationLabel(latestTrip.destination) !== normalizedDestination) {
           return;
         }
 
         await upsertTrip({
           ...latestTrip,
           destinationType: resolved.destinationType,
-          heroImageRemoteUrl: resolved.heroImageRemoteUrl,
+          destinationImageLocalPath: resolved.localPath,
+          destinationImageRemoteUrl: resolved.remoteUrl,
+          destinationImageSource: resolved.source,
+          attributionText: resolved.attributionText,
+          attributionMeta: resolved.attribution,
+          heroImageRemoteUrl: resolved.remoteUrl,
           heroImageStatus: resolved.heroImageStatus,
-          coverImageUri: resolved.coverImageUri,
+          coverImageUri: resolved.localPath,
         });
         await get().refreshData();
       })().catch((error) => {
-        logStoreError('resolveTripHeroImage failed', error);
+        logStoreError('resolveDestinationImage failed', error);
       });
     }
 

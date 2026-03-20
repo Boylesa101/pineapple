@@ -70,6 +70,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Flight / travel segment management
 - Hotel stay management
 - Automatic trip-card destination images that resolve from country or place text, cache locally after the first fetch, and fall back cleanly when offline or unresolved
+- Trip-card destination imagery now prefers Pexels when an optional `EXPO_PUBLIC_PEXELS_API_KEY` is supplied at build time, falls back to Wikimedia Commons otherwise, caches the chosen image locally, and exposes source attribution through a small in-card info action
 - Chronological itinerary timeline
 - Emergency reference storage per trip
 - High-contrast Travel Mode with family overview, traveller tabs/swipe, quick copy actions, and temporary sensitive reveal
@@ -123,6 +124,14 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Android screenshots are blocked with `FLAG_SECURE`
 - Android OS backup is disabled; Pineapple relies on its own encrypted backup/restore flow instead
 - A fuller threat model and security posture summary lives in `SECURITY.md`
+
+### Destination image providers
+
+- Trip cards always render with a background image: Pineapple uses the encrypted cached trip image when available and falls back to a bundled local Pineapple image if no remote result can be resolved
+- Destination image lookup is local-first friendly after the first fetch because Pineapple downloads and stores the chosen trip image in app-managed storage
+- Pexels is the preferred remote source when `EXPO_PUBLIC_PEXELS_API_KEY` is present during the build; if no key is set, Pineapple skips Pexels and falls back to Wikimedia Commons and then the bundled Pineapple image
+- Attribution is available from the small `i` icon on each trip card
+- Honest limitation: a client-side Pexels key bundled into an APK can still be extracted by a determined attacker, so treat it as an optional convenience integration rather than a secret credential
 
 ### Project structure
 

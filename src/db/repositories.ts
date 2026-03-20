@@ -136,7 +136,10 @@ async function cleanupDocumentFiles(
 
 async function cleanupTripFiles(tripId: string) {
   const db = await getDatabase();
-  const trip = await db.getFirstAsync<{ coverImageUri: string | null }>('SELECT coverImageUri FROM trips WHERE id = ?', tripId);
+  const trip = await db.getFirstAsync<{ coverImageUri: string | null; destinationImageLocalPath: string | null }>(
+    'SELECT coverImageUri, destinationImageLocalPath FROM trips WHERE id = ?',
+    tripId
+  );
   const documents = await db.getAllAsync<{
     localFileUri: string;
     previewUri: string | null;
@@ -147,8 +150,9 @@ async function cleanupTripFiles(tripId: string) {
     tripId
   );
 
-  if (trip?.coverImageUri) {
-    await deleteLocalFile(trip.coverImageUri);
+  const tripImageUris = new Set([trip?.coverImageUri, trip?.destinationImageLocalPath].filter((value): value is string => Boolean(value)));
+  for (const uri of tripImageUris) {
+    await deleteLocalFile(uri);
   }
 
   for (const document of documents) {
@@ -249,7 +253,10 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         ...trip,
         name: (await decryptField(trip.name)) ?? '',
         destination: (await decryptField(trip.destination)) ?? '',
+        destinationImageRemoteUrl: await decryptField(trip.destinationImageRemoteUrl),
         heroImageRemoteUrl: await decryptField(trip.heroImageRemoteUrl),
+        attributionText: await decryptField(trip.attributionText),
+        attributionMeta: await decryptField(trip.attributionMeta),
         notes: (await decryptField(trip.notes)) ?? '',
         transferSummary: (await decryptField(trip.transferSummary)) ?? '',
       })
@@ -410,28 +417,37 @@ export async function upsertTrip(input: TripDraft) {
   const timestamp = now();
   const id = input.id ?? createId('trip');
   const existing = input.id
-    ? await db.getFirstAsync<{ coverImageUri: string | null }>(
-        'SELECT coverImageUri FROM trips WHERE id = ?',
+    ? await db.getFirstAsync<{ coverImageUri: string | null; destinationImageLocalPath: string | null }>(
+        'SELECT coverImageUri, destinationImageLocalPath FROM trips WHERE id = ?',
         input.id
       )
     : null;
   const encryptedName = (await encryptField(input.name)) ?? '';
   const encryptedDestination = (await encryptField(input.destination)) ?? '';
-  const encryptedHeroImageRemoteUrl = await encryptField(input.heroImageRemoteUrl ?? null);
+  const destinationImageLocalPath = input.destinationImageLocalPath ?? input.coverImageUri ?? null;
+  const destinationImageRemoteUrl = input.destinationImageRemoteUrl ?? input.heroImageRemoteUrl ?? null;
+  const encryptedDestinationImageRemoteUrl = await encryptField(destinationImageRemoteUrl);
+  const encryptedAttributionText = await encryptField(input.attributionText ?? null);
+  const encryptedAttributionMeta = await encryptField(input.attributionMeta ? JSON.stringify(input.attributionMeta) : null);
   const encryptedNotes = (await encryptField(input.notes ?? '')) ?? '';
   const encryptedTransferSummary = (await encryptField(input.transferSummary ?? '')) ?? '';
 
   await db.runAsync(
     `INSERT INTO trips (
-      id, name, destination, destinationType, startDate, endDate, coverImageUri, heroImageRemoteUrl, heroImageStatus, notes, transferSummary, status, createdAt, updatedAt
+      id, name, destination, destinationType, startDate, endDate, destinationImageLocalPath, destinationImageRemoteUrl, destinationImageSource, attributionText, attributionMeta, coverImageUri, heroImageRemoteUrl, heroImageStatus, notes, transferSummary, status, createdAt, updatedAt
     )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        destination = excluded.destination,
        destinationType = excluded.destinationType,
        startDate = excluded.startDate,
        endDate = excluded.endDate,
+       destinationImageLocalPath = excluded.destinationImageLocalPath,
+       destinationImageRemoteUrl = excluded.destinationImageRemoteUrl,
+       destinationImageSource = excluded.destinationImageSource,
+       attributionText = excluded.attributionText,
+       attributionMeta = excluded.attributionMeta,
        coverImageUri = excluded.coverImageUri,
        heroImageRemoteUrl = excluded.heroImageRemoteUrl,
        heroImageStatus = excluded.heroImageStatus,
@@ -445,8 +461,13 @@ export async function upsertTrip(input: TripDraft) {
     input.destinationType ?? 'unknown',
     input.startDate,
     input.endDate,
-    input.coverImageUri ?? null,
-    encryptedHeroImageRemoteUrl,
+    destinationImageLocalPath,
+    encryptedDestinationImageRemoteUrl,
+    input.destinationImageSource ?? 'fallback',
+    encryptedAttributionText,
+    encryptedAttributionMeta,
+    destinationImageLocalPath,
+    encryptedDestinationImageRemoteUrl,
     input.heroImageStatus ?? 'idle',
     encryptedNotes,
     encryptedTransferSummary,
@@ -455,8 +476,11 @@ export async function upsertTrip(input: TripDraft) {
     timestamp
   );
 
-  if (existing?.coverImageUri && existing.coverImageUri !== input.coverImageUri) {
-    await deleteLocalFile(existing.coverImageUri);
+  const previousUris = new Set([existing?.coverImageUri, existing?.destinationImageLocalPath].filter((value): value is string => Boolean(value)));
+  for (const uri of previousUris) {
+    if (uri !== destinationImageLocalPath) {
+      await deleteLocalFile(uri);
+    }
   }
 
   await db.runAsync(
@@ -1071,7 +1095,9 @@ export async function deleteById(table: string, id: string) {
 export async function clearAllData() {
   const db = await getDatabase();
   const [trips, documents] = await Promise.all([
-    db.getAllAsync<{ coverImageUri: string | null }>('SELECT coverImageUri FROM trips'),
+    db.getAllAsync<{ coverImageUri: string | null; destinationImageLocalPath: string | null }>(
+      'SELECT coverImageUri, destinationImageLocalPath FROM trips'
+    ),
     db.getAllAsync<{
       localFileUri: string;
       previewUri: string | null;
@@ -1081,8 +1107,9 @@ export async function clearAllData() {
   ]);
 
   for (const trip of trips) {
-    if (trip.coverImageUri) {
-      await deleteLocalFile(trip.coverImageUri);
+    const tripImageUris = new Set([trip.coverImageUri, trip.destinationImageLocalPath].filter((value): value is string => Boolean(value)));
+    for (const uri of tripImageUris) {
+      await deleteLocalFile(uri);
     }
   }
 

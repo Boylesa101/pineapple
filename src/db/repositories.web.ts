@@ -76,7 +76,10 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         ...trip,
         name: (await decryptStructuredValue(trip.name)) ?? '',
         destination: (await decryptStructuredValue(trip.destination)) ?? '',
+        destinationImageRemoteUrl: await decryptStructuredValue(trip.destinationImageRemoteUrl),
         heroImageRemoteUrl: await decryptStructuredValue(trip.heroImageRemoteUrl),
+        attributionText: await decryptStructuredValue(trip.attributionText),
+        attributionMeta: await decryptStructuredValue(trip.attributionMeta as unknown as string | null),
         notes: (await decryptStructuredValue(trip.notes)) ?? '',
         transferSummary: (await decryptStructuredValue(trip.transferSummary)) ?? '',
       }))
@@ -186,7 +189,7 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         incomingPayload: (await decryptStructuredValue(conflict.incomingPayload)) ?? '',
       }))
     ),
-  };
+  } as AppDataSnapshot;
 }
 
 async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapshot> {
@@ -201,7 +204,12 @@ async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         ...trip,
         name: (await encryptStructuredValue(trip.name)) ?? '',
         destination: (await encryptStructuredValue(trip.destination)) ?? '',
+        destinationImageRemoteUrl: await encryptStructuredValue(trip.destinationImageRemoteUrl),
         heroImageRemoteUrl: await encryptStructuredValue(trip.heroImageRemoteUrl),
+        attributionText: await encryptStructuredValue(trip.attributionText),
+        attributionMeta: await encryptStructuredValue(
+          trip.attributionMeta ? JSON.stringify(trip.attributionMeta) : null
+        ),
         notes: (await encryptStructuredValue(trip.notes)) ?? '',
         transferSummary: (await encryptStructuredValue(trip.transferSummary)) ?? '',
       }))
@@ -306,7 +314,7 @@ async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         incomingPayload: (await encryptStructuredValue(conflict.incomingPayload)) ?? '',
       }))
     ),
-  };
+  } as AppDataSnapshot;
 }
 
 async function readSnapshot() {
@@ -359,14 +367,21 @@ export async function upsertTrip(input: TripDraft) {
   const snapshot = await readSnapshot();
   const timestamp = now();
   const id = input.id ?? createId('trip');
+  const destinationImageLocalPath = input.destinationImageLocalPath ?? input.coverImageUri ?? null;
+  const destinationImageRemoteUrl = input.destinationImageRemoteUrl ?? input.heroImageRemoteUrl ?? null;
   await writeSnapshot({
     ...snapshot,
     trips: withUpsert(snapshot.trips, {
       ...input,
       id,
       destinationType: input.destinationType ?? 'unknown',
-      coverImageUri: input.coverImageUri ?? null,
-      heroImageRemoteUrl: input.heroImageRemoteUrl ?? null,
+      destinationImageLocalPath,
+      destinationImageRemoteUrl,
+      destinationImageSource: input.destinationImageSource ?? 'fallback',
+      attributionText: input.attributionText ?? 'Default Pineapple image',
+      attributionMeta: input.attributionMeta ?? { source: 'fallback', sourceLabel: 'Pineapple' },
+      coverImageUri: destinationImageLocalPath,
+      heroImageRemoteUrl: destinationImageRemoteUrl,
       heroImageStatus: input.heroImageStatus ?? 'idle',
       notes: input.notes ?? '',
       transferSummary: input.transferSummary ?? '',
