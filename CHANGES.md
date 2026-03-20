@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.1 - 2026-03-20
+
+- Trip-card polish: restored the cleaner image-led trip-card treatment, increased the right-side shortcut icons again, and changed `Days till trip` from a second pill into plain white text sitting beside the key-doc status badge
+- Trip-detail hero refresh: the trip detail screen now opens with the trip title and date range overlaid directly on the destination image instead of splitting the image and heading into separate blocks
+- Footer order fix: the main bottom nav now renders in the requested order of `Home`, `SOS`, then `Vault`
+- Vibes route: trip footer navigation now replaces the old itinerary shortcut with a new `Vibes` page that can fetch live area suggestions for places to eat, visit, and do from Tripadvisor when `EXPO_PUBLIC_TRIPADVISOR_API_KEY` is configured
+- Itinerary handoff from Vibes: each live Vibes suggestion can now be added straight into the trip itinerary as a meal or excursion entry
+- Honest limitation: Tripadvisor content is not cached locally because the official Content API is key-gated and has stricter storage/display rules than Pineapple’s normal local-first data sources, so `Vibes` needs a valid Tripadvisor API key and live connectivity to load suggestions
+
 ## 1.7.0 - 2026-03-20
 
 - Travel-flow rebuild: trip detail now supports outbound/return transport entries with a real flight/train switch, searchable airline/operator selection, provider-logo rendering with safe fallback, and a cleaner contextual trip footer for `Packing`, `Itinerary`, `Flight`, and `Hotel`

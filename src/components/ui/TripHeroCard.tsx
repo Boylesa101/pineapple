@@ -132,20 +132,20 @@ export function TripHeroCard({
               <Text style={styles.meta}>{meta}</Text>
               <View style={styles.badgeRow}>
                 {badgeLabel ? <Text style={styles.badge}>{badgeLabel}</Text> : null}
-                <Text style={styles.badgeSecondary}>Days till trip {daysTillTripLabel(trip)}</Text>
+                <Text style={styles.daysLabel}>{daysTillTripLabel(trip)}</Text>
               </View>
               {fallbackLabel ? <Text style={styles.helper}>{fallbackLabel}</Text> : null}
             </View>
 
             <View style={styles.actions}>
               <Pressable onPress={onOpenFlights} disabled={!onOpenFlights} style={styles.iconButton}>
-                <MaterialIcons name="flight" size={22} color={colors.white} />
+                <MaterialIcons name="flight" size={24} color={colors.white} />
               </Pressable>
               <Pressable onPress={onOpenHotel} disabled={!onOpenHotel} style={styles.iconButton}>
-                <MaterialIcons name="hotel" size={22} color={colors.white} />
+                <MaterialIcons name="hotel" size={24} color={colors.white} />
               </Pressable>
               <Pressable onPress={onOpenTransfers} disabled={!onOpenTransfers} style={styles.iconButton}>
-                <MaterialIcons name="swap-horiz" size={22} color={colors.white} />
+                <MaterialIcons name="swap-horiz" size={24} color={colors.white} />
               </Pressable>
             </View>
           </View>
@@ -259,16 +259,14 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.xs,
     marginTop: spacing.xs,
+    alignItems: 'center',
   },
-  badgeSecondary: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+  daysLabel: {
+    alignSelf: 'center',
     color: colors.white,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
+    opacity: 0.96,
   },
   helper: {
     color: 'rgba(255,255,255,0.82)',

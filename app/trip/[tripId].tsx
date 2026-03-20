@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -47,7 +48,7 @@ import { toUserMessage } from '@/utils/userErrors';
 import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, validateTraveller } from '@/utils/validation';
 
 type ModalKind = 'traveller' | 'segment' | 'hotel' | 'transfer' | 'emergency' | 'export' | 'invite' | null;
-type TripSection = 'overview' | 'travel' | 'hotel' | 'transfer' | 'packing' | 'itinerary';
+type TripSection = 'overview' | 'travel' | 'hotel' | 'transfer' | 'packing' | 'itinerary' | 'vibes';
 type TransferDraft = {
   provider: string;
   method: string;
@@ -88,6 +89,16 @@ const documentTypeLabels = {
   id_card: 'ID card',
   custom: 'document',
 } as const;
+
+function tripHeroGradient(type: 'country' | 'place' | 'unknown'): readonly [string, string] {
+  if (type === 'country') {
+    return ['rgba(13, 59, 102, 0.18)', 'rgba(13, 110, 253, 0.08)'];
+  }
+  if (type === 'place') {
+    return ['rgba(23, 74, 120, 0.2)', 'rgba(63, 140, 255, 0.08)'];
+  }
+  return ['rgba(13, 59, 102, 0.18)', 'rgba(74, 128, 200, 0.08)'];
+}
 
 export default function TripDetailScreen() {
   const router = useRouter();
@@ -427,8 +438,6 @@ export default function TripDetailScreen() {
 
   return (
     <AppScreen
-      title={trip.name}
-      subtitle={tripDateRange(trip.startDate, trip.endDate)}
       footer={
         <View style={styles.tripFooterNav}>
           <Pressable
@@ -445,13 +454,13 @@ export default function TripDetailScreen() {
           <Pressable
             onPress={() => {
               setActiveTrip(tripId);
-              setActiveSection('itinerary');
-              router.push('/itinerary');
+              setActiveSection('vibes');
+              router.push({ pathname: '/trip/[tripId]/vibes', params: { tripId } });
             }}
-            style={[styles.tripFooterButton, activeSection === 'itinerary' ? styles.tripFooterButtonActive : null]}
+            style={[styles.tripFooterButton, activeSection === 'vibes' ? styles.tripFooterButtonActive : null]}
           >
-            <MaterialIcons name="event-note" size={22} color={colors.white} />
-            <Text style={styles.tripFooterLabel}>Itinerary</Text>
+            <MaterialIcons name="explore" size={22} color={colors.white} />
+            <Text style={styles.tripFooterLabel}>Vibes</Text>
           </Pressable>
           <Pressable
             onPress={() => setActiveSection('travel')}
@@ -470,10 +479,20 @@ export default function TripDetailScreen() {
         </View>
       }
     >
-      {trip.coverImageUri ? <ManagedFileImage uri={trip.coverImageUri} style={styles.cover} /> : null}
+      <View style={styles.heroCard}>
+        {trip.destinationImageLocalPath ?? trip.coverImageUri ? (
+          <ManagedFileImage uri={trip.destinationImageLocalPath ?? trip.coverImageUri} style={styles.cover} />
+        ) : null}
+        <LinearGradient colors={tripHeroGradient(trip.destinationType)} style={styles.coverFallback} />
+        <LinearGradient colors={['rgba(10, 28, 44, 0.18)', 'rgba(10, 28, 44, 0.82)']} style={styles.coverOverlay} />
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroDestination}>{trip.destination.toUpperCase()}</Text>
+          <Text style={styles.heroTitle}>{trip.name}</Text>
+          <Text style={styles.heroDate}>{tripDateRange(trip.startDate, trip.endDate)}</Text>
+        </View>
+      </View>
 
       <AppCard>
-        <Text style={styles.destination}>{trip.destination}</Text>
         <View style={styles.chipRow}>
           <InfoChip
             label={
@@ -1432,15 +1451,46 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 11,
   },
-  cover: {
-    width: '100%',
-    height: 200,
-    borderRadius: 18,
+  heroCard: {
+    minHeight: 232,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
-  destination: {
-    color: colors.nightNavy,
+  cover: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  coverFallback: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  heroCopy: {
+    minHeight: 232,
+    justifyContent: 'flex-end',
+    gap: 6,
+    padding: spacing.lg,
+  },
+  heroDestination: {
+    color: colors.white,
     fontFamily: 'Poppins_700Bold',
-    fontSize: 26,
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: 1.8,
+  },
+  heroTitle: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  heroDate: {
+    color: 'rgba(255,255,255,0.96)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    lineHeight: 18,
   },
   notes: {
     color: colors.textMuted,
