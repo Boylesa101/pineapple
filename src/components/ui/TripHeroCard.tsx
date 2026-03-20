@@ -35,7 +35,7 @@ function statusLabel(trip: Trip) {
     return 'Finding destination view';
   }
   if (trip.heroImageStatus === 'failed') {
-    return 'Showing Pineapple fallback image';
+    return 'Showing default trip background';
   }
   return null;
 }
@@ -72,7 +72,7 @@ function buildAttributionRows(trip: Trip) {
   if (trip.destinationImageSource === 'curated') {
     return {
       title: 'Image attribution',
-      rows: [trip.attributionText || 'Curated Pineapple destination image'],
+      rows: [trip.attributionText || 'Curated destination image'],
       linkLabel: null,
       linkUrl: null,
     };

@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, parseISO, subDays } from 'date-fns';
 
 import type { AppDataSnapshot, Document, ExpiryReminderLeadTime, ReminderKind, ReminderLeadTime } from '@/types/models';
+import { formatAirportDisplay } from '@/utils/airports';
 import { getTripBundle } from '@/utils/selectors';
 
 export type ReminderInput = {
@@ -121,7 +122,7 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
         if (isFutureDate(date)) {
           reminders.push({
             title: `${segment.airline} ${segment.flightNumber || ''}`.trim(),
-            body: `Check in for ${segment.departureAirport} to ${segment.arrivalAirport}.`,
+            body: `Check in for ${formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} to ${formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}.`,
             date,
           });
         }

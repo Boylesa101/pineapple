@@ -13,6 +13,7 @@ import { colors, spacing } from '@/constants/theme';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import { useAppStore } from '@/store/useAppStore';
 import { formatDateTime } from '@/utils/date';
+import { formatAirportDisplay } from '@/utils/airports';
 import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { maskSensitive, tripDateRange } from '@/utils/format';
 import { getNextEvent, getNextFlight, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
@@ -229,7 +230,10 @@ export default function TravelModeScreen() {
             <Text style={styles.subline}>{nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : 'No upcoming flight saved'}</Text>
             {nextFlight ? (
               <>
-                <Text style={styles.smallText}>{nextFlight.departureAirport} → {nextFlight.arrivalAirport}</Text>
+                <Text style={styles.smallText}>
+                  {formatAirportDisplay(nextFlight.departureAirport, nextFlight.departureAirportCode)} →{' '}
+                  {formatAirportDisplay(nextFlight.arrivalAirport, nextFlight.arrivalAirportCode)}
+                </Text>
                 <Text style={styles.smallText}>{formatDateTime(nextFlight.departureTime)}</Text>
                 <ValueCard label="Booking ref" value={nextFlight.bookingRef} revealed />
               </>

@@ -18,7 +18,7 @@ type CuratedDestinationImage = {
   attribution: DestinationImageAttribution;
 };
 
-type ExternalImageResult = {
+export type ExternalImageResult = {
   imageUrl: string;
   attributionText: string;
   attribution: DestinationImageAttribution;
@@ -169,6 +169,11 @@ function getDestinationQueries(destination: string, destinationType: Destination
   );
 }
 
+export function getDestinationImageQueries(destination: string) {
+  const destinationType = resolveDestinationType(destination);
+  return getDestinationQueries(destination, destinationType === 'unknown' ? 'place' : destinationType);
+}
+
 async function fetchJson<T>(url: string, headers?: Record<string, string>) {
   const response = await fetch(url, {
     headers: {
@@ -212,14 +217,10 @@ export function resolveDestinationType(destination: string) {
   return resolveDestinationKind(destination);
 }
 
-export async function fetchFromPexels(destination: string): Promise<ExternalImageResult | null> {
+export async function fetchFromPexelsQueries(queries: string[]): Promise<ExternalImageResult | null> {
   if (!PEXELS_API_KEY) {
     return null;
   }
-
-  const destinationType = resolveDestinationType(destination);
-  const queries = getDestinationQueries(destination, destinationType === 'unknown' ? 'place' : destinationType);
-
   for (const query of queries) {
     try {
       const url = new URL(PEXELS_SEARCH_URL);
@@ -242,7 +243,7 @@ export async function fetchFromPexels(destination: string): Promise<ExternalImag
         const photographer = photo.photographer?.trim() || 'Unknown photographer';
         return {
           imageUrl: usableImageUrl,
-          attributionText: `Photo by ${photographer} on Pexels`,
+          attributionText: `This photo was taken by ${photographer} on Pexels.`,
           attribution: {
             source: 'pexels',
             photographer,
@@ -261,10 +262,11 @@ export async function fetchFromPexels(destination: string): Promise<ExternalImag
   return null;
 }
 
-export async function fetchFromWikimedia(destination: string): Promise<ExternalImageResult | null> {
-  const destinationType = resolveDestinationType(destination);
-  const queries = getDestinationQueries(destination, destinationType === 'unknown' ? 'place' : destinationType);
+export async function fetchFromPexels(destination: string): Promise<ExternalImageResult | null> {
+  return fetchFromPexelsQueries(getDestinationImageQueries(destination));
+}
 
+export async function fetchFromWikimediaQueries(queries: string[]): Promise<ExternalImageResult | null> {
   for (const query of queries) {
     try {
       const url = new URL(WIKIMEDIA_SEARCH_URL);
@@ -321,19 +323,23 @@ export async function fetchFromWikimedia(destination: string): Promise<ExternalI
   return null;
 }
 
-export async function cacheImageLocally(imageUrl: string, tripId: string) {
+export async function fetchFromWikimedia(destination: string): Promise<ExternalImageResult | null> {
+  return fetchFromWikimediaQueries(getDestinationImageQueries(destination));
+}
+
+export async function cacheImageLocally(imageUrl: string, cacheKey: string, fileStem = 'destination') {
   if (Platform.OS === 'web') {
     return imageUrl;
   }
 
-  const tempUri = `${FileSystem.cacheDirectory ?? ''}pineapple-trip-${tripId}-${Date.now()}`;
+  const tempUri = `${FileSystem.cacheDirectory ?? ''}pineapple-trip-${cacheKey}-${Date.now()}`;
   const downloaded = await FileSystem.downloadAsync(imageUrl, tempUri);
   const base64 = await readBase64File(downloaded.uri);
   const extension = inferMimeTypeFromUrl(imageUrl).split('/').pop() ?? 'jpg';
-  const cachedUri = await writeBase64File('trips', `${tripId}-destination.${extension}`, base64, {
+  const cachedUri = await writeBase64File('trips', `${cacheKey}-${fileStem}.${extension}`, base64, {
     encryptAtRest: true,
     mimeType: inferMimeTypeFromUrl(imageUrl),
-    sourceFileName: `destination.${extension}`,
+    sourceFileName: `${fileStem}.${extension}`,
   });
   await cleanupImportedSource(downloaded.uri);
   return cachedUri;
@@ -364,7 +370,7 @@ export async function resolveDestinationImage(destination: string, tripId: strin
   }
 
   try {
-    const localPath = await cacheImageLocally(externalImage.imageUrl, tripId);
+    const localPath = await cacheImageLocally(externalImage.imageUrl, tripId, 'destination');
     return {
       destinationType,
       localPath,

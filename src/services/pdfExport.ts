@@ -3,6 +3,7 @@ import * as Sharing from 'expo-sharing';
 
 import { colors } from '@/constants/theme';
 import type { AppDataSnapshot, PdfExportOptions } from '@/types/models';
+import { formatAirportDisplay } from '@/utils/airports';
 import { formatDateTime, formatShortDate } from '@/utils/date';
 import { maskSensitive } from '@/utils/format';
 import { getTripBundle, getTripById } from '@/utils/selectors';
@@ -96,7 +97,7 @@ export async function exportTripPdf(
           'Flights / travel',
           bundle.travelSegments.map(
             (segment) =>
-              `<strong>${escapeHtml(`${segment.airline} ${segment.flightNumber}`.trim())}</strong> • ${escapeHtml(segment.departureAirport)} to ${escapeHtml(segment.arrivalAirport)} • ${escapeHtml(formatDateTime(segment.departureTime))} • Ref ${escapeHtml(segment.bookingRef || 'Not set')}`
+              `<strong>${escapeHtml(`${segment.airline} ${segment.flightNumber}`.trim())}</strong> • ${escapeHtml(formatAirportDisplay(segment.departureAirport, segment.departureAirportCode))} to ${escapeHtml(formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode))} • ${escapeHtml(formatDateTime(segment.departureTime))} • Ref ${escapeHtml(segment.bookingRef || 'Not set')}`
           )
         )}
         ${renderList(

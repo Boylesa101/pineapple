@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.8 - 2026-03-20
+
+- Flight entry upgrade: travel segments now use a bundled searchable airport picker with IATA-code suggestions, so typing places like London, Newcastle, or New York resolves real airports even when the phone is offline
+- Travel-segment data model upgrade: Pineapple now persists departure and arrival airport codes alongside the airport names, keeps those fields encrypted with the rest of structured trip data, and uses the codes in trip UI, PDF export, and reminders
+- Hotel image pipeline: hotel stays now try to resolve a free image from the hotel name and typed address by combining address geocoding with Pexels-first and Wikimedia fallback queries, then cache the chosen image locally for later offline use
+- Hotel UI cleanup: the trip detail hotel section now shows each stay with an image-led row and clearer save-state messaging while Pineapple fetches the hotel or local-area image in the background
+- Honest limitation: free hotel-photo lookup cannot guarantee the exact property exterior every time, so Pineapple falls back to a relevant local-area stay/travel image when the hotel itself is not available from the free sources
+
 ## 1.6.7 - 2026-03-20
 
 - Destination image system upgrade: trip cards now resolve imagery through a stricter pipeline with optional Pexels-first lookup, Wikimedia Commons fallback, encrypted local caching, and a guaranteed Pineapple fallback image so cards never render blank

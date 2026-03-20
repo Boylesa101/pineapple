@@ -15,6 +15,7 @@ import { normalizeDrivingLicenceData } from '@/utils/drivingLicence';
 import { normalizeFormalDocumentData } from '@/utils/formalDocument';
 import { normalizeHealthCardData } from '@/utils/healthCard';
 import { deleteLocalFile } from '@/utils/fileStorage';
+import { normalizeHotelStayRecord } from '@/utils/hotels';
 import { normalizePaymentCardData } from '@/utils/paymentCard';
 import { normalizePassportData } from '@/utils/passport';
 import { normalizeTripRecord } from '@/utils/trips';
@@ -140,6 +141,10 @@ async function cleanupTripFiles(tripId: string) {
     'SELECT coverImageUri, destinationImageLocalPath FROM trips WHERE id = ?',
     tripId
   );
+  const hotels = await db.getAllAsync<{ hotelImageLocalPath: string | null }>(
+    'SELECT hotelImageLocalPath FROM hotel_stays WHERE tripId = ?',
+    tripId
+  );
   const documents = await db.getAllAsync<{
     localFileUri: string;
     previewUri: string | null;
@@ -152,6 +157,11 @@ async function cleanupTripFiles(tripId: string) {
 
   const tripImageUris = new Set([trip?.coverImageUri, trip?.destinationImageLocalPath].filter((value): value is string => Boolean(value)));
   for (const uri of tripImageUris) {
+    await deleteLocalFile(uri);
+  }
+
+  const hotelImageUris = new Set(hotels.map((hotel) => hotel.hotelImageLocalPath).filter((value): value is string => Boolean(value)));
+  for (const uri of hotelImageUris) {
     await deleteLocalFile(uri);
   }
 
@@ -314,7 +324,9 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
       airline: (await decryptField(segment.airline)) ?? '',
       flightNumber: (await decryptField(segment.flightNumber)) ?? '',
       departureAirport: (await decryptField(segment.departureAirport)) ?? '',
+      departureAirportCode: (await decryptField(segment.departureAirportCode)) ?? '',
       arrivalAirport: (await decryptField(segment.arrivalAirport)) ?? '',
+      arrivalAirportCode: (await decryptField(segment.arrivalAirportCode)) ?? '',
       terminal: (await decryptField(segment.terminal)) ?? '',
       gate: (await decryptField(segment.gate)) ?? '',
       bookingRef: (await decryptField(segment.bookingRef)) ?? '',
@@ -323,14 +335,20 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
   );
 
   const decryptedHotelStays = await Promise.all(
-    hotelStays.map(async (hotel) => ({
-      ...hotel,
-      hotelName: (await decryptField(hotel.hotelName)) ?? '',
-      address: (await decryptField(hotel.address)) ?? '',
-      phone: (await decryptField(hotel.phone)) ?? '',
-      bookingRef: (await decryptField(hotel.bookingRef)) ?? '',
-      notes: (await decryptField(hotel.notes)) ?? '',
-    }))
+    hotelStays.map(async (hotel) =>
+      normalizeHotelStayRecord({
+        ...hotel,
+        hotelName: (await decryptField(hotel.hotelName)) ?? '',
+        address: (await decryptField(hotel.address)) ?? '',
+        hotelImageLocalPath: hotel.hotelImageLocalPath ?? null,
+        hotelImageRemoteUrl: await decryptField(hotel.hotelImageRemoteUrl),
+        hotelImageAttributionText: await decryptField(hotel.hotelImageAttributionText),
+        hotelImageAttributionMeta: await decryptField(hotel.hotelImageAttributionMeta),
+        phone: (await decryptField(hotel.phone)) ?? '',
+        bookingRef: (await decryptField(hotel.bookingRef)) ?? '',
+        notes: (await decryptField(hotel.notes)) ?? '',
+      })
+    )
   );
 
   const decryptedItineraryEvents = await Promise.all(
@@ -714,21 +732,25 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
   const encryptedAirline = (await encryptField(input.airline)) ?? '';
   const encryptedFlightNumber = (await encryptField(input.flightNumber)) ?? '';
   const encryptedDepartureAirport = (await encryptField(input.departureAirport)) ?? '';
+  const encryptedDepartureAirportCode = (await encryptField(input.departureAirportCode)) ?? '';
   const encryptedArrivalAirport = (await encryptField(input.arrivalAirport)) ?? '';
+  const encryptedArrivalAirportCode = (await encryptField(input.arrivalAirportCode)) ?? '';
   const encryptedTerminal = (await encryptField(input.terminal)) ?? '';
   const encryptedGate = (await encryptField(input.gate)) ?? '';
   const encryptedBookingRef = (await encryptField(input.bookingRef)) ?? '';
   const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
-    `INSERT INTO travel_segments (id, tripId, airline, flightNumber, departureAirport, arrivalAirport, departureTime, arrivalTime, terminal, gate, bookingRef, notes, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO travel_segments (id, tripId, airline, flightNumber, departureAirport, departureAirportCode, arrivalAirport, arrivalAirportCode, departureTime, arrivalTime, terminal, gate, bookingRef, notes, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        airline = excluded.airline,
        flightNumber = excluded.flightNumber,
        departureAirport = excluded.departureAirport,
+       departureAirportCode = excluded.departureAirportCode,
        arrivalAirport = excluded.arrivalAirport,
+       arrivalAirportCode = excluded.arrivalAirportCode,
        departureTime = excluded.departureTime,
        arrivalTime = excluded.arrivalTime,
        terminal = excluded.terminal,
@@ -741,7 +763,9 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
     encryptedAirline,
     encryptedFlightNumber,
     encryptedDepartureAirport,
+    encryptedDepartureAirportCode,
     encryptedArrivalAirport,
+    encryptedArrivalAirportCode,
     input.departureTime,
     input.arrivalTime,
     encryptedTerminal,
@@ -759,19 +783,32 @@ export async function upsertHotelStay(input: HotelStayDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('hotel');
+  const existing = await db.getFirstAsync<{ hotelImageLocalPath: string | null }>(
+    'SELECT hotelImageLocalPath FROM hotel_stays WHERE id = ?',
+    id
+  );
   const encryptedHotelName = (await encryptField(input.hotelName)) ?? '';
   const encryptedAddress = (await encryptField(input.address)) ?? '';
+  const encryptedHotelImageRemoteUrl = (await encryptField(input.hotelImageRemoteUrl)) ?? null;
+  const encryptedHotelImageAttributionText = (await encryptField(input.hotelImageAttributionText)) ?? null;
+  const encryptedHotelImageAttributionMeta = (await encryptField(JSON.stringify(input.hotelImageAttributionMeta ?? null))) ?? null;
   const encryptedPhone = (await encryptField(input.phone)) ?? '';
   const encryptedBookingRef = (await encryptField(input.bookingRef)) ?? '';
   const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
-    `INSERT INTO hotel_stays (id, tripId, hotelName, address, phone, bookingRef, checkIn, checkOut, notes, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO hotel_stays (id, tripId, hotelName, address, hotelImageLocalPath, hotelImageRemoteUrl, hotelImageSource, hotelImageAttributionText, hotelImageAttributionMeta, hotelImageStatus, phone, bookingRef, checkIn, checkOut, notes, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        hotelName = excluded.hotelName,
        address = excluded.address,
+       hotelImageLocalPath = excluded.hotelImageLocalPath,
+       hotelImageRemoteUrl = excluded.hotelImageRemoteUrl,
+       hotelImageSource = excluded.hotelImageSource,
+       hotelImageAttributionText = excluded.hotelImageAttributionText,
+       hotelImageAttributionMeta = excluded.hotelImageAttributionMeta,
+       hotelImageStatus = excluded.hotelImageStatus,
        phone = excluded.phone,
        bookingRef = excluded.bookingRef,
        checkIn = excluded.checkIn,
@@ -782,6 +819,12 @@ export async function upsertHotelStay(input: HotelStayDraft) {
     input.tripId,
     encryptedHotelName,
     encryptedAddress,
+    input.hotelImageLocalPath ?? null,
+    encryptedHotelImageRemoteUrl,
+    input.hotelImageSource,
+    encryptedHotelImageAttributionText,
+    encryptedHotelImageAttributionMeta,
+    input.hotelImageStatus,
     encryptedPhone,
     encryptedBookingRef,
     input.checkIn,
@@ -790,6 +833,10 @@ export async function upsertHotelStay(input: HotelStayDraft) {
     timestamp,
     timestamp
   );
+
+  if (existing?.hotelImageLocalPath && existing.hotelImageLocalPath !== input.hotelImageLocalPath) {
+    await deleteLocalFile(existing.hotelImageLocalPath);
+  }
 
   return id;
 }
@@ -1087,6 +1134,16 @@ export async function deleteById(table: string, id: string) {
 
   if (table === 'trips') {
     await cleanupTripFiles(id);
+  }
+
+  if (table === 'hotel_stays') {
+    const hotel = await db.getFirstAsync<{ hotelImageLocalPath: string | null }>(
+      'SELECT hotelImageLocalPath FROM hotel_stays WHERE id = ?',
+      id
+    );
+    if (hotel?.hotelImageLocalPath) {
+      await deleteLocalFile(hotel.hotelImageLocalPath);
+    }
   }
 
   await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, id);

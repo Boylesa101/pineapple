@@ -2,6 +2,7 @@ import { parseISO } from 'date-fns';
 
 import type { AppDataSnapshot, Document, PackingItem, Traveller } from '@/types/models';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
+import { formatAirportDisplay } from './airports';
 import { daysLeft, daysUntil } from './date';
 import { getDocumentExpiryRelativeLabel } from './documentExpiry';
 
@@ -248,7 +249,7 @@ export function getUpcomingTimeline(snapshot: AppDataSnapshot, tripId: string | 
           id: item.id,
           title: `${item.airline} ${item.flightNumber}`.trim(),
           dateTime: item.departureTime,
-          subtitle: `${item.departureAirport} to ${item.arrivalAirport}`,
+          subtitle: `${formatAirportDisplay(item.departureAirport, item.departureAirportCode)} to ${formatAirportDisplay(item.arrivalAirport, item.arrivalAirportCode)}`,
         };
       }
       if ('checkIn' in item) {

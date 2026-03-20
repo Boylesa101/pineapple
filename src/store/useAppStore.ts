@@ -27,6 +27,7 @@ import {
 import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup';
 import { protectStoredFilesAtRest } from '@/services/documentProtection';
 import { resolveDestinationImage } from '@/services/destinationImageService';
+import { resolveHotelImage } from '@/services/hotelImageService';
 import { queueNotificationRefresh } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
 import { protectStructuredDataAtRest } from '@/services/structuredDataProtection';
@@ -46,6 +47,7 @@ import {
 } from '@/utils/security';
 import { defaultAppExpiryPreferences } from '@/utils/documentExpiry';
 import { resolveDestinationType } from '@/utils/destinationImage';
+import { createId } from '@/utils/ids';
 import { clearMaterializedSecureFiles } from '@/utils/fileStorage';
 import { loadOnboardingComplete, persistOnboardingComplete } from '@/utils/onboarding';
 import { deriveOnboardingCompletionStatus } from '@/utils/onboardingState';
@@ -469,8 +471,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
       existingTrip?.heroImageRemoteUrl ??
       null;
     const preservedAttribution =
-      draft.attributionMeta ?? existingTrip?.attributionMeta ?? { source: 'fallback' as const, sourceLabel: 'Pineapple' };
-    const preservedAttributionText = draft.attributionText ?? existingTrip?.attributionText ?? 'Default Pineapple image';
+      draft.attributionMeta ?? existingTrip?.attributionMeta ?? { source: 'fallback' as const, sourceLabel: 'Default trip background' };
+    const preservedAttributionText = draft.attributionText ?? existingTrip?.attributionText ?? 'Default trip background';
     const preparedDraft: TripDraft = {
       ...draft,
       name: normalizedName,
@@ -479,8 +481,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
       destinationImageLocalPath: shouldRefreshHero ? null : preservedLocalPath,
       destinationImageRemoteUrl: shouldRefreshHero ? null : preservedRemoteUrl,
       destinationImageSource: shouldRefreshHero ? 'fallback' : draft.destinationImageSource ?? existingTrip?.destinationImageSource ?? 'fallback',
-      attributionText: shouldRefreshHero ? 'Default Pineapple image' : preservedAttributionText,
-      attributionMeta: shouldRefreshHero ? { source: 'fallback', sourceLabel: 'Pineapple' } : preservedAttribution,
+      attributionText: shouldRefreshHero ? 'Default trip background' : preservedAttributionText,
+      attributionMeta: shouldRefreshHero ? { source: 'fallback', sourceLabel: 'Default trip background' } : preservedAttribution,
       heroImageRemoteUrl: shouldRefreshHero ? null : preservedRemoteUrl,
       heroImageStatus: shouldRefreshHero ? 'loading' : draft.heroImageStatus ?? existingTrip?.heroImageStatus ?? 'idle',
       coverImageUri: shouldRefreshHero ? null : preservedLocalPath,
@@ -562,13 +564,75 @@ export const useAppStore = create<StoreState>((set, get) => ({
     await get().refreshData();
   },
   saveTravelSegment: async (draft) => {
-    const id = await upsertTravelSegment(draft);
+    const id = await upsertTravelSegment({
+      ...draft,
+      departureAirportCode: draft.departureAirportCode ?? '',
+      arrivalAirportCode: draft.arrivalAirportCode ?? '',
+    });
     await get().refreshData();
     return id;
   },
   saveHotelStay: async (draft) => {
-    const id = await upsertHotelStay(draft);
+    const existingHotel = draft.id ? get().data.hotelStays.find((hotel) => hotel.id === draft.id) ?? null : null;
+    const id = draft.id ?? createId('hotel');
+    const fallbackAttribution = { source: 'fallback' as const, sourceLabel: 'Default hotel background' };
+    const preparedDraft = {
+      ...draft,
+      id,
+      hotelImageLocalPath: existingHotel?.hotelImageLocalPath ?? draft.hotelImageLocalPath ?? null,
+      hotelImageRemoteUrl: existingHotel?.hotelImageRemoteUrl ?? draft.hotelImageRemoteUrl ?? null,
+      hotelImageSource: existingHotel?.hotelImageSource ?? draft.hotelImageSource ?? 'fallback',
+      hotelImageAttributionText: existingHotel?.hotelImageAttributionText ?? draft.hotelImageAttributionText ?? 'Default hotel background',
+      hotelImageAttributionMeta: existingHotel?.hotelImageAttributionMeta ?? draft.hotelImageAttributionMeta ?? fallbackAttribution,
+      hotelImageStatus: existingHotel ? 'loading' : draft.hotelImageStatus ?? 'loading',
+    };
+    const imageInputsChanged =
+      !existingHotel ||
+      existingHotel.hotelName.trim() !== preparedDraft.hotelName.trim() ||
+      existingHotel.address.trim() !== preparedDraft.address.trim();
+
+    await upsertHotelStay(
+      imageInputsChanged
+        ? preparedDraft
+        : {
+            ...preparedDraft,
+            hotelImageLocalPath: existingHotel.hotelImageLocalPath,
+            hotelImageRemoteUrl: existingHotel.hotelImageRemoteUrl,
+            hotelImageSource: existingHotel.hotelImageSource,
+            hotelImageAttributionText: existingHotel.hotelImageAttributionText,
+            hotelImageAttributionMeta: existingHotel.hotelImageAttributionMeta,
+            hotelImageStatus: existingHotel.hotelImageStatus,
+          }
+    );
     await get().refreshData();
+
+    if (imageInputsChanged) {
+      void (async () => {
+        const resolved = await resolveHotelImage(preparedDraft, id);
+        const latestHotel = get().data.hotelStays.find((hotel) => hotel.id === id);
+        if (
+          !latestHotel ||
+          latestHotel.hotelName.trim() !== preparedDraft.hotelName.trim() ||
+          latestHotel.address.trim() !== preparedDraft.address.trim()
+        ) {
+          return;
+        }
+
+        await upsertHotelStay({
+          ...latestHotel,
+          hotelImageLocalPath: resolved.localPath,
+          hotelImageRemoteUrl: resolved.remoteUrl,
+          hotelImageSource: resolved.source,
+          hotelImageAttributionText: resolved.attributionText,
+          hotelImageAttributionMeta: resolved.attribution,
+          hotelImageStatus: resolved.status,
+        });
+        await get().refreshData();
+      })().catch((error) => {
+        logStoreError('resolveHotelImage failed', error);
+      });
+    }
+
     return id;
   },
   saveItineraryEvent: async (draft) => {

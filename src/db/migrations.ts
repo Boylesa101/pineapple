@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const DATABASE_VERSION = 14;
+const DATABASE_VERSION = 15;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -99,7 +99,9 @@ CREATE TABLE IF NOT EXISTS travel_segments (
   airline TEXT NOT NULL,
   flightNumber TEXT NOT NULL DEFAULT '',
   departureAirport TEXT NOT NULL,
+  departureAirportCode TEXT NOT NULL DEFAULT '',
   arrivalAirport TEXT NOT NULL,
+  arrivalAirportCode TEXT NOT NULL DEFAULT '',
   departureTime TEXT NOT NULL,
   arrivalTime TEXT NOT NULL,
   terminal TEXT NOT NULL DEFAULT '',
@@ -115,6 +117,12 @@ CREATE TABLE IF NOT EXISTS hotel_stays (
   tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   hotelName TEXT NOT NULL,
   address TEXT NOT NULL,
+  hotelImageLocalPath TEXT,
+  hotelImageRemoteUrl TEXT,
+  hotelImageSource TEXT NOT NULL DEFAULT 'fallback',
+  hotelImageAttributionText TEXT,
+  hotelImageAttributionMeta TEXT,
+  hotelImageStatus TEXT NOT NULL DEFAULT 'idle',
   phone TEXT NOT NULL DEFAULT '',
   bookingRef TEXT NOT NULL DEFAULT '',
   checkIn TEXT NOT NULL,
@@ -338,10 +346,31 @@ async function runPhaseFourteenMigration(db: SQLiteDatabase) {
       WHEN attributionText IS NULL OR attributionText = '' THEN
         CASE
           WHEN coverImageUri IS NOT NULL THEN 'Existing destination image'
-          ELSE 'Default Pineapple image'
+          ELSE 'Default trip background'
         END
       ELSE attributionText
     END;
+  `);
+}
+
+async function runPhaseFifteenMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'travel_segments', 'departureAirportCode', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'travel_segments', 'arrivalAirportCode', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'hotel_stays', 'hotelImageLocalPath', 'TEXT');
+  await ensureColumn(db, 'hotel_stays', 'hotelImageRemoteUrl', 'TEXT');
+  await ensureColumn(db, 'hotel_stays', 'hotelImageSource', "TEXT NOT NULL DEFAULT 'fallback'");
+  await ensureColumn(db, 'hotel_stays', 'hotelImageAttributionText', 'TEXT');
+  await ensureColumn(db, 'hotel_stays', 'hotelImageAttributionMeta', 'TEXT');
+  await ensureColumn(db, 'hotel_stays', 'hotelImageStatus', "TEXT NOT NULL DEFAULT 'idle'");
+
+  await db.execAsync(`
+    UPDATE hotel_stays
+    SET hotelImageSource = COALESCE(NULLIF(hotelImageSource, ''), 'fallback')
+    WHERE hotelImageSource IS NULL OR hotelImageSource = '';
+
+    UPDATE hotel_stays
+    SET hotelImageAttributionText = COALESCE(NULLIF(hotelImageAttributionText, ''), 'Default hotel background')
+    WHERE hotelImageAttributionText IS NULL OR hotelImageAttributionText = '';
   `);
 }
 
@@ -462,6 +491,10 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   if (version < 14) {
     await runPhaseFourteenMigration(db);
+  }
+
+  if (version < 15) {
+    await runPhaseFifteenMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

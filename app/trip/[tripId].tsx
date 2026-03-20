@@ -10,6 +10,7 @@ import { AppCard } from '@/components/AppCard';
 import { AppModal } from '@/components/AppModal';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
+import { AirportSearchField } from '@/components/AirportSearchField';
 import { AvatarBadge } from '@/components/AvatarBadge';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
@@ -35,6 +36,7 @@ import type {
 } from '@/types/models';
 import { daysLeft, daysUntil, formatDateTime, formatShortDate } from '@/utils/date';
 import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
+import { formatAirportDisplay } from '@/utils/airports';
 import { relationshipLabel, tripDateRange } from '@/utils/format';
 import { getMissingInfoPrompts, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
 import { toUserMessage } from '@/utils/userErrors';
@@ -156,12 +158,14 @@ export default function TripDetailScreen() {
 
   function openSegmentEditor(current?: TravelSegmentDraft) {
     setSegmentDraft(
-      current ?? {
+        current ?? {
         tripId,
         airline: '',
         flightNumber: '',
         departureAirport: '',
+        departureAirportCode: '',
         arrivalAirport: '',
+        arrivalAirportCode: '',
         departureTime: new Date().toISOString(),
         arrivalTime: new Date().toISOString(),
         terminal: '',
@@ -175,10 +179,16 @@ export default function TripDetailScreen() {
 
   function openHotelEditor(current?: HotelStayDraft) {
     setHotelDraft(
-      current ?? {
+        current ?? {
         tripId,
         hotelName: '',
         address: '',
+        hotelImageLocalPath: null,
+        hotelImageRemoteUrl: null,
+        hotelImageSource: 'fallback',
+        hotelImageAttributionText: 'Default hotel background',
+        hotelImageAttributionMeta: { source: 'fallback', sourceLabel: 'Default hotel background' },
+        hotelImageStatus: 'idle',
         phone: '',
         bookingRef: '',
         checkIn: trip.startDate,
@@ -234,8 +244,12 @@ export default function TripDetailScreen() {
         Alert.alert('Flight details need attention', errors.join('\n'));
         return;
       }
-      await saveTravelSegment(segmentDraft);
-      setModalKind(null);
+      try {
+        await saveTravelSegment(segmentDraft);
+        setModalKind(null);
+      } catch (error) {
+        Alert.alert('Flight could not be saved', toUserMessage(error, 'Unable to save those flight details right now.'));
+      }
       return;
     }
 
@@ -245,8 +259,12 @@ export default function TripDetailScreen() {
         Alert.alert('Hotel details need attention', errors.join('\n'));
         return;
       }
-      await saveHotelStay(hotelDraft);
-      setModalKind(null);
+      try {
+        await saveHotelStay(hotelDraft);
+        setModalKind(null);
+      } catch (error) {
+        Alert.alert('Hotel could not be saved', toUserMessage(error, 'Unable to save that hotel right now.'));
+      }
       return;
     }
 
@@ -566,7 +584,7 @@ export default function TripDetailScreen() {
             <ListRow
               key={segment.id}
               title={`${segment.airline} ${segment.flightNumber}`.trim()}
-              subtitle={`${segment.departureAirport} → ${segment.arrivalAirport} • ${formatDateTime(segment.departureTime)}`}
+              subtitle={`${formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} → ${formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)} • ${formatDateTime(segment.departureTime)}`}
               right={
                 <View style={styles.iconRow}>
                   <Pressable onPress={() => openSegmentEditor(segment)}>
@@ -590,21 +608,32 @@ export default function TripDetailScreen() {
       <AppCard title="Hotel Info" right={<AppButton label="Add" tone="secondary" onPress={() => openHotelEditor()} />}>
         {bundle.hotelStays.length ? (
           bundle.hotelStays.map((hotel) => (
-            <ListRow
-              key={hotel.id}
-              title={hotel.hotelName}
-              subtitle={`${hotel.address} • ${formatShortDate(hotel.checkIn)} to ${formatShortDate(hotel.checkOut)}`}
-              right={
-                <View style={styles.iconRow}>
-                  <Pressable onPress={() => openHotelEditor(hotel)}>
-                    <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                  </Pressable>
-                  <Pressable onPress={() => deleteRecord('hotel_stays', hotel.id)}>
-                    <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                  </Pressable>
+            <View key={hotel.id} style={styles.hotelRow}>
+              <View style={styles.hotelThumb}>
+                {hotel.hotelImageLocalPath || hotel.hotelImageRemoteUrl ? (
+                  <ManagedFileImage uri={hotel.hotelImageLocalPath ?? hotel.hotelImageRemoteUrl} style={styles.hotelThumbImage} />
+                ) : null}
+                <View style={styles.hotelThumbOverlay}>
+                  <MaterialIcons name="hotel" size={18} color={colors.white} />
                 </View>
-              }
-            />
+              </View>
+              <View style={styles.hotelCopy}>
+                <Text style={styles.hotelTitle}>{hotel.hotelName}</Text>
+                <Text style={styles.hotelSubtitle}>{hotel.address}</Text>
+                <Text style={styles.hotelMeta}>
+                  {formatShortDate(hotel.checkIn)} to {formatShortDate(hotel.checkOut)}
+                </Text>
+                {hotel.hotelImageStatus === 'loading' ? <Text style={styles.hotelStatus}>Finding a free hotel image</Text> : null}
+              </View>
+              <View style={styles.iconRow}>
+                <Pressable onPress={() => openHotelEditor(hotel)}>
+                  <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
+                </Pressable>
+                <Pressable onPress={() => deleteRecord('hotel_stays', hotel.id)}>
+                  <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
+                </Pressable>
+              </View>
+            </View>
           ))
         ) : (
           <EmptyState
@@ -793,15 +822,51 @@ export default function TripDetailScreen() {
               value={segmentDraft.flightNumber}
               onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, flightNumber: value } : current))}
             />
-            <AppTextField
+            <AirportSearchField
               label="Departure airport"
               value={segmentDraft.departureAirport}
-              onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, departureAirport: value } : current))}
+              airportCode={segmentDraft.departureAirportCode}
+              onChangeText={(value) =>
+                setSegmentDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        departureAirport: value,
+                        departureAirportCode: current.departureAirport === value ? current.departureAirportCode : '',
+                      }
+                    : current
+                )
+              }
+              onSelectAirport={(airport) =>
+                setSegmentDraft((current) =>
+                  current ? { ...current, departureAirport: airport.name, departureAirportCode: airport.code } : current
+                )
+              }
+              placeholder="Search by city, airport, or IATA"
+              helper="Type a place like London, Newcastle, or JFK."
             />
-            <AppTextField
+            <AirportSearchField
               label="Arrival airport"
               value={segmentDraft.arrivalAirport}
-              onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, arrivalAirport: value } : current))}
+              airportCode={segmentDraft.arrivalAirportCode}
+              onChangeText={(value) =>
+                setSegmentDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        arrivalAirport: value,
+                        arrivalAirportCode: current.arrivalAirport === value ? current.arrivalAirportCode : '',
+                      }
+                    : current
+                )
+              }
+              onSelectAirport={(airport) =>
+                setSegmentDraft((current) =>
+                  current ? { ...current, arrivalAirport: airport.name, arrivalAirportCode: airport.code } : current
+                )
+              }
+              placeholder="Search by city, airport, or IATA"
+              helper="Pick the right airport and Pineapple keeps the IATA code."
             />
             <DateTimeField
               label="Departure time"
@@ -855,6 +920,14 @@ export default function TripDetailScreen() {
               onChangeText={(value) => setHotelDraft((current) => (current ? { ...current, address: value } : current))}
               multiline
             />
+            {hotelDraft.hotelImageLocalPath || hotelDraft.hotelImageRemoteUrl ? (
+              <View style={styles.hotelPreviewCard}>
+                <ManagedFileImage uri={hotelDraft.hotelImageLocalPath ?? hotelDraft.hotelImageRemoteUrl} style={styles.hotelPreviewImage} />
+                <Text style={styles.hotelPreviewLabel}>Current hotel image</Text>
+              </View>
+            ) : (
+              <Text style={styles.helperText}>After save, Pineapple will try to fetch a free hotel or local-area image from the address.</Text>
+            )}
             <AppTextField
               label="Phone"
               value={hotelDraft.phone}
@@ -1077,6 +1150,76 @@ const styles = StyleSheet.create({
   iconRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+    alignItems: 'center',
+  },
+  hotelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  hotelThumb: {
+    width: 82,
+    height: 82,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.primaryBlue,
+  },
+  hotelThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  hotelThumbOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 28, 44, 0.24)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hotelCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  hotelTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+  },
+  hotelSubtitle: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  hotelMeta: {
+    color: colors.primaryBlueDark,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+  },
+  hotelStatus: {
+    color: colors.primaryBlue,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+  },
+  hotelPreviewCard: {
+    gap: spacing.xs,
+  },
+  hotelPreviewImage: {
+    width: '100%',
+    height: 140,
+    borderRadius: 16,
+  },
+  hotelPreviewLabel: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+  },
+  helperText: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
   },
   participantList: {
     gap: spacing.sm,

@@ -6,6 +6,7 @@ import {
   normalizeAppPreferences,
   normalizeDocumentRecord,
 } from '@/utils/documentExpiry';
+import { normalizeHotelStayRecord } from '@/utils/hotels';
 import { decryptStructuredValue, encryptStructuredValue } from '@/utils/structuredDataEncryption';
 import { normalizeTripRecord } from '@/utils/trips';
 import type {
@@ -122,7 +123,9 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         airline: (await decryptStructuredValue(segment.airline)) ?? '',
         flightNumber: (await decryptStructuredValue(segment.flightNumber)) ?? '',
         departureAirport: (await decryptStructuredValue(segment.departureAirport)) ?? '',
+        departureAirportCode: (await decryptStructuredValue(segment.departureAirportCode)) ?? '',
         arrivalAirport: (await decryptStructuredValue(segment.arrivalAirport)) ?? '',
+        arrivalAirportCode: (await decryptStructuredValue(segment.arrivalAirportCode)) ?? '',
         terminal: (await decryptStructuredValue(segment.terminal)) ?? '',
         gate: (await decryptStructuredValue(segment.gate)) ?? '',
         bookingRef: (await decryptStructuredValue(segment.bookingRef)) ?? '',
@@ -130,14 +133,28 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
       }))
     ),
     hotelStays: await Promise.all(
-      (snapshot.hotelStays ?? []).map(async (hotel) => ({
-        ...hotel,
-        hotelName: (await decryptStructuredValue(hotel.hotelName)) ?? '',
-        address: (await decryptStructuredValue(hotel.address)) ?? '',
-        phone: (await decryptStructuredValue(hotel.phone)) ?? '',
-        bookingRef: (await decryptStructuredValue(hotel.bookingRef)) ?? '',
-        notes: (await decryptStructuredValue(hotel.notes)) ?? '',
-      }))
+      (snapshot.hotelStays ?? []).map(async (hotel) => {
+        const decryptedAttributionMeta = (await decryptStructuredValue(hotel.hotelImageAttributionMeta as unknown as string)) ?? null;
+        return normalizeHotelStayRecord({
+          id: hotel.id,
+          tripId: hotel.tripId,
+          hotelName: (await decryptStructuredValue(hotel.hotelName)) ?? '',
+          address: (await decryptStructuredValue(hotel.address)) ?? '',
+          hotelImageLocalPath: hotel.hotelImageLocalPath ?? null,
+          hotelImageRemoteUrl: (await decryptStructuredValue(hotel.hotelImageRemoteUrl)) ?? null,
+          hotelImageSource: hotel.hotelImageSource,
+          hotelImageAttributionText: (await decryptStructuredValue(hotel.hotelImageAttributionText)) ?? null,
+          hotelImageAttributionMeta: decryptedAttributionMeta as unknown,
+          hotelImageStatus: hotel.hotelImageStatus,
+          phone: (await decryptStructuredValue(hotel.phone)) ?? '',
+          bookingRef: (await decryptStructuredValue(hotel.bookingRef)) ?? '',
+          checkIn: hotel.checkIn,
+          checkOut: hotel.checkOut,
+          notes: (await decryptStructuredValue(hotel.notes)) ?? '',
+          createdAt: hotel.createdAt,
+          updatedAt: hotel.updatedAt,
+        } as any);
+      })
     ),
     itineraryEvents: await Promise.all(
       (snapshot.itineraryEvents ?? []).map(async (event) => ({
@@ -247,7 +264,9 @@ async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         airline: (await encryptStructuredValue(segment.airline)) ?? '',
         flightNumber: (await encryptStructuredValue(segment.flightNumber)) ?? '',
         departureAirport: (await encryptStructuredValue(segment.departureAirport)) ?? '',
+        departureAirportCode: (await encryptStructuredValue(segment.departureAirportCode)) ?? '',
         arrivalAirport: (await encryptStructuredValue(segment.arrivalAirport)) ?? '',
+        arrivalAirportCode: (await encryptStructuredValue(segment.arrivalAirportCode)) ?? '',
         terminal: (await encryptStructuredValue(segment.terminal)) ?? '',
         gate: (await encryptStructuredValue(segment.gate)) ?? '',
         bookingRef: (await encryptStructuredValue(segment.bookingRef)) ?? '',
@@ -259,6 +278,9 @@ async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         ...hotel,
         hotelName: (await encryptStructuredValue(hotel.hotelName)) ?? '',
         address: (await encryptStructuredValue(hotel.address)) ?? '',
+        hotelImageRemoteUrl: (await encryptStructuredValue(hotel.hotelImageRemoteUrl)) ?? null,
+        hotelImageAttributionText: (await encryptStructuredValue(hotel.hotelImageAttributionText)) ?? null,
+        hotelImageAttributionMeta: (await encryptStructuredValue(JSON.stringify(hotel.hotelImageAttributionMeta ?? null))) ?? null,
         phone: (await encryptStructuredValue(hotel.phone)) ?? '',
         bookingRef: (await encryptStructuredValue(hotel.bookingRef)) ?? '',
         notes: (await encryptStructuredValue(hotel.notes)) ?? '',
@@ -378,8 +400,8 @@ export async function upsertTrip(input: TripDraft) {
       destinationImageLocalPath,
       destinationImageRemoteUrl,
       destinationImageSource: input.destinationImageSource ?? 'fallback',
-      attributionText: input.attributionText ?? 'Default Pineapple image',
-      attributionMeta: input.attributionMeta ?? { source: 'fallback', sourceLabel: 'Pineapple' },
+      attributionText: input.attributionText ?? 'Default trip background',
+      attributionMeta: input.attributionMeta ?? { source: 'fallback', sourceLabel: 'Default trip background' },
       coverImageUri: destinationImageLocalPath,
       heroImageRemoteUrl: destinationImageRemoteUrl,
       heroImageStatus: input.heroImageStatus ?? 'idle',

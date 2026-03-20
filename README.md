@@ -68,9 +68,10 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Reusable document expiry status system for passports, visas, GHIC / EHIC, travel insurance, driving licences, ID cards, and custom docs with expiry dates
 - Packing lists grouped by category with multi-traveller assignment, templates, duplicate action, and priority flags
 - Flight / travel segment management
-- Hotel stay management
+- Hotel stay management with automatic free image lookup and offline cache after the first successful fetch
 - Automatic trip-card destination images that resolve from country or place text, cache locally after the first fetch, and fall back cleanly when offline or unresolved
 - Trip-card destination imagery now prefers Pexels when an optional `EXPO_PUBLIC_PEXELS_API_KEY` is supplied at build time, falls back to Wikimedia Commons otherwise, caches the chosen image locally, and exposes source attribution through a small in-card info action
+- Flight entry now includes a built-in searchable airport picker with stored IATA codes for cleaner travel records
 - Chronological itinerary timeline
 - Emergency reference storage per trip
 - High-contrast Travel Mode with family overview, traveller tabs/swipe, quick copy actions, and temporary sensitive reveal
@@ -127,9 +128,10 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 
 ### Destination image providers
 
-- Trip cards always render with a background image: Pineapple uses the encrypted cached trip image when available and falls back to a bundled local Pineapple image if no remote result can be resolved
+- Trip cards always render with a background image: Pineapple uses the encrypted cached trip image when available and falls back to the built-in card background if no remote result can be resolved
 - Destination image lookup is local-first friendly after the first fetch because Pineapple downloads and stores the chosen trip image in app-managed storage
-- Pexels is the preferred remote source when `EXPO_PUBLIC_PEXELS_API_KEY` is present during the build; if no key is set, Pineapple skips Pexels and falls back to Wikimedia Commons and then the bundled Pineapple image
+- Hotel stays can also fetch and cache a free image after save by combining the typed hotel address with free geocoding and the same Pexels/Wikimedia pipeline
+- Pexels is the preferred remote source when `EXPO_PUBLIC_PEXELS_API_KEY` is present during the build; if no key is set, Pineapple skips Pexels and falls back to Wikimedia Commons and then the default local background
 - Attribution is available from the small `i` icon on each trip card
 - Honest limitation: a client-side Pexels key bundled into an APK can still be extracted by a determined attacker, so treat it as an optional convenience integration rather than a secret credential
 

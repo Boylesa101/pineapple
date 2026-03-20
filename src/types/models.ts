@@ -191,7 +191,9 @@ export interface TravelSegment {
   airline: string;
   flightNumber: string;
   departureAirport: string;
+  departureAirportCode: string;
   arrivalAirport: string;
+  arrivalAirportCode: string;
   departureTime: string;
   arrivalTime: string;
   terminal: string;
@@ -207,6 +209,12 @@ export interface HotelStay {
   tripId: string;
   hotelName: string;
   address: string;
+  hotelImageLocalPath: string | null;
+  hotelImageRemoteUrl: string | null;
+  hotelImageSource: DestinationImageSource;
+  hotelImageAttributionText: string | null;
+  hotelImageAttributionMeta: DestinationImageAttribution | null;
+  hotelImageStatus: HeroImageStatus;
   phone: string;
   bookingRef: string;
   checkIn: string;
