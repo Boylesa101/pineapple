@@ -77,7 +77,8 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Flight entry now includes a built-in searchable airport picker with stored IATA codes for cleaner travel records
 - Date-of-birth entry now uses direct typed `DD / MM / YYYY` input in traveller, passport, and driving-licence flows instead of the calendar picker
 - Trip detail now uses a contextual footer for `Packing`, `Vibes`, `Flight`, and `Hotel`, keeping those sections in the trip flow instead of the global footer
-- `Vibes` can fetch live top picks for places to eat, visit, and do from Tripadvisor and add them directly into the itinerary when `EXPO_PUBLIC_TRIPADVISOR_API_KEY` is provided at build time
+- `Vibes` can fetch live top picks for places to eat, visit, and do from Tripadvisor through the `pinapple-dev.pages.dev/api/vibes` Cloudflare Pages Function proxy and add them directly into the itinerary
+- To enable live Vibes on Cloudflare Pages, add the Pages secret `TRIPADVISOR_API_KEY`, optionally set `TRIPADVISOR_ALLOWED_DOMAIN=pinapple-dev.pages.dev`, and allowlist `pinapple-dev.pages.dev` in Tripadvisor
 - Chronological itinerary timeline
 - Emergency reference storage per trip
 - High-contrast Travel Mode with family overview, traveller tabs/swipe, quick copy actions, and temporary sensitive reveal

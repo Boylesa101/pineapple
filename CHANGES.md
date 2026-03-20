@@ -1,7 +1,9 @@
 # Changelog
 
-## 1.7.2 - 2026-03-20
+## 1.7.3 - 2026-03-20
 
+- Vibes proxy prep: Pineapple no longer expects a Tripadvisor key inside the APK for the `Vibes` screen, and the Cloudflare Pages deployment now includes a `/api/vibes` server-side proxy route designed for the `pinapple-dev.pages.dev` allowlisted domain
+- Cloudflare setup note: live Vibes now requires the `TRIPADVISOR_API_KEY` Pages secret to be set on Cloudflare; until then the app shows a clean configuration message instead of exposing build-time env-key assumptions
 - Home-screen cleanup: removed the blue hero banner, removed the traveller summary block, removed the Home document CTA, stripped the top header down to `Hello Andrew` plus account/notification icons, and made the trip area the only main dashboard content again
 - Stacked trip deck: Home now renders trips as a vertically stacked image-led deck sorted by departure date, with lower cards peeking from the bottom, swipe up/down navigation, and tap-to-bring-forward behavior for the visible lower cards
 - Floating create action: Home now uses a single blue floating `New trip` button above the footer instead of multiple trip/document CTAs

@@ -8,7 +8,7 @@ import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { EmptyState } from '@/components/EmptyState';
 import { colors, spacing } from '@/constants/theme';
-import { fetchTripVibes, hasTripadvisorKey, type VibeCategory, type VibeItem } from '@/services/tripadvisorVibesService';
+import { fetchTripVibes, getVibesBaseUrl, type VibeCategory, type VibeItem } from '@/services/tripadvisorVibesService';
 import { useAppStore } from '@/store/useAppStore';
 import { getTripBundle } from '@/utils/selectors';
 import { toUserMessage } from '@/utils/userErrors';
@@ -33,12 +33,6 @@ export default function TripVibesScreen() {
 
   useEffect(() => {
     if (!trip) {
-      setLoading(false);
-      return;
-    }
-
-    if (!hasTripadvisorKey()) {
-      setError('Add EXPO_PUBLIC_TRIPADVISOR_API_KEY to enable live Vibes suggestions from Tripadvisor.');
       setLoading(false);
       return;
     }
@@ -126,8 +120,9 @@ export default function TripVibesScreen() {
     >
       <AppCard>
         <Text style={styles.lead}>
-          Live area picks powered by Tripadvisor. These suggestions are fetched live when the page opens and are not cached locally.
+          Live area picks powered by Tripadvisor through Pineapple&apos;s Cloudflare proxy. These suggestions are fetched live when the page opens and are not cached locally.
         </Text>
+        <Text style={styles.proxyNote}>Source endpoint: {getVibesBaseUrl()}/api/vibes</Text>
       </AppCard>
 
       {loading ? (
@@ -194,6 +189,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     lineHeight: 20,
+  },
+  proxyNote: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: spacing.sm,
   },
   vibeRow: {
     gap: spacing.sm,

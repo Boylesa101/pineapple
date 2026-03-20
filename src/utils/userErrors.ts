@@ -39,6 +39,10 @@ export function toUserMessage(error: unknown, fallback: string) {
     case 'Secure random bytes are unavailable on this platform.':
     case 'Secure random bytes are unavailable on this device build.':
       return 'Pineapple could not generate a secure local key on this device build. Reinstall or update the app if this keeps happening.';
+    case 'Destination is required for live Vibes suggestions.':
+      return 'Add a destination to the trip before opening Vibes.';
+    case 'Tripadvisor is not configured on the Pineapple Cloudflare site yet. Add the TRIPADVISOR_API_KEY Pages secret to enable Vibes.':
+      return 'Vibes is not live yet. Add the TripAdvisor key to the Pineapple Cloudflare Pages project to enable it.';
     default:
       return message.length > 160 ? fallback : message;
   }
