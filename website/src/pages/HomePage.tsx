@@ -6,7 +6,6 @@ import {
   whyPineappleSections,
 } from '../../../src/content/legal';
 import { SurfaceCard } from '../components/ContentBlocks';
-import { HomePreview } from '../components/HomePreview';
 import { MaterialIcon, SiteLayout } from '../components/SiteLayout';
 
 export function HomePage() {
@@ -19,31 +18,55 @@ export function HomePage() {
       title={legalConfig.appName}
       lede="Store travel documents, organise trips, get expiry reminders, and access SOS help quickly when it matters most."
     >
-      <section className="hero-grid">
-        <SurfaceCard>
-          <div className="hero-copy">
-            <p className="hero-tagline">{legalConfig.tagline}</p>
-            <p>
-              Pineapple keeps travel documents, trips, reminders, and emergency travel context together in one calm,
-              privacy-aware mobile experience.
+      <section className="hero-banner">
+        <div className="hero-banner-overlay" />
+        <div className="hero-banner-top">
+          <div className="hero-brand">
+            <span className="hero-brand-badge" aria-hidden="true">
+              P
+            </span>
+            <div className="hero-brand-copy">
+              <strong>{legalConfig.appName}</strong>
+              <span>Travel companion app</span>
+            </div>
+          </div>
+        </div>
+        <div className="hero-banner-body">
+          <div className="hero-banner-copy">
+            <p className="hero-banner-eyebrow">Travel essentials, without the clutter</p>
+            <h2>{legalConfig.tagline}</h2>
+            <p className="hero-banner-text">
+              Store travel documents, organise trips, get expiry reminders, and access SOS travel help quickly when it
+              matters most.
             </p>
+            <div className="hero-explainer">
+              <h3>Why Pineapple exists</h3>
+              <p>
+                Travel documents, bookings, reminders, and emergency details are usually scattered across screenshots,
+                emails, and separate apps. Pineapple brings them back into one clear place on your device.
+              </p>
+            </div>
             <div className="cta-row">
               <a
-                className={playStoreReady ? 'button button-primary' : 'button button-primary button-disabled'}
+                className={playStoreReady ? 'button button-play' : 'button button-play button-disabled'}
                 href={playStoreReady ? legalConfig.futurePlayStoreUrl : '#'}
                 aria-disabled={!playStoreReady}
               >
-                <MaterialIcon name="shop" />
-                <span>Coming soon to Google Play</span>
+                <span className="play-badge-icon" aria-hidden="true">
+                  ▶
+                </span>
+                <span className="play-badge-copy">
+                  <small>Get it on</small>
+                  <strong>Google Play</strong>
+                </span>
               </a>
-              <a className="button button-secondary" href="/privacy/">
+              <a className="button button-ghost-light" href="/privacy/">
                 <MaterialIcon name="policy" />
                 <span>Read the privacy policy</span>
               </a>
             </div>
           </div>
-        </SurfaceCard>
-        <HomePreview />
+        </div>
       </section>
 
       <section className="content-section">

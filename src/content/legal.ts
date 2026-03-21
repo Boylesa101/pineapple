@@ -17,8 +17,8 @@ export type FAQItem = {
 export const legalConfig = {
   appName: 'Pineapple',
   tagline: 'Your travel essentials in one secure place — even offline.',
-  supportEmail: 'support@pineappleapp.example',
-  privacyEmail: 'privacy@pineappleapp.example',
+  supportEmail: 'studiopixel101@gmail.com',
+  privacyEmail: 'studiopixel101@gmail.com',
   websiteUrl: 'https://get-pineapple.pages.dev',
   privacyPolicyUrl: 'https://get-pineapple.pages.dev/privacy',
   termsUrl: 'https://get-pineapple.pages.dev/terms',

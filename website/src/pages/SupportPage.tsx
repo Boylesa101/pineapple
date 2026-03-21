@@ -1,6 +1,7 @@
 import { legalConfig, releaseChecklist, supportFaqs, supportIntroSections } from '../../../src/content/legal';
 import { FaqList, LegalSections, SurfaceCard } from '../components/ContentBlocks';
 import { MaterialIcon, SiteLayout } from '../components/SiteLayout';
+import { SupportTicketForm } from '../components/SupportTicketForm';
 
 export function SupportPage() {
   return (
@@ -28,6 +29,10 @@ export function SupportPage() {
 
       <section className="content-section">
         <LegalSections sections={supportIntroSections} />
+      </section>
+
+      <section className="content-section">
+        <SupportTicketForm />
       </section>
 
       <section className="content-section">
