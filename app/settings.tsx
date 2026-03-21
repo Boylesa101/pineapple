@@ -24,7 +24,12 @@ import {
   isNotificationsRuntimeSupported,
   requestNotificationPermissions,
 } from '@/services/notifications';
-import { PINEAPPLE_BACKUP_EXTENSION, isBackupFileName } from '@/services/backup';
+import {
+  MIN_BACKUP_PASSWORD_LENGTH,
+  PINEAPPLE_BACKUP_EXTENSION,
+  hasStrongEnoughBackupPassword,
+  isBackupFileName,
+} from '@/services/backup';
 import { useAppStore } from '@/store/useAppStore';
 import type { ConflictStatus, ExpiryReminderLeadTime, PrivacyMaskingMode } from '@/types/models';
 import { canUseBiometrics } from '@/utils/security';
@@ -129,6 +134,13 @@ export default function SettingsScreen() {
   async function handleBackupAction() {
     if (!backupPassword.trim()) {
       Alert.alert('Password required', 'Enter a password to continue.');
+      return;
+    }
+    if (backupAction === 'export' && !hasStrongEnoughBackupPassword(backupPassword)) {
+      Alert.alert(
+        'Stronger password needed',
+        `Use at least ${MIN_BACKUP_PASSWORD_LENGTH} characters to protect the backup file.`
+      );
       return;
     }
 

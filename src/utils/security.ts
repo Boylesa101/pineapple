@@ -8,7 +8,9 @@ import type { PinLength, StoredSecurityConfig } from '@/types/models';
 import { getSecureRandomHex } from '@/utils/random';
 
 const SECURITY_KEY = 'pineapple.security';
-const PIN_PBKDF2_ITERATIONS = 150000;
+const PIN_SECRET_KEY = 'pineapple.pin-secret';
+const PIN_PBKDF2_ITERATIONS_V3 = 150000;
+const PIN_PBKDF2_ITERATIONS_V4 = 90000;
 
 function canUseWebStorage() {
   return Platform.OS === 'web' && typeof window !== 'undefined' && 'localStorage' in window;
@@ -17,7 +19,7 @@ function canUseWebStorage() {
 export const defaultSecurityConfig: StoredSecurityConfig = {
   pinConfigured: false,
   pinLength: 4,
-  hashVersion: 3,
+  hashVersion: 4,
   salt: '',
   hash: '',
   biometricEnabled: false,
@@ -45,7 +47,38 @@ async function hashPinV2(pin: string, salt: string) {
 async function hashPinV3(pin: string, salt: string) {
   return CryptoJS.PBKDF2(pin, CryptoJS.enc.Hex.parse(salt), {
     keySize: 256 / 32,
-    iterations: PIN_PBKDF2_ITERATIONS,
+    iterations: PIN_PBKDF2_ITERATIONS_V3,
+    hasher: CryptoJS.algo.SHA256,
+  }).toString(CryptoJS.enc.Hex);
+}
+
+async function loadOrCreatePinSecret() {
+  if (canUseWebStorage()) {
+    const existing = window.localStorage.getItem(PIN_SECRET_KEY);
+    if (existing) {
+      return existing;
+    }
+
+    const next = getSecureRandomHex(32);
+    window.localStorage.setItem(PIN_SECRET_KEY, next);
+    return next;
+  }
+
+  const existing = await SecureStore.getItemAsync(PIN_SECRET_KEY);
+  if (existing) {
+    return existing;
+  }
+
+  const next = getSecureRandomHex(32);
+  await SecureStore.setItemAsync(PIN_SECRET_KEY, next);
+  return next;
+}
+
+async function hashPinV4(pin: string, salt: string) {
+  const deviceSecret = await loadOrCreatePinSecret();
+  return CryptoJS.PBKDF2(`${deviceSecret}:${pin}`, CryptoJS.enc.Hex.parse(salt), {
+    keySize: 256 / 32,
+    iterations: PIN_PBKDF2_ITERATIONS_V4,
     hasher: CryptoJS.algo.SHA256,
   }).toString(CryptoJS.enc.Hex);
 }
@@ -116,13 +149,13 @@ export async function clearSecurityConfig() {
 
 export async function createPinConfig(pin: string, pinLength: PinLength) {
   const salt = getSecureRandomHex(16);
-  const hash = await hashPinV3(pin, salt);
+  const hash = await hashPinV4(pin, salt);
 
   return {
     ...defaultSecurityConfig,
     pinConfigured: true,
     pinLength,
-    hashVersion: 3,
+    hashVersion: 4,
     salt,
     hash,
   } satisfies StoredSecurityConfig;
@@ -138,7 +171,9 @@ export async function verifyPin(pin: string, config: StoredSecurityConfig) {
       ? await hashPinV1(pin, config.salt)
       : config.hashVersion === 2
         ? await hashPinV2(pin, config.salt)
-        : await hashPinV3(pin, config.salt);
+        : config.hashVersion === 3
+          ? await hashPinV3(pin, config.salt)
+          : await hashPinV4(pin, config.salt);
   return candidate === config.hash;
 }
 

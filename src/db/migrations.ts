@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { createShareCode } from '@/utils/shareCodes';
 
 const DATABASE_VERSION = 17;
 
@@ -423,12 +424,13 @@ async function runPhaseThreeMigration(db: SQLiteDatabase) {
 
   const tripRows = await db.getAllAsync<{ id: string; createdAt: string; updatedAt: string }>('SELECT id, createdAt, updatedAt FROM trips');
   for (const trip of tripRows) {
+    const shareCode = createShareCode();
     await db.runAsync(
       `INSERT OR IGNORE INTO shared_trip_states (
         tripId, shareCode, syncEnabled, syncStatus, lastSyncAt, lastExportedAt, lastImportedAt, lastKnownRemoteUpdatedAt, createdAt, updatedAt
       ) VALUES (?, ?, 0, 'local_only', NULL, NULL, NULL, NULL, ?, ?)`,
       trip.id,
-      `PINE-${trip.id.slice(-6).toUpperCase()}`,
+      shareCode,
       trip.createdAt,
       trip.updatedAt
     );
@@ -439,7 +441,7 @@ async function runPhaseThreeMigration(db: SQLiteDatabase) {
       ) VALUES (?, ?, 'You', '', 'owner', '#F4B400', ?, 1, ?, ?)`,
       `participant_${trip.id}`,
       trip.id,
-      `PINE-${trip.id.slice(-6).toUpperCase()}`,
+      shareCode,
       trip.createdAt,
       trip.updatedAt
     );

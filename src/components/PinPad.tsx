@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing } from '@/constants/theme';
@@ -64,11 +64,16 @@ function PinPadComponent({
 }: Props) {
   const dots = useMemo(() => Array.from({ length: Math.max(pinLength, value.length, 4) }), [pinLength, value.length]);
   const rows = variant === 'auth' ? authRows : defaultRows;
+  const valueRef = useRef(value);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   const handlePress = useCallback((key: string) => {
     if (!key || disabled) return;
     if (key === 'delete') {
-      onChange(value.slice(0, -1));
+      onChange(valueRef.current.slice(0, -1));
       return;
     }
     if (key === 'enter') {
@@ -81,9 +86,9 @@ function PinPadComponent({
       onCancel?.();
       return;
     }
-    if (maxLength && value.length >= maxLength) return;
-    onChange(`${value}${key}`);
-  }, [canEnter, disabled, maxLength, onCancel, onChange, onEnter, value]);
+    if (maxLength && valueRef.current.length >= maxLength) return;
+    onChange(`${valueRef.current}${key}`);
+  }, [canEnter, disabled, maxLength, onCancel, onChange, onEnter]);
 
   return (
     <View style={styles.wrapper}>

@@ -1,6 +1,7 @@
 import { getDatabase } from './client';
 
 import { createId } from '@/utils/ids';
+import { createShareCode } from '@/utils/shareCodes';
 import {
   decryptStructuredValue,
   encryptStructuredValue,
@@ -533,12 +534,14 @@ export async function upsertTrip(input: TripDraft) {
     }
   }
 
+  const shareCode = createShareCode();
+
   await db.runAsync(
     `INSERT OR IGNORE INTO shared_trip_states (
       tripId, shareCode, syncEnabled, syncStatus, lastSyncAt, lastExportedAt, lastImportedAt, lastKnownRemoteUpdatedAt, createdAt, updatedAt
     ) VALUES (?, ?, 0, 'local_only', NULL, NULL, NULL, NULL, ?, ?)`,
     id,
-    (await encryptField(`PINE-${id.slice(-6).toUpperCase()}`)) ?? '',
+    (await encryptField(shareCode)) ?? '',
     timestamp,
     timestamp
   );
@@ -551,7 +554,7 @@ export async function upsertTrip(input: TripDraft) {
     id,
     (await encryptField('You')) ?? '',
     '',
-    (await encryptField(`PINE-${id.slice(-6).toUpperCase()}`)) ?? '',
+    (await encryptField(shareCode)) ?? '',
     timestamp,
     timestamp
   );

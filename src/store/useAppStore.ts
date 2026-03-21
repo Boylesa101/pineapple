@@ -54,6 +54,7 @@ import { loadOnboardingComplete, persistOnboardingComplete } from '@/utils/onboa
 import { deriveOnboardingCompletionStatus } from '@/utils/onboardingState';
 import { normalizeDestinationLabel } from '@/utils/trips';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
+import { createShareCode, isLegacyShareCode } from '@/utils/shareCodes';
 import type {
   AppDataSnapshot,
   ConflictStatus,
@@ -194,6 +195,69 @@ function destinationNeedsHeroRefresh(
   return nextDestination !== previousDestination || !(previous?.destinationImageLocalPath ?? previous?.coverImageUri);
 }
 
+function rotateLegacyShareCodes(snapshot: AppDataSnapshot) {
+  const shareCodeByTrip = new Map<string, string>();
+  let changed = false;
+  const timestamp = new Date().toISOString();
+
+  const nextSharedTripStates = snapshot.sharedTripStates.map((state) => {
+    const nextShareCode = isLegacyShareCode(state.shareCode) ? createShareCode() : state.shareCode;
+    shareCodeByTrip.set(state.tripId, nextShareCode);
+    if (nextShareCode !== state.shareCode) {
+      changed = true;
+      return { ...state, shareCode: nextShareCode, updatedAt: timestamp };
+    }
+    return state;
+  });
+
+  const nextTripParticipants = snapshot.tripParticipants.map((participant) => {
+    const mappedShareCode = shareCodeByTrip.get(participant.tripId) ?? createShareCode();
+    shareCodeByTrip.set(participant.tripId, mappedShareCode);
+    if (!isLegacyShareCode(participant.inviteCode)) {
+      return participant;
+    }
+
+    changed = true;
+    return { ...participant, inviteCode: mappedShareCode, updatedAt: timestamp };
+  });
+
+  const nextTripInvites = snapshot.tripInvites.map((invite) => {
+    const mappedShareCode = shareCodeByTrip.get(invite.tripId) ?? createShareCode();
+    shareCodeByTrip.set(invite.tripId, mappedShareCode);
+    if (!isLegacyShareCode(invite.inviteCode)) {
+      return invite;
+    }
+
+    changed = true;
+    return { ...invite, inviteCode: mappedShareCode, updatedAt: timestamp };
+  });
+
+  const nextSyncConflicts = snapshot.syncConflicts.map((conflict) => {
+    const mappedShareCode = shareCodeByTrip.get(conflict.tripId);
+    if (!mappedShareCode || !isLegacyShareCode(conflict.shareCode)) {
+      return conflict;
+    }
+
+    changed = true;
+    return { ...conflict, shareCode: mappedShareCode, updatedAt: timestamp };
+  });
+
+  if (!changed) {
+    return { snapshot, changed: false };
+  }
+
+  return {
+    changed: true,
+    snapshot: {
+      ...snapshot,
+      sharedTripStates: nextSharedTripStates,
+      tripParticipants: nextTripParticipants,
+      tripInvites: nextTripInvites,
+      syncConflicts: nextSyncConflicts,
+    },
+  };
+}
+
 export const useAppStore = create<StoreState>((set, get) => ({
   isBootstrapped: false,
   isBusy: false,
@@ -229,6 +293,11 @@ export const useAppStore = create<StoreState>((set, get) => ({
       data = protectionResult.snapshot;
       const structuredProtectionResult = await protectStructuredDataAtRest(data);
       data = structuredProtectionResult.snapshot;
+      const shareCodeRotationResult = rotateLegacyShareCodes(data);
+      if (shareCodeRotationResult.changed) {
+        data = shareCodeRotationResult.snapshot;
+        await replaceAllData(data);
+      }
 
       const visibleTrips = filterVisibleTrips(data.trips);
       const hasCompletedOnboarding = deriveOnboardingCompletionStatus(onboardingStatus, {
@@ -356,7 +425,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
       const valid = await verifyPin(pin, state.security);
       if (valid) {
         let nextSecurity = clearUnlockLockout(state.security);
-        if (state.security.hashVersion !== 3) {
+        if (state.security.hashVersion !== 4) {
           nextSecurity = {
             ...(await createPinConfig(pin, state.security.pinLength)),
             biometricEnabled: state.security.biometricEnabled,

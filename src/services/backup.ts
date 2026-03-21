@@ -26,6 +26,7 @@ type ImportBackupArgs = {
 };
 
 const BACKUP_PBKDF2_ITERATIONS = 150000;
+export const MIN_BACKUP_PASSWORD_LENGTH = 12;
 export const PINEAPPLE_BACKUP_EXTENSION = '.pineapplebackup';
 export const PINEAPPLE_BACKUP_MIME_TYPE = 'application/json';
 
@@ -35,6 +36,10 @@ export function isBackupFileName(name: string | null | undefined) {
 
 export function parseBackupEnvelope(encryptedContents: string) {
   return parseBackupEnvelopeString(encryptedContents);
+}
+
+export function hasStrongEnoughBackupPassword(password: string) {
+  return password.trim().length >= MIN_BACKUP_PASSWORD_LENGTH;
 }
 
 export async function collectBackupAttachments(snapshot: AppDataSnapshot) {
@@ -76,6 +81,10 @@ export async function collectBackupAttachments(snapshot: AppDataSnapshot) {
 }
 
 export async function exportEncryptedBackup({ data, security, password }: ExportBackupArgs): Promise<BackupExportResult> {
+  if (!hasStrongEnoughBackupPassword(password)) {
+    throw new Error(`Backup password must be at least ${MIN_BACKUP_PASSWORD_LENGTH} characters long.`);
+  }
+
   const exportedAt = new Date().toISOString();
   const { attachments, skippedAttachmentCount } = await collectBackupAttachments(data);
   const payload: BackupPayload = {

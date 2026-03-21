@@ -41,6 +41,7 @@ import type {
   TripInviteDraft,
   TravellerDraft,
 } from '@/types/models';
+import { createShareCode } from '@/utils/shareCodes';
 import { daysLeft, daysUntil, formatDateTime, formatShortDate } from '@/utils/date';
 import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { formatAirportDisplay } from '@/utils/airports';
@@ -291,7 +292,7 @@ export default function TripDetailScreen() {
     setInviteDraft({
       tripId,
       email: '',
-      inviteCode: bundle.sharedTripState?.shareCode ?? `PINE-${tripId.slice(-6).toUpperCase()}`,
+      inviteCode: bundle.sharedTripState?.shareCode ?? createShareCode(),
       role: 'editor',
       status: 'pending',
     });

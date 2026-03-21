@@ -1,5 +1,5 @@
-import { startTransition, useCallback, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { PineappleMark } from '@/brand/PineappleMark';
@@ -13,6 +13,12 @@ import { canUseBiometrics } from '@/utils/security';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 const MAX_PIN_LENGTH = 12;
+
+function nextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
 
 export default function SetupPinScreen() {
   const router = useRouter();
@@ -70,9 +76,7 @@ export default function SetupPinScreen() {
     }
 
     if (step === 'create') {
-      startTransition(() => {
-        setStep('confirm');
-      });
+      setStep('confirm');
       return;
     }
 
@@ -87,9 +91,8 @@ export default function SetupPinScreen() {
     setSaving(true);
 
     try {
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => resolve());
-      });
+      await nextFrame();
+      await nextFrame();
       await createPin(pin, pin.length);
       const biometricAvailable = await canUseBiometrics();
       router.replace(biometricAvailable ? '/biometric-opt-in' : getPostUnlockRoute(tripCount));
@@ -117,7 +120,10 @@ export default function SetupPinScreen() {
         </View>
 
         <View style={styles.centerRail}>
-          <Text style={styles.stepLabel}>{step === 'create' ? 'Create your PIN' : 'Confirm your PIN'}</Text>
+          <Text style={styles.stepLabel}>
+            {saving ? 'Securing your PIN' : step === 'create' ? 'Create your PIN' : 'Confirm your PIN'}
+          </Text>
+          {saving ? <ActivityIndicator size="small" color={colors.white} /> : null}
           <PinPad
             value={currentValue}
             pinLength={step === 'create' ? Math.max(4, pin.length) : Math.max(pin.length, 4)}

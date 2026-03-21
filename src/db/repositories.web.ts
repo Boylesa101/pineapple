@@ -1,6 +1,7 @@
 import { del, get, set } from 'idb-keyval';
 
 import { createId } from '@/utils/ids';
+import { createShareCode } from '@/utils/shareCodes';
 import {
   defaultAppExpiryPreferences,
   normalizeAppPreferences,
@@ -418,6 +419,7 @@ export async function upsertTrip(input: TripDraft) {
   const snapshot = await readSnapshot();
   const timestamp = now();
   const id = input.id ?? createId('trip');
+  const shareCode = createShareCode();
   const destinationImageLocalPath = input.destinationImageLocalPath ?? input.coverImageUri ?? null;
   const destinationImageRemoteUrl = input.destinationImageRemoteUrl ?? input.heroImageRemoteUrl ?? null;
   await writeSnapshot({
@@ -455,7 +457,7 @@ export async function upsertTrip(input: TripDraft) {
             email: '',
             role: 'owner',
             avatarColor: '#F4B400',
-            inviteCode: `PINE-${id.slice(-6).toUpperCase()}`,
+            inviteCode: shareCode,
             isLocalProfile: true,
             createdAt: timestamp,
             updatedAt: timestamp,
@@ -467,7 +469,7 @@ export async function upsertTrip(input: TripDraft) {
           ...snapshot.sharedTripStates,
           {
             tripId: id,
-            shareCode: `PINE-${id.slice(-6).toUpperCase()}`,
+            shareCode,
             syncEnabled: false,
             syncStatus: 'local_only',
             lastSyncAt: null,

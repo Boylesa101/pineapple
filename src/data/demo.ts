@@ -2,6 +2,7 @@ import { addDays, addHours, startOfTomorrow, subYears } from 'date-fns';
 
 import type { AppDataSnapshot } from '@/types/models';
 import { createId } from '@/utils/ids';
+import { createShareCode } from '@/utils/shareCodes';
 
 export function createDemoSnapshot(): AppDataSnapshot {
   const start = startOfTomorrow();
@@ -13,7 +14,7 @@ export function createDemoSnapshot(): AppDataSnapshot {
   const travellerA = createId('traveller');
   const travellerB = createId('traveller');
   const travellerC = createId('traveller');
-  const shareCode = `PINE-${tripId.slice(-6).toUpperCase()}`;
+  const shareCode = createShareCode();
   const now = new Date().toISOString();
 
   return {

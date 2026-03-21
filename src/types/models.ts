@@ -358,7 +358,7 @@ export interface AppSecuritySettings {
 }
 
 export interface StoredSecurityConfig extends AppSecuritySettings {
-  hashVersion: 1 | 2 | 3;
+  hashVersion: 1 | 2 | 3 | 4;
   salt: string;
   hash: string;
   failedUnlockAttempts: number;

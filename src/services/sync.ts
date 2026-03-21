@@ -9,6 +9,7 @@ import type {
 } from '@/types/models';
 import { createId } from '@/utils/ids';
 import { writeUtf8File } from '@/utils/fileStorage';
+import { createShareCode } from '@/utils/shareCodes';
 import { getTripBundle, getTripById } from '@/utils/selectors';
 
 function cloneSnapshot<T>(value: T): T {
@@ -48,7 +49,7 @@ export function createSharedTripPacket(snapshot: AppDataSnapshot, tripId: string
     bundle.participants.find((participant) => participant.role === 'owner' && participant.isLocalProfile)?.displayName ??
     bundle.participants[0]?.displayName ??
     'Pineapple user';
-  const shareCode = bundle.sharedTripState?.shareCode ?? `PINE-${tripId.slice(-6).toUpperCase()}`;
+  const shareCode = bundle.sharedTripState?.shareCode ?? createShareCode();
 
   if (!trip) {
     throw new Error('Trip not found.');
