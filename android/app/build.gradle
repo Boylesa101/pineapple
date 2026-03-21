@@ -77,7 +77,6 @@ react {
  * Set this to true in release builds to optimize the app using [R8](https://developer.android.com/topic/performance/app-optimization/enable-app-optimization).
  */
 def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: 'true').toBoolean()
-def allowScreenshotsInThisBuild = (findProperty('pineappleAllowScreenshots') ?: 'false').toBoolean()
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -107,7 +106,6 @@ android {
         versionName "1.7.4"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
-        buildConfigField "boolean", "BLOCK_SCREENSHOTS", allowScreenshotsInThisBuild ? "false" : "true"
     }
     signingConfigs {
         debug {
