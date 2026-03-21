@@ -34,6 +34,8 @@ type Props = {
 const CARD_HEIGHT = 228;
 const STACK_OFFSETS = [0, 54, 102, 146];
 const STACK_SCALES = [1, 0.989, 0.978, 0.966];
+const SWIPE_DISTANCE_TRIGGER = 56;
+const SWIPE_VELOCITY_TRIGGER = 0.55;
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -71,16 +73,23 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
   function completeSwipe(direction: 'next' | 'previous') {
     const canAdvance = direction === 'next' ? currentIndex < items.length - 1 : currentIndex > 0;
     if (!canAdvance) {
-      Animated.spring(dragY, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
+      Animated.spring(dragY, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 18,
+        stiffness: 130,
+        mass: 0.9,
+      }).start();
       return;
     }
 
-    const toValue = direction === 'next' ? -CARD_HEIGHT * 0.55 : CARD_HEIGHT * 0.55;
-    Animated.timing(dragY, {
+    const toValue = direction === 'next' ? -CARD_HEIGHT * 0.62 : CARD_HEIGHT * 0.62;
+    Animated.spring(dragY, {
       toValue,
-      duration: 300,
-      easing: Easing.bezier(0.18, 0.96, 0.22, 1),
       useNativeDriver: true,
+      damping: 19,
+      stiffness: 140,
+      mass: 0.88,
     }).start(() => {
       dragY.setValue(0);
       animateToIndex(direction === 'next' ? currentIndex + 1 : currentIndex - 1);
@@ -90,34 +99,38 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderGrant: () => {
+          dragY.stopAnimation();
+        },
         onPanResponderMove: (_, gesture) => {
-          dragY.setValue(gesture.dy);
+          const clamped = Math.max(-CARD_HEIGHT * 0.7, Math.min(CARD_HEIGHT * 0.7, gesture.dy));
+          dragY.setValue(clamped);
         },
         onPanResponderRelease: (_, gesture) => {
-          if (gesture.dy <= -70) {
+          if (gesture.dy <= -SWIPE_DISTANCE_TRIGGER || gesture.vy <= -SWIPE_VELOCITY_TRIGGER) {
             completeSwipe('next');
             return;
           }
-          if (gesture.dy >= 70) {
+          if (gesture.dy >= SWIPE_DISTANCE_TRIGGER || gesture.vy >= SWIPE_VELOCITY_TRIGGER) {
             completeSwipe('previous');
             return;
           }
           Animated.spring(dragY, {
             toValue: 0,
             useNativeDriver: true,
-            damping: 21,
-            stiffness: 150,
-            mass: 1,
+            damping: 18,
+            stiffness: 128,
+            mass: 0.92,
           }).start();
         },
         onPanResponderTerminate: () => {
           Animated.spring(dragY, {
             toValue: 0,
             useNativeDriver: true,
-            damping: 21,
-            stiffness: 150,
-            mass: 1,
+            damping: 18,
+            stiffness: 128,
+            mass: 0.92,
           }).start();
         },
       }),
@@ -152,7 +165,7 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
                         {
                           rotate: dragY.interpolate({
                             inputRange: [-180, 0, 180],
-                            outputRange: ['-1deg', '0deg', '1deg'],
+                            outputRange: ['-0.75deg', '0deg', '0.75deg'],
                           }),
                         },
                       ]
@@ -201,7 +214,7 @@ const styles = StyleSheet.create({
   },
   peekTapTarget: {
     ...StyleSheet.absoluteFillObject,
-    top: 102,
+    top: 88,
     zIndex: 1,
   },
   hint: {

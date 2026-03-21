@@ -152,8 +152,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   topIconButton: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   },
   fabWrap: {
     alignItems: 'flex-end',
-    marginBottom: -spacing.sm,
+    marginBottom: -spacing.md,
   },
   fabButton: {
     borderRadius: radii.pill,

@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    minHeight: 62,
+    minHeight: 64,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   itemCompact: {
-    minHeight: 72,
+    minHeight: 76,
     gap: 6,
   },
   label: {

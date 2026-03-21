@@ -17,15 +17,23 @@ export default function BiometricOptInScreen() {
   const tripCount = useAppStore((state) => filterVisibleTrips(state.data.trips).length);
   const updateSecurityPreferences = useAppStore((state) => state.updateSecurityPreferences);
   const [submitting, setSubmitting] = useState(false);
+  const [availabilityChecked, setAvailabilityChecked] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     void canUseBiometrics().then((available) => {
+      if (cancelled) {
+        return;
+      }
+
       if (!available && !cancelled) {
         void updateSecurityPreferences({ biometricEnabled: false });
         router.replace(getPostUnlockRoute(tripCount));
+        return;
       }
+
+      setAvailabilityChecked(true);
     });
 
     return () => {
@@ -71,10 +79,14 @@ export default function BiometricOptInScreen() {
         <View style={styles.hero}>
           <PineappleMark size={72} />
           <View style={styles.iconWrap}>
-            <FingerprintIcon size={42} color={colors.authBlue} />
+          <FingerprintIcon size={42} color={colors.authBlue} />
           </View>
           <Text style={styles.title}>Use fingerprint or face unlock on this device?</Text>
-          <Text style={styles.body}>Your PIN stays as the fallback. Turn on biometrics now, or keep going and enable it later in Settings.</Text>
+          <Text style={styles.body}>
+            {availabilityChecked
+              ? 'Your PIN stays as the fallback. Turn on biometrics now, or keep going and enable it later in Settings.'
+              : 'Checking biometric support on this device.'}
+          </Text>
         </View>
 
         <View style={styles.actions}>
@@ -85,6 +97,7 @@ export default function BiometricOptInScreen() {
               void finishSetup(true);
             }}
             loading={submitting}
+            disabled={!availabilityChecked || submitting}
           />
           <AppButton
             label="Not now"
@@ -93,7 +106,7 @@ export default function BiometricOptInScreen() {
             onPress={() => {
               void finishSetup(false);
             }}
-            disabled={submitting}
+            disabled={!availabilityChecked || submitting}
           />
         </View>
       </View>

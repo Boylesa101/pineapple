@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing } from '@/constants/theme';
@@ -29,6 +29,28 @@ const authRows = [
   ['enter', '0', 'cancel'],
 ] as const;
 
+type PinKeyProps = {
+  label: string;
+  isAction?: boolean;
+  disabled?: boolean;
+  onPress: (key: string) => void;
+};
+
+const PinKey = memo(function PinKey({ label, isAction = false, disabled = false, onPress }: PinKeyProps) {
+  return (
+    <Pressable
+      onPressIn={() => onPress(label)}
+      style={[styles.key, isAction ? styles.actionKey : null, disabled ? styles.keyDisabled : null]}
+      disabled={disabled}
+      hitSlop={6}
+    >
+      <Text style={[styles.keyLabel, isAction ? styles.actionKeyLabel : null, disabled ? styles.keyLabelDisabled : null]}>
+        {label === 'enter' ? 'Enter' : label === 'cancel' ? 'Cancel' : label}
+      </Text>
+    </Pressable>
+  );
+});
+
 function PinPadComponent({
   value,
   pinLength,
@@ -43,7 +65,7 @@ function PinPadComponent({
   const dots = useMemo(() => Array.from({ length: Math.max(pinLength, value.length, 4) }), [pinLength, value.length]);
   const rows = variant === 'auth' ? authRows : defaultRows;
 
-  function handlePress(key: string) {
+  const handlePress = useCallback((key: string) => {
     if (!key || disabled) return;
     if (key === 'delete') {
       onChange(value.slice(0, -1));
@@ -61,7 +83,7 @@ function PinPadComponent({
     }
     if (maxLength && value.length >= maxLength) return;
     onChange(`${value}${key}`);
-  }
+  }, [canEnter, disabled, maxLength, onCancel, onChange, onEnter, value]);
 
   return (
     <View style={styles.wrapper}>
@@ -83,25 +105,13 @@ function PinPadComponent({
               }
 
               return (
-                <Pressable
+                <PinKey
                   key={cellKey}
-                  onPress={() => handlePress(digit)}
-                  style={[
-                    styles.key,
-                    isAction ? styles.actionKey : null,
-                    actionDisabled ? styles.keyDisabled : null,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.keyLabel,
-                      isAction ? styles.actionKeyLabel : null,
-                      actionDisabled ? styles.keyLabelDisabled : null,
-                    ]}
-                  >
-                    {digit === 'enter' ? 'Enter' : digit === 'cancel' ? 'Cancel' : digit}
-                  </Text>
-                </Pressable>
+                  label={digit}
+                  isAction={isAction}
+                  disabled={actionDisabled}
+                  onPress={handlePress}
+                />
               );
             })}
           </View>
