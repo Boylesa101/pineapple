@@ -10,10 +10,11 @@ import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { getPostUnlockRoute } from '@/utils/authRoutes';
 import { authenticateBiometrics, canUseBiometrics } from '@/utils/security';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 export default function BiometricOptInScreen() {
   const router = useRouter();
-  const tripCount = useAppStore((state) => state.data.trips.length);
+  const tripCount = useAppStore((state) => filterVisibleTrips(state.data.trips).length);
   const updateSecurityPreferences = useAppStore((state) => state.updateSecurityPreferences);
   const [submitting, setSubmitting] = useState(false);
 

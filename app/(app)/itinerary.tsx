@@ -17,6 +17,7 @@ import { useAppStore } from '@/store/useAppStore';
 import type { ItineraryEventDraft, ItineraryType } from '@/types/models';
 import { formatDateTime, formatTimelineDate } from '@/utils/date';
 import { getTripBundle } from '@/utils/selectors';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 import { validateItineraryEvent } from '@/utils/validation';
 
 const eventLabels: Record<ItineraryType, string> = {
@@ -41,7 +42,9 @@ export default function ItineraryScreen() {
   const { data, activeTripId, setActiveTrip, saveItineraryEvent, deleteRecord } = useAppStore();
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState<ItineraryEventDraft | null>(null);
-  const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
+  const visibleTrips = useMemo(() => filterVisibleTrips(data.trips), [data.trips]);
+  const activeVisibleTripId = activeTripId && visibleTrips.some((trip) => trip.id === activeTripId) ? activeTripId : null;
+  const selectedTripId = activeVisibleTripId ?? visibleTrips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
   const grouped = useMemo(() => {
     return bundle.itineraryEvents.reduce<Record<string, typeof bundle.itineraryEvents>>((accumulator, event) => {
@@ -51,7 +54,7 @@ export default function ItineraryScreen() {
     }, {});
   }, [bundle.itineraryEvents]);
 
-  if (!data.trips.length) {
+  if (!visibleTrips.length) {
     return (
       <AppScreen title="Itinerary">
         <AppCard>
@@ -74,7 +77,7 @@ export default function ItineraryScreen() {
 
   return (
     <AppScreen title="Itinerary" subtitle="A chronological timeline for excursions, meals, tickets, and reminders.">
-      <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
+      <TripPicker trips={visibleTrips} value={selectedTripId} onChange={setActiveTrip} />
       {Object.keys(grouped).length ? (
         Object.entries(grouped).map(([dateLabel, events]) => (
           <AppCard key={dateLabel}>

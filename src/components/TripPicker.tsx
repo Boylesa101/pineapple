@@ -3,24 +3,38 @@ import { ScrollView, StyleSheet, Text, Pressable } from 'react-native';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { Trip } from '@/types/models';
 
+type TripPickerOption = {
+  id: string;
+  label: string;
+};
+
 type Props = {
   trips: Trip[];
   value: string | null;
   onChange: (tripId: string) => void;
+  extraOptions?: TripPickerOption[];
 };
 
-export function TripPicker({ trips, value, onChange }: Props) {
-  if (!trips.length) {
+export function TripPicker({ trips, value, onChange, extraOptions = [] }: Props) {
+  if (!trips.length && !extraOptions.length) {
     return null;
   }
 
+  const options: TripPickerOption[] = [
+    ...extraOptions,
+    ...trips.map((trip) => ({
+      id: trip.id,
+      label: trip.destination,
+    })),
+  ];
+
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      {trips.map((trip) => {
-        const active = trip.id === value;
+      {options.map((option) => {
+        const active = option.id === value;
         return (
-          <Pressable key={trip.id} onPress={() => onChange(trip.id)} style={[styles.chip, active ? styles.chipActive : null]}>
-            <Text style={[styles.label, active ? styles.labelActive : null]}>{trip.destination}</Text>
+          <Pressable key={option.id} onPress={() => onChange(option.id)} style={[styles.chip, active ? styles.chipActive : null]}>
+            <Text style={[styles.label, active ? styles.labelActive : null]}>{option.label}</Text>
           </Pressable>
         );
       })}

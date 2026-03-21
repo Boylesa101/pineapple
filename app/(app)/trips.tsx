@@ -18,6 +18,7 @@ import { packingTemplates, type PackingTemplateId } from '@/data/packingTemplate
 import { useAppStore } from '@/store/useAppStore';
 import type { TripDraft, TripStatus } from '@/types/models';
 import { tripDateRange } from '@/utils/format';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 import { toUserMessage } from '@/utils/userErrors';
 import { validateTrip } from '@/utils/validation';
 
@@ -53,7 +54,7 @@ export default function TripsScreen() {
   const [templateId, setTemplateId] = useState<PackingTemplateId | 'none'>('none');
   const [saving, setSaving] = useState(false);
 
-  const sortedTrips = useMemo(() => [...data.trips], [data.trips]);
+  const sortedTrips = useMemo(() => filterVisibleTrips([...data.trips]), [data.trips]);
 
   function openNewTrip() {
     setDraft(emptyTripDraft);

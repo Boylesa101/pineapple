@@ -35,6 +35,7 @@ import { PassportDocument } from '@/components/passport/PassportDocument';
 import { TypedDateField } from '@/components/TypedDateField';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
+import { PERSONAL_DOCUMENTS_LABEL, PERSONAL_DOCUMENTS_TRIP_ID } from '@/constants/vault';
 import { travellerAvatarColors } from '@/data/travellerOptions';
 import { recognizeDrivingLicenceScan } from '@/services/drivingLicenceOcr';
 import { recognizeFormalDocumentScan } from '@/services/formalDocumentOcr';
@@ -183,7 +184,8 @@ export default function VaultScreen() {
   const [formalDocumentOcrLoading, setFormalDocumentOcrLoading] = useState(false);
   const [addDocumentType, setAddDocumentType] = useState<DocumentType>('passport');
   const openedEditIdRef = useRef<string | null>(null);
-  const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
+  const hasPersonalDocuments = data.documents.some((document) => document.tripId === PERSONAL_DOCUMENTS_TRIP_ID);
+  const selectedTripId = activeTripId ?? data.trips[0]?.id ?? (hasPersonalDocuments ? PERSONAL_DOCUMENTS_TRIP_ID : null);
   const bundle = getTripBundle(data, selectedTripId);
   const selectedDocument = bundle.documents.find((item) => item.id === selectedId) ?? null;
   const selectedTraveller = selectedDocument
@@ -451,7 +453,7 @@ export default function VaultScreen() {
     };
   }, [bundle.documents, bundle.hotelStays, bundle.travelSegments, bundle.trip]);
 
-  if (!data.trips.length) {
+  if (!data.trips.length && !hasPersonalDocuments) {
     return (
       <AppScreen title="Vault">
         <AppCard>
@@ -1540,7 +1542,12 @@ export default function VaultScreen() {
         </Pressable>
       </View>
 
-      <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
+        <TripPicker
+          trips={data.trips}
+          value={selectedTripId}
+          onChange={setActiveTrip}
+          extraOptions={hasPersonalDocuments ? [{ id: PERSONAL_DOCUMENTS_TRIP_ID, label: PERSONAL_DOCUMENTS_LABEL }] : []}
+        />
 
       <View style={styles.quickAccessRow}>
         <Pressable onPress={openFlightTicketArea} style={styles.quickAccessButton}>

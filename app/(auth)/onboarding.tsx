@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,9 +10,13 @@ import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
+import { TypedDateField } from '@/components/TypedDateField';
 import { OnboardingIllustration } from '@/components/OnboardingIllustration';
 import { colors, radii, spacing } from '@/constants/theme';
+import { PERSONAL_DOCUMENTS_TRIP_ID } from '@/constants/vault';
 import { useAppStore } from '@/store/useAppStore';
+import { createEmptyPassportData, ensurePassportDraftData } from '@/utils/passport';
+import { validateDocument } from '@/utils/validation';
 import { cleanupImportedSource, copyIntoAppStorage, deleteLocalFile } from '@/utils/fileStorage';
 
 const slides = [
@@ -54,6 +58,7 @@ const slides = [
 ];
 
 type SetupStep = 'name' | 'photo' | 'document';
+type DocumentSetupChoice = 'skip' | 'passport';
 
 function initialsForName(value: string) {
   return value
@@ -68,17 +73,28 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
   const saveAppPreferences = useAppStore((state) => state.saveAppPreferences);
+  const ensurePersonalDocumentsTrip = useAppStore((state) => state.ensurePersonalDocumentsTrip);
+  const saveDocument = useAppStore((state) => state.saveDocument);
+  const appPreferences = useAppStore((state) => state.data.appPreferences);
   const [slideIndex, setSlideIndex] = useState(0);
   const [setupStep, setSetupStep] = useState<SetupStep>('name');
   const [submitting, setSubmitting] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profilePhotoUri, setProfilePhotoUri] = useState<string | null>(null);
+  const [documentChoice, setDocumentChoice] = useState<DocumentSetupChoice>('skip');
+  const [passportHolderName, setPassportHolderName] = useState('');
+  const [passportNumber, setPassportNumber] = useState('');
+  const [passportNationality, setPassportNationality] = useState('');
+  const [passportCountryCode, setPassportCountryCode] = useState('');
+  const [passportDateOfBirth, setPassportDateOfBirth] = useState<string | null>(null);
+  const [passportExpiryDate, setPassportExpiryDate] = useState<string | null>(null);
 
   const inSlides = slideIndex < slides.length;
   const currentSlide = slides[Math.min(slideIndex, slides.length - 1)];
   const isLastSlide = slideIndex === slides.length - 1;
   const displayName = profileName.trim();
   const initials = initialsForName(displayName) || 'P';
+  const passportHolderDisplay = passportHolderName.trim() || displayName;
 
   async function finalizeOnboarding() {
     setSubmitting(true);
@@ -87,8 +103,61 @@ export default function OnboardingScreen() {
         profileName: displayName,
         profilePhotoUri,
       });
+
+      if (documentChoice === 'passport') {
+        await ensurePersonalDocumentsTrip();
+        const draft = ensurePassportDraftData(
+          {
+            tripId: PERSONAL_DOCUMENTS_TRIP_ID,
+            travellerId: null,
+            holderName: passportHolderDisplay,
+            documentType: 'passport',
+            documentNumber: passportNumber.trim(),
+            issueDate: null,
+            expiryDate: passportExpiryDate,
+            expiryReminderEnabled: true,
+            expiryReminderSchedule: appPreferences.expiryReminderSchedule,
+            expiredStatus: false,
+            expiringSoonStatus: false,
+            notes: '',
+            localFileUri: '',
+            previewUri: null,
+            mimeType: null,
+            passportData: {
+              ...createEmptyPassportData(),
+              countryCode: passportCountryCode.trim().toUpperCase(),
+              nationality: passportNationality.trim(),
+              dateOfBirth: passportDateOfBirth,
+            },
+            secondaryLocalFileUri: null,
+            secondaryPreviewUri: null,
+            secondaryMimeType: null,
+            drivingLicenceData: null,
+            healthCardData: null,
+            paymentCardData: null,
+            formalDocumentData: null,
+            sensitive: true,
+          },
+          null
+        );
+
+        const errors = validateDocument(draft);
+        if (errors.length) {
+          Alert.alert('Passport needs attention', errors.join('\n'));
+          setSubmitting(false);
+          return;
+        }
+
+        await saveDocument(draft);
+      }
+
       await completeOnboarding();
       router.replace('/setup-pin');
+    } catch (error) {
+      if (__DEV__) {
+        console.error('Onboarding finalization failed', error);
+      }
+      Alert.alert('Setup could not continue', 'Pineapple could not save this setup step. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -223,10 +292,12 @@ export default function OnboardingScreen() {
       );
     }
 
+    const documentReady = documentChoice === 'skip' || Boolean(passportHolderDisplay && passportNationality.trim() && passportCountryCode.trim());
+
     return (
       <View style={styles.footer}>
         <AppButton
-          label="Continue to PIN"
+          label={documentChoice === 'passport' ? 'Save passport and continue' : 'Continue to PIN'}
           tone="secondary"
           size="large"
           style={styles.footerButton}
@@ -235,6 +306,7 @@ export default function OnboardingScreen() {
             void finalizeOnboarding();
           }}
           loading={submitting}
+          disabled={!documentReady}
         />
         <AppButton
           label="Skip for now"
@@ -249,10 +321,23 @@ export default function OnboardingScreen() {
         />
       </View>
     );
-  }, [displayName, finalizeOnboarding, inSlides, isLastSlide, setupStep, slideIndex, submitting]);
+  }, [
+    appPreferences.expiryReminderSchedule,
+    displayName,
+    documentChoice,
+    finalizeOnboarding,
+    inSlides,
+    isLastSlide,
+    passportCountryCode,
+    passportHolderDisplay,
+    passportNationality,
+    setupStep,
+    slideIndex,
+    submitting,
+  ]);
 
   return (
-    <AppScreen scroll={false} footer={footer} backgroundColor={colors.authBlue} hideBackgroundDecor>
+    <AppScreen footer={footer} backgroundColor={colors.authBlue} hideBackgroundDecor>
       <View style={styles.hero}>
         <PineappleMark size={82} />
         <Text style={styles.brand}>Pineapple</Text>
@@ -308,14 +393,81 @@ export default function OnboardingScreen() {
           <View style={styles.documentBadge}>
             <MaterialIcons name="badge" size={28} color={colors.primaryBlue} />
           </View>
-          <Text style={styles.heading}>Add your main ID next</Text>
-          <Text style={styles.body}>
-            Your passport or other travel ID can be added later from Vault. Pineapple keeps this step skippable so setup stays quick on first launch.
-          </Text>
-          <View style={styles.documentNotes}>
-            <Text style={styles.documentNote}>Vault remains the place to scan or import documents later.</Text>
-            <Text style={styles.documentNote}>Skipping now will not block trips, SOS, or later document setup.</Text>
+          <Text style={styles.heading}>Add your main ID</Text>
+          <Text style={styles.body}>You can add a passport now with a short manual form, or skip and use Vault later.</Text>
+          <View style={styles.documentChoiceRow}>
+            <Pressable
+              style={[styles.documentChoiceCard, documentChoice === 'passport' ? styles.documentChoiceCardActive : null]}
+              onPress={() => {
+                setDocumentChoice('passport');
+                if (!passportHolderName && displayName) {
+                  setPassportHolderName(displayName);
+                }
+              }}
+            >
+              <MaterialIcons
+                name="badge"
+                size={22}
+                color={documentChoice === 'passport' ? colors.white : colors.primaryBlue}
+              />
+              <Text style={[styles.documentChoiceTitle, documentChoice === 'passport' ? styles.documentChoiceTitleActive : null]}>
+                Add passport
+              </Text>
+              <Text style={[styles.documentChoiceBody, documentChoice === 'passport' ? styles.documentChoiceBodyActive : null]}>
+                Save a real passport record now.
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.documentChoiceCard, documentChoice === 'skip' ? styles.documentChoiceCardActive : null]}
+              onPress={() => setDocumentChoice('skip')}
+            >
+              <MaterialIcons name="schedule" size={22} color={documentChoice === 'skip' ? colors.white : colors.primaryBlue} />
+              <Text style={[styles.documentChoiceTitle, documentChoice === 'skip' ? styles.documentChoiceTitleActive : null]}>
+                Skip for now
+              </Text>
+              <Text style={[styles.documentChoiceBody, documentChoice === 'skip' ? styles.documentChoiceBodyActive : null]}>
+                Add documents later from Vault.
+              </Text>
+            </Pressable>
           </View>
+          {documentChoice === 'passport' ? (
+            <View style={styles.documentForm}>
+              <AppTextField
+                label="Passport holder"
+                value={passportHolderName}
+                onChangeText={setPassportHolderName}
+                placeholder={displayName || 'Andrew Boyles'}
+                helper="Use the holder name exactly as it appears on the passport."
+              />
+              <AppTextField
+                label="Passport number"
+                value={passportNumber}
+                onChangeText={setPassportNumber}
+                placeholder="123456789"
+                helper="Leave spaces out if possible."
+              />
+              <AppTextField
+                label="Nationality"
+                value={passportNationality}
+                onChangeText={setPassportNationality}
+                placeholder="British"
+              />
+              <AppTextField
+                label="Issuing country code"
+                value={passportCountryCode}
+                onChangeText={setPassportCountryCode}
+                placeholder="GBR"
+                helper="Use the 3-letter passport country code."
+              />
+              <TypedDateField label="Date of birth" value={passportDateOfBirth} onChange={setPassportDateOfBirth} />
+              <TypedDateField label="Expiry date" value={passportExpiryDate} onChange={setPassportExpiryDate} />
+            </View>
+          ) : (
+            <View style={styles.documentNotes}>
+              <Text style={styles.documentNote}>Vault remains the place to scan or import documents later.</Text>
+              <Text style={styles.documentNote}>Skipping now does not block trips, SOS, or later document setup.</Text>
+            </View>
+          )}
         </AppCard>
       ) : null}
     </AppScreen>
@@ -405,6 +557,45 @@ const styles = StyleSheet.create({
   documentNotes: {
     gap: spacing.xs,
     marginTop: spacing.sm,
+  },
+  documentChoiceRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  documentChoiceCard: {
+    flex: 1,
+    gap: spacing.xs,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: colors.white,
+    padding: spacing.md,
+  },
+  documentChoiceCardActive: {
+    backgroundColor: colors.primaryBlue,
+    borderColor: colors.primaryBlue,
+  },
+  documentChoiceTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  },
+  documentChoiceTitleActive: {
+    color: colors.white,
+  },
+  documentChoiceBody: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  documentChoiceBodyActive: {
+    color: 'rgba(255,255,255,0.88)',
+  },
+  documentForm: {
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   documentNote: {
     color: colors.textMuted,

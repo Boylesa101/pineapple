@@ -23,6 +23,7 @@ import { AppButton } from '@/components/AppButton';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { resolveAuthRoute } from '@/utils/authRoutes';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -42,6 +43,7 @@ function RouteGuard() {
   const pathname = usePathname();
   const rootNavigationState = useRootNavigationState();
   const { isBootstrapped, security, isUnlocked, hasCompletedOnboarding, data } = useAppStore();
+  const visibleTripCount = filterVisibleTrips(data.trips).length;
 
   useEffect(() => {
     if (!isBootstrapped || !rootNavigationState?.key) {
@@ -54,7 +56,7 @@ function RouteGuard() {
       hasCompletedOnboarding,
       pinConfigured: security.pinConfigured,
       isUnlocked,
-      tripCount: data.trips.length,
+      tripCount: visibleTripCount,
     });
 
     if (__DEV__) {
@@ -64,7 +66,7 @@ function RouteGuard() {
         hasCompletedOnboarding,
         pinConfigured: security.pinConfigured,
         isUnlocked,
-        tripCount: data.trips.length,
+        tripCount: visibleTripCount,
       });
     }
 
@@ -72,7 +74,7 @@ function RouteGuard() {
       router.replace(target);
     }
   }, [
-    data.trips.length,
+    visibleTripCount,
     hasCompletedOnboarding,
     isBootstrapped,
     isUnlocked,

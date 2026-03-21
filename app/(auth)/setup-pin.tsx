@@ -10,13 +10,14 @@ import { useAppStore } from '@/store/useAppStore';
 import { canAdvancePinSetup, canConfirmPinSetup } from '@/utils/authFlow';
 import { getPostUnlockRoute } from '@/utils/authRoutes';
 import { canUseBiometrics } from '@/utils/security';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 const MAX_PIN_LENGTH = 12;
 
 export default function SetupPinScreen() {
   const router = useRouter();
   const createPin = useAppStore((state) => state.createPin);
-  const tripCount = useAppStore((state) => state.data.trips.length);
+  const tripCount = useAppStore((state) => filterVisibleTrips(state.data.trips).length);
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [step, setStep] = useState<'create' | 'confirm'>('create');

@@ -4,6 +4,7 @@ import { create } from 'zustand';
 
 import { buildPackingTemplateItems, type PackingTemplateId } from '@/data/packingTemplates';
 import { createDemoSnapshot } from '@/data/demo';
+import { PERSONAL_DOCUMENTS_LABEL, PERSONAL_DOCUMENTS_TRIP_ID, isPersonalDocumentsTripId } from '@/constants/vault';
 import {
   clearAllData,
   deleteById,
@@ -52,6 +53,7 @@ import { clearMaterializedSecureFiles } from '@/utils/fileStorage';
 import { loadOnboardingComplete, persistOnboardingComplete } from '@/utils/onboarding';
 import { deriveOnboardingCompletionStatus } from '@/utils/onboardingState';
 import { normalizeDestinationLabel } from '@/utils/trips';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 import type {
   AppDataSnapshot,
   ConflictStatus,
@@ -136,6 +138,7 @@ type StoreState = {
   unlockVault: (seconds?: number) => void;
   updateSecurityPreferences: (updates: Partial<Pick<StoredSecurityConfig, 'biometricEnabled' | 'autoLockSeconds'>>) => Promise<void>;
   saveAppPreferences: (updates: Partial<AppDataSnapshot['appPreferences']>) => Promise<void>;
+  ensurePersonalDocumentsTrip: () => Promise<string>;
   saveTrip: (draft: TripDraft) => Promise<string>;
   saveTraveller: (draft: TravellerDraft) => Promise<string>;
   saveTripParticipant: (draft: TripParticipantDraft) => Promise<string>;
@@ -160,11 +163,14 @@ type StoreState = {
 };
 
 function nextActiveTripId(state: StoreState, snapshot: AppDataSnapshot) {
-  if (state.activeTripId && snapshot.trips.some((trip) => trip.id === state.activeTripId)) {
+  if (
+    state.activeTripId &&
+    (isPersonalDocumentsTripId(state.activeTripId) || snapshot.trips.some((trip) => trip.id === state.activeTripId && !isPersonalDocumentsTripId(trip.id)))
+  ) {
     return state.activeTripId;
   }
 
-  return snapshot.trips[0]?.id ?? null;
+  return filterVisibleTrips(snapshot.trips)[0]?.id ?? null;
 }
 
 function logStoreError(context: string, error: unknown) {
@@ -224,9 +230,10 @@ export const useAppStore = create<StoreState>((set, get) => ({
       const structuredProtectionResult = await protectStructuredDataAtRest(data);
       data = structuredProtectionResult.snapshot;
 
+      const visibleTrips = filterVisibleTrips(data.trips);
       const hasCompletedOnboarding = deriveOnboardingCompletionStatus(onboardingStatus, {
         pinConfigured: security.pinConfigured,
-        tripCount: data.trips.length,
+        tripCount: visibleTrips.length,
       });
       if (onboardingStatus === null && hasCompletedOnboarding) {
         await persistOnboardingComplete(true);
@@ -235,7 +242,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
         security,
         data,
         hasCompletedOnboarding,
-        activeTripId: data.trips[0]?.id ?? null,
+        activeTripId: visibleTrips[0]?.id ?? null,
         isUnlocked: false,
         isBootstrapped: true,
         isBusy: false,
@@ -247,7 +254,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
       if (__DEV__) {
         console.log('[auth] bootstrap complete', {
           pinConfigured: security.pinConfigured,
-          tripCount: data.trips.length,
+          tripCount: visibleTrips.length,
           hasCompletedOnboarding,
         });
       }
@@ -461,6 +468,40 @@ export const useAppStore = create<StoreState>((set, get) => ({
       id: 'app',
     });
     await get().refreshData();
+  },
+  ensurePersonalDocumentsTrip: async () => {
+    const existing = get().data.trips.find((trip) => trip.id === PERSONAL_DOCUMENTS_TRIP_ID);
+    if (existing) {
+      return existing.id;
+    }
+
+    const now = new Date().toISOString();
+    await upsertTrip({
+      id: PERSONAL_DOCUMENTS_TRIP_ID,
+      name: PERSONAL_DOCUMENTS_LABEL,
+      destination: PERSONAL_DOCUMENTS_LABEL,
+      destinationType: 'unknown',
+      startDate: now,
+      endDate: now,
+      destinationImageLocalPath: null,
+      destinationImageRemoteUrl: null,
+      destinationImageSource: 'fallback',
+      attributionText: 'Default Pineapple image',
+      attributionMeta: { source: 'fallback', sourceLabel: 'Default Pineapple image' },
+      coverImageUri: null,
+      heroImageRemoteUrl: null,
+      heroImageStatus: 'idle',
+      notes: '',
+      transferSummary: '',
+      transferProvider: '',
+      transferMethod: '',
+      transferLocation: '',
+      transferTime: null,
+      transferNotes: '',
+      status: 'completed',
+    });
+    await get().refreshData();
+    return PERSONAL_DOCUMENTS_TRIP_ID;
   },
   saveTrip: async (draft) => {
     const existingTrip = draft.id ? get().data.trips.find((trip) => trip.id === draft.id) ?? null : null;

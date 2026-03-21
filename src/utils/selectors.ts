@@ -2,6 +2,7 @@ import { parseISO } from 'date-fns';
 
 import type { AppDataSnapshot, Document, PackingItem, Traveller } from '@/types/models';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
+import { isPersonalDocumentsTripId } from '@/constants/vault';
 import { formatAirportDisplay } from './airports';
 import { daysLeft, daysUntil } from './date';
 import { getDocumentExpiryRelativeLabel } from './documentExpiry';
@@ -22,6 +23,9 @@ function possessiveOwner(ownerLabel: string) {
 }
 
 export function getTripById(snapshot: AppDataSnapshot, tripId: string | null | undefined) {
+  if (isPersonalDocumentsTripId(tripId)) {
+    return null;
+  }
   return snapshot.trips.find((trip) => trip.id === tripId) ?? null;
 }
 
@@ -45,21 +49,22 @@ export function getTripBundle(snapshot: AppDataSnapshot, tripId: string | null |
 
 export function getDashboardTrip(snapshot: AppDataSnapshot) {
   const now = new Date();
-  const activeTrips = snapshot.trips
+  const visibleTrips = snapshot.trips.filter((trip) => !isPersonalDocumentsTripId(trip.id));
+  const activeTrips = visibleTrips
     .filter((trip) => trip.status === 'active' || (parseISO(trip.startDate) <= now && parseISO(trip.endDate) >= now))
     .sort((left, right) => left.startDate.localeCompare(right.startDate));
   if (activeTrips.length) {
     return activeTrips[0];
   }
 
-  const upcomingTrips = snapshot.trips
+  const upcomingTrips = visibleTrips
     .filter((trip) => parseISO(trip.startDate) > now || trip.status === 'upcoming')
     .sort((left, right) => left.startDate.localeCompare(right.startDate));
   if (upcomingTrips.length) {
     return upcomingTrips[0];
   }
 
-  const completedTrips = snapshot.trips
+  const completedTrips = visibleTrips
     .filter((trip) => trip.status === 'completed' || parseISO(trip.endDate) < now)
     .sort((left, right) => right.endDate.localeCompare(left.endDate));
   return completedTrips[0] ?? null;

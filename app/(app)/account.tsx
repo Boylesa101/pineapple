@@ -12,6 +12,7 @@ import { MiniActionCard } from '@/components/ui/MiniActionCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 function initialsForName(value: string) {
   return value
@@ -25,6 +26,7 @@ function initialsForName(value: string) {
 export default function AccountScreen() {
   const router = useRouter();
   const { data } = useAppStore();
+  const visibleTrips = useMemo(() => filterVisibleTrips(data.trips), [data.trips]);
   const travellers = data.travellers;
   const primaryTraveller = travellers[0] ?? null;
   const fullName = primaryTraveller?.fullName || data.appPreferences.profileName || 'Pineapple traveller';
@@ -51,7 +53,7 @@ export default function AccountScreen() {
 
       <View style={styles.statRow}>
         <View style={styles.statBox}>
-          <Text style={styles.statValue}>{data.trips.length}</Text>
+          <Text style={styles.statValue}>{visibleTrips.length}</Text>
           <Text style={styles.statLabel}>Trips</Text>
         </View>
         <View style={styles.statBox}>

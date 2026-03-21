@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { colors, spacing } from '@/constants/theme';
 import { fetchTripVibes, getVibesBaseUrl, type VibeCategory, type VibeItem } from '@/services/tripadvisorVibesService';
 import { useAppStore } from '@/store/useAppStore';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 import { getTripBundle } from '@/utils/selectors';
 import { toUserMessage } from '@/utils/userErrors';
 
@@ -22,13 +23,14 @@ const sectionTitles: Record<VibeCategory, { title: string; subtitle: string }> =
 export default function VibeTabScreen() {
   const router = useRouter();
   const { data, activeTripId, saveItineraryEvent, setActiveTrip } = useAppStore();
+  const visibleTrips = useMemo(() => filterVisibleTrips(data.trips), [data.trips]);
   const trip = useMemo(() => {
-    if (activeTripId) {
-      return data.trips.find((item) => item.id === activeTripId) ?? null;
+    if (activeTripId && visibleTrips.some((item) => item.id === activeTripId)) {
+      return visibleTrips.find((item) => item.id === activeTripId) ?? null;
     }
 
-    return [...data.trips].sort((left, right) => left.startDate.localeCompare(right.startDate))[0] ?? null;
-  }, [activeTripId, data.trips]);
+    return [...visibleTrips].sort((left, right) => left.startDate.localeCompare(right.startDate))[0] ?? null;
+  }, [activeTripId, visibleTrips]);
   const tripId = trip?.id ?? null;
   const bundle = useMemo(() => (tripId ? getTripBundle(data, tripId) : null), [data, tripId]);
   const primaryHotel = bundle?.hotelStays[0] ?? null;

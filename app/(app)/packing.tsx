@@ -26,6 +26,7 @@ import type {
 } from '@/types/models';
 import { percent } from '@/utils/format';
 import { getPackingProgress, getPackingProgressByTraveller, getTripBundle } from '@/utils/selectors';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 import { validatePackingItem } from '@/utils/validation';
 
 const emptyDraft = (tripId: string): PackingItemDraft => ({
@@ -70,7 +71,9 @@ export default function PackingScreen() {
   } = useAppStore();
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState<PackingItemDraft | null>(null);
-  const selectedTripId = activeTripId ?? data.trips[0]?.id ?? null;
+  const visibleTrips = useMemo(() => filterVisibleTrips(data.trips), [data.trips]);
+  const activeVisibleTripId = activeTripId && visibleTrips.some((trip) => trip.id === activeTripId) ? activeTripId : null;
+  const selectedTripId = activeVisibleTripId ?? visibleTrips[0]?.id ?? null;
   const bundle = getTripBundle(data, selectedTripId);
   const progress = getPackingProgress(data, selectedTripId);
   const travellerProgress = getPackingProgressByTraveller(bundle.packingItems, bundle.travellers);
@@ -81,7 +84,7 @@ export default function PackingScreen() {
     }, {});
   }, [bundle.packingItems]);
 
-  if (!data.trips.length) {
+  if (!visibleTrips.length) {
     return (
       <AppScreen title="Packing">
         <AppCard>
@@ -112,7 +115,7 @@ export default function PackingScreen() {
 
   return (
     <AppScreen title="Packing" subtitle="Family-focused lists, templates, and traveller progress that stay offline.">
-      <TripPicker trips={data.trips} value={selectedTripId} onChange={setActiveTrip} />
+      <TripPicker trips={visibleTrips} value={selectedTripId} onChange={setActiveTrip} />
       <AppCard title="Completion">
         <Text style={styles.meta}>
           {progress.packed} of {progress.total} items packed

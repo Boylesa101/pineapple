@@ -13,12 +13,13 @@ import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { tripDateRange } from '@/utils/format';
 import { getDashboardAlerts, getDocumentExpiryOverview, getTripBundle } from '@/utils/selectors';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { data, setActiveTrip } = useAppStore();
   const sortedTrips = useMemo(
-    () => [...data.trips].sort((left, right) => left.startDate.localeCompare(right.startDate)),
+    () => filterVisibleTrips([...data.trips]).sort((left, right) => left.startDate.localeCompare(right.startDate)),
     [data.trips]
   );
   const alerts = useMemo(() => getDashboardAlerts(data, sortedTrips[0]?.id), [data, sortedTrips]);

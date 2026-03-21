@@ -9,6 +9,7 @@ import { colors, spacing } from '@/constants/theme';
 import { unlockCultureFacts, unlockGreetings } from '@/data/unlockCulture';
 import { useAppStore } from '@/store/useAppStore';
 import { getPostUnlockRoute } from '@/utils/authRoutes';
+import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 export default function LockScreen() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function LockScreen() {
   const unlockWithPin = useAppStore((state) => state.unlockWithPin);
   const unlockWithBiometrics = useAppStore((state) => state.unlockWithBiometrics);
   const unlockBlockedUntil = useAppStore((state) => state.unlockBlockedUntil);
-  const tripCount = useAppStore((state) => state.data.trips.length);
+  const tripCount = useAppStore((state) => filterVisibleTrips(state.data.trips).length);
   const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [greetingIndex, setGreetingIndex] = useState(() => Date.now() % unlockGreetings.length);
