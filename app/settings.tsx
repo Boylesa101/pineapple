@@ -232,7 +232,7 @@ export default function SettingsScreen() {
     if (!granted) {
       Alert.alert(
         'Notifications unavailable',
-        'Pineapple only uses local reminders on this device. Turn on notifications in system settings if you want expiry and trip reminders.'
+        'Pineapple only uses local reminders on this device. Turn on notifications in system settings if you want expiry, trip, hotel, transfer, and travel reminders.'
       );
       return;
     }

@@ -7,6 +7,7 @@ import { FingerprintIcon } from '@/components/FingerprintIcon';
 import { PinPad } from '@/components/PinPad';
 import { colors, spacing } from '@/constants/theme';
 import { unlockCultureFacts, unlockGreetings } from '@/data/unlockCulture';
+import { consumePendingNotificationTarget } from '@/services/notifications';
 import { useAppStore } from '@/store/useAppStore';
 import { getPostUnlockRoute } from '@/utils/authRoutes';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
@@ -32,6 +33,10 @@ export default function LockScreen() {
   const fact = unlockCultureFacts[factIndex];
   const nextRoute = getPostUnlockRoute(tripCount);
 
+  function resolvePostUnlockRoute() {
+    return consumePendingNotificationTarget()?.href ?? nextRoute;
+  }
+
   useEffect(() => {
     const base = Date.now();
     setGreetingIndex(base % unlockGreetings.length);
@@ -56,7 +61,7 @@ export default function LockScreen() {
     try {
       const valid = await unlockWithPin(pin);
       if (valid) {
-        router.replace(nextRoute);
+        router.replace(resolvePostUnlockRoute());
         return;
       }
 
@@ -101,7 +106,7 @@ export default function LockScreen() {
       if (!unlocked) {
         return;
       }
-      router.replace(nextRoute);
+      router.replace(resolvePostUnlockRoute());
     } catch (error) {
       if (__DEV__) {
         console.error('Biometric unlock failed', error);

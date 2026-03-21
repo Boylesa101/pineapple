@@ -62,8 +62,13 @@ type TransferDraft = {
 const reminderMeta: Record<Exclude<ReminderKind, 'passport_expiry' | 'ghic_expiry'>, { label: string; leadTimeDays: ReminderLeadTime }> = {
   packing_incomplete: { label: 'Packing incomplete warning', leadTimeDays: 1 },
   trip_starts_tomorrow: { label: 'Trip starts tomorrow warning', leadTimeDays: 1 },
+  trip_today: { label: 'Trip day reminder', leadTimeDays: 0 },
   insurance_missing: { label: 'Missing insurance warning', leadTimeDays: 7 },
   flight_check_in: { label: 'Flight check-in reminder', leadTimeDays: 1 },
+  hotel_check_in: { label: 'Hotel check-in reminder', leadTimeDays: 0 },
+  transfer_reminder: { label: 'Transfer reminder', leadTimeDays: 0 },
+  travel_mode_reminder: { label: 'Travel mode reminder', leadTimeDays: 0 },
+  sos_ready: { label: 'SOS tools reminder', leadTimeDays: 0 },
   excursion_reminder: { label: 'Excursion reminder', leadTimeDays: 1 },
 };
 

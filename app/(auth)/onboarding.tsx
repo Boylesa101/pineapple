@@ -11,11 +11,15 @@ import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
 import { TypedDateField } from '@/components/TypedDateField';
+import { DocumentScanFlowModal, type DocumentScanStage } from '@/components/document-support/DocumentScanFlowModal';
 import { OnboardingIllustration } from '@/components/OnboardingIllustration';
 import { colors, radii, spacing } from '@/constants/theme';
 import { PERSONAL_DOCUMENTS_TRIP_ID } from '@/constants/vault';
+import { recognizeDocumentText } from '@/services/documentTextOcr';
+import { isLiveDocumentScannerAvailable, scanDocumentWithLiveEdges } from '@/services/documentScanner';
 import { useAppStore } from '@/store/useAppStore';
 import { createEmptyPassportData, ensurePassportDraftData } from '@/utils/passport';
+import { applyPassportOcrToDraft, parsePassportOcrText } from '@/utils/passportOcr';
 import { validateDocument } from '@/utils/validation';
 import { cleanupImportedSource, copyIntoAppStorage, deleteLocalFile } from '@/utils/fileStorage';
 
@@ -58,7 +62,7 @@ const slides = [
 ];
 
 type SetupStep = 'name' | 'photo' | 'document';
-type DocumentSetupChoice = 'skip' | 'passport';
+type DocumentSetupChoice = 'skip' | 'passport_manual' | 'passport_photo';
 
 function initialsForName(value: string) {
   return value
@@ -88,6 +92,14 @@ export default function OnboardingScreen() {
   const [passportCountryCode, setPassportCountryCode] = useState('');
   const [passportDateOfBirth, setPassportDateOfBirth] = useState<string | null>(null);
   const [passportExpiryDate, setPassportExpiryDate] = useState<string | null>(null);
+  const [passportLocalFileUri, setPassportLocalFileUri] = useState<string>('');
+  const [passportPreviewUri, setPassportPreviewUri] = useState<string | null>(null);
+  const [passportMimeType, setPassportMimeType] = useState<string | null>(null);
+  const [documentCaptureMessage, setDocumentCaptureMessage] = useState<string | null>(null);
+  const [scanStage, setScanStage] = useState<DocumentScanStage | null>(null);
+  const [scanGuidance, setScanGuidance] = useState<string | undefined>();
+  const [scanDetail, setScanDetail] = useState<string | undefined>();
+  const [scanWarningText, setScanWarningText] = useState<string | null>(null);
 
   const inSlides = slideIndex < slides.length;
   const currentSlide = slides[Math.min(slideIndex, slides.length - 1)];
@@ -95,6 +107,7 @@ export default function OnboardingScreen() {
   const displayName = profileName.trim();
   const initials = initialsForName(displayName) || 'P';
   const passportHolderDisplay = passportHolderName.trim() || displayName;
+  const photoDocumentReady = Boolean(passportLocalFileUri);
 
   async function finalizeOnboarding() {
     setSubmitting(true);
@@ -104,7 +117,7 @@ export default function OnboardingScreen() {
         profilePhotoUri,
       });
 
-      if (documentChoice === 'passport') {
+      if (documentChoice === 'passport_manual' || documentChoice === 'passport_photo') {
         await ensurePersonalDocumentsTrip();
         const draft = ensurePassportDraftData(
           {
@@ -120,9 +133,9 @@ export default function OnboardingScreen() {
             expiredStatus: false,
             expiringSoonStatus: false,
             notes: '',
-            localFileUri: '',
-            previewUri: null,
-            mimeType: null,
+            localFileUri: passportLocalFileUri,
+            previewUri: passportPreviewUri,
+            mimeType: passportMimeType,
             passportData: {
               ...createEmptyPassportData(),
               countryCode: passportCountryCode.trim().toUpperCase(),
@@ -200,6 +213,169 @@ export default function OnboardingScreen() {
         console.error('Profile photo selection failed', error);
       }
       Alert.alert('Photo not added', 'Pineapple could not use that photo. You can skip this step and add one later.');
+    }
+  }
+
+  async function attachPassportImage(source: 'camera' | 'library') {
+    if (submitting) {
+      return;
+    }
+
+    try {
+      setScanGuidance(
+        source === 'camera'
+          ? 'Keep the whole passport inside the frame and reduce glare before capture.'
+          : 'Choose a clear passport photo with all corners visible.'
+      );
+      setScanDetail(
+        source === 'camera'
+          ? 'Pineapple will store the image now and try to read passport details if OCR is available on this build.'
+          : 'Pineapple will store the imported image now and try to read passport details if OCR is available on this build.'
+      );
+      setScanWarningText(null);
+      setScanStage('capturing');
+
+      let assetUri: string | null = null;
+      let mimeType: string | null = 'image/jpeg';
+
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          setScanStage(null);
+          Alert.alert('Camera permission needed', 'Allow camera access to capture a passport photo, or skip this step for now.');
+          return;
+        }
+
+        if (isLiveDocumentScannerAvailable()) {
+          try {
+            const result = await scanDocumentWithLiveEdges({ maxNumDocuments: 1 });
+            if (result.status === 'success' && result.scannedImages[0]) {
+              assetUri = result.scannedImages[0];
+              mimeType = 'image/jpeg';
+            }
+          } catch {
+            // Fall back to the plain camera flow.
+          }
+        }
+
+        if (!assetUri) {
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            quality: 0.8,
+          });
+          if (result.canceled || !result.assets[0]) {
+            setScanStage(null);
+            return;
+          }
+          assetUri = result.assets[0].uri;
+          mimeType = result.assets[0].mimeType ?? 'image/jpeg';
+        }
+      } else {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          setScanStage(null);
+          Alert.alert('Photos permission needed', 'Allow photo library access to import a passport photo, or skip this step for now.');
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          quality: 0.8,
+        });
+        if (result.canceled || !result.assets[0]) {
+          setScanStage(null);
+          return;
+        }
+        assetUri = result.assets[0].uri;
+        mimeType = result.assets[0].mimeType ?? 'image/jpeg';
+      }
+
+      if (!assetUri) {
+        setScanStage(null);
+        return;
+      }
+
+      setScanStage('processing');
+      const localFileUri = await copyIntoAppStorage(assetUri, 'vault', mimeType, { encryptAtRest: true });
+      await cleanupImportedSource(assetUri);
+
+      if (passportLocalFileUri && passportLocalFileUri !== localFileUri) {
+        await deleteLocalFile(passportLocalFileUri);
+      }
+
+      setPassportLocalFileUri(localFileUri);
+      setPassportPreviewUri(localFileUri);
+      setPassportMimeType(mimeType);
+      setDocumentChoice('passport_photo');
+      setDocumentCaptureMessage('Passport image saved. You can continue now or add details before saving.');
+
+      try {
+        const ocr = await recognizeDocumentText(localFileUri, mimeType, 'Passport');
+        const parsed = parsePassportOcrText(ocr.rawText);
+        if (parsed) {
+          const nextDraft = applyPassportOcrToDraft(
+            ensurePassportDraftData(
+              {
+                tripId: PERSONAL_DOCUMENTS_TRIP_ID,
+                travellerId: null,
+                holderName: passportHolderDisplay,
+                documentType: 'passport',
+                documentNumber: passportNumber.trim(),
+                issueDate: null,
+                expiryDate: passportExpiryDate,
+                expiryReminderEnabled: true,
+                expiryReminderSchedule: appPreferences.expiryReminderSchedule,
+                expiredStatus: false,
+                expiringSoonStatus: false,
+                notes: '',
+                localFileUri,
+                previewUri: localFileUri,
+                mimeType,
+                passportData: {
+                  ...createEmptyPassportData(),
+                  countryCode: passportCountryCode.trim().toUpperCase(),
+                  nationality: passportNationality.trim(),
+                  dateOfBirth: passportDateOfBirth,
+                },
+                secondaryLocalFileUri: null,
+                secondaryPreviewUri: null,
+                secondaryMimeType: null,
+                drivingLicenceData: null,
+                healthCardData: null,
+                paymentCardData: null,
+                formalDocumentData: null,
+                sensitive: true,
+              },
+              null
+            ),
+            parsed
+          );
+          if (nextDraft.holderName) {
+            setPassportHolderName(nextDraft.holderName);
+          }
+          setPassportNumber(nextDraft.documentNumber);
+          setPassportExpiryDate(nextDraft.expiryDate);
+          setPassportCountryCode(nextDraft.passportData?.countryCode ?? '');
+          setPassportNationality(nextDraft.passportData?.nationality ?? '');
+          setPassportDateOfBirth(nextDraft.passportData?.dateOfBirth ?? null);
+          setDocumentCaptureMessage(parsed.warnings.length ? 'Passport image saved. OCR extracted details, but review them before continuing.' : 'Passport image saved and key details were extracted.');
+          setScanWarningText(parsed.warnings[0] ?? null);
+          setScanStage(parsed.warnings.length ? 'warning' : 'extracted');
+          return;
+        }
+
+        setScanStage('warning');
+        setScanWarningText('Passport image saved, but Pineapple could not extract reliable details. You can continue and review later in Vault.');
+      } catch {
+        setScanStage('warning');
+        setScanWarningText('Passport image saved. OCR is unavailable or could not read this image, but onboarding can continue.');
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.error('Onboarding passport capture failed', error);
+      }
+      setScanStage('error');
+      setScanWarningText('Pineapple could not use that passport image right now. Try again or skip this step.');
     }
   }
 
@@ -292,12 +468,15 @@ export default function OnboardingScreen() {
       );
     }
 
-    const documentReady = documentChoice === 'skip' || Boolean(passportHolderDisplay && passportNationality.trim() && passportCountryCode.trim());
+    const documentReady =
+      documentChoice === 'skip' ||
+      (documentChoice === 'passport_manual' && Boolean(passportHolderDisplay && passportNationality.trim() && passportCountryCode.trim())) ||
+      (documentChoice === 'passport_photo' && photoDocumentReady);
 
     return (
       <View style={styles.footer}>
         <AppButton
-          label={documentChoice === 'passport' ? 'Save passport and continue' : 'Continue to PIN'}
+          label={documentChoice === 'skip' ? 'Continue to PIN' : 'Save passport and continue'}
           tone="secondary"
           size="large"
           style={styles.footerButton}
@@ -329,6 +508,7 @@ export default function OnboardingScreen() {
     inSlides,
     isLastSlide,
     passportCountryCode,
+    photoDocumentReady,
     passportHolderDisplay,
     passportNationality,
     setupStep,
@@ -397,9 +577,9 @@ export default function OnboardingScreen() {
           <Text style={styles.body}>You can add a passport now with a short manual form, or skip and use Vault later.</Text>
           <View style={styles.documentChoiceRow}>
             <Pressable
-              style={[styles.documentChoiceCard, documentChoice === 'passport' ? styles.documentChoiceCardActive : null]}
+              style={[styles.documentChoiceCard, documentChoice === 'passport_manual' ? styles.documentChoiceCardActive : null]}
               onPress={() => {
-                setDocumentChoice('passport');
+                setDocumentChoice('passport_manual');
                 if (!passportHolderName && displayName) {
                   setPassportHolderName(displayName);
                 }
@@ -408,13 +588,34 @@ export default function OnboardingScreen() {
               <MaterialIcons
                 name="badge"
                 size={22}
-                color={documentChoice === 'passport' ? colors.white : colors.primaryBlue}
+                color={documentChoice === 'passport_manual' ? colors.white : colors.primaryBlue}
               />
-              <Text style={[styles.documentChoiceTitle, documentChoice === 'passport' ? styles.documentChoiceTitleActive : null]}>
-                Add passport
+              <Text style={[styles.documentChoiceTitle, documentChoice === 'passport_manual' ? styles.documentChoiceTitleActive : null]}>
+                Manual entry
               </Text>
-              <Text style={[styles.documentChoiceBody, documentChoice === 'passport' ? styles.documentChoiceBodyActive : null]}>
-                Save a real passport record now.
+              <Text style={[styles.documentChoiceBody, documentChoice === 'passport_manual' ? styles.documentChoiceBodyActive : null]}>
+                Type the main passport fields now.
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.documentChoiceCard, documentChoice === 'passport_photo' ? styles.documentChoiceCardActive : null]}
+              onPress={() => {
+                setDocumentChoice('passport_photo');
+                if (!passportHolderName && displayName) {
+                  setPassportHolderName(displayName);
+                }
+              }}
+            >
+              <MaterialIcons
+                name="photo-camera"
+                size={22}
+                color={documentChoice === 'passport_photo' ? colors.white : colors.primaryBlue}
+              />
+              <Text style={[styles.documentChoiceTitle, documentChoice === 'passport_photo' ? styles.documentChoiceTitleActive : null]}>
+                Photo / OCR
+              </Text>
+              <Text style={[styles.documentChoiceBody, documentChoice === 'passport_photo' ? styles.documentChoiceBodyActive : null]}>
+                Capture or import now, then review later if needed.
               </Text>
             </Pressable>
             <Pressable
@@ -430,7 +631,7 @@ export default function OnboardingScreen() {
               </Text>
             </Pressable>
           </View>
-          {documentChoice === 'passport' ? (
+          {documentChoice === 'passport_manual' ? (
             <View style={styles.documentForm}>
               <AppTextField
                 label="Passport holder"
@@ -462,6 +663,43 @@ export default function OnboardingScreen() {
               <TypedDateField label="Date of birth" value={passportDateOfBirth} onChange={setPassportDateOfBirth} />
               <TypedDateField label="Expiry date" value={passportExpiryDate} onChange={setPassportExpiryDate} />
             </View>
+          ) : documentChoice === 'passport_photo' ? (
+            <View style={styles.documentForm}>
+              <Text style={styles.documentPhotoLead}>
+                Add a passport photo now. Pineapple will store it immediately and try OCR when supported, but you can always continue onboarding.
+              </Text>
+              <View style={styles.photoActionRow}>
+                <AppButton
+                  label="Capture photo"
+                  tone="outline"
+                  onPress={() => {
+                    void attachPassportImage('camera');
+                  }}
+                  icon={<MaterialIcons name="photo-camera" size={18} color={colors.primaryBlue} />}
+                />
+                <AppButton
+                  label="Choose photo"
+                  tone="outline"
+                  onPress={() => {
+                    void attachPassportImage('library');
+                  }}
+                  icon={<MaterialIcons name="photo-library" size={18} color={colors.primaryBlue} />}
+                />
+              </View>
+              {passportPreviewUri ? (
+                <View style={styles.passportPreviewWrap}>
+                  <Image source={passportPreviewUri} style={styles.passportPreview} contentFit="cover" />
+                </View>
+              ) : null}
+              {documentCaptureMessage ? <Text style={styles.documentPhotoNote}>{documentCaptureMessage}</Text> : null}
+              <AppTextField
+                label="Passport holder"
+                value={passportHolderName}
+                onChangeText={setPassportHolderName}
+                placeholder={displayName || 'Andrew Boyles'}
+                helper="Optional now. You can refine all passport fields later in Vault."
+              />
+            </View>
           ) : (
             <View style={styles.documentNotes}>
               <Text style={styles.documentNote}>Vault remains the place to scan or import documents later.</Text>
@@ -470,6 +708,30 @@ export default function OnboardingScreen() {
           )}
         </AppCard>
       ) : null}
+      <DocumentScanFlowModal
+        visible={scanStage !== null}
+        title="Add passport"
+        stage={scanStage ?? 'ready'}
+        documentLabel="Passport"
+        previewUri={passportPreviewUri}
+        mimeType={passportMimeType}
+        guidance={scanGuidance}
+        detail={scanDetail}
+        warningText={scanWarningText}
+        onClose={() => {
+          setScanStage(null);
+          setScanWarningText(null);
+        }}
+        primaryLabel={scanStage === 'warning' || scanStage === 'extracted' ? 'Continue' : undefined}
+        onPrimaryAction={
+          scanStage === 'warning' || scanStage === 'extracted'
+            ? () => {
+                setScanStage(null);
+                setScanWarningText(null);
+              }
+            : undefined
+        }
+      />
     </AppScreen>
   );
 }
@@ -596,6 +858,32 @@ const styles = StyleSheet.create({
   documentForm: {
     gap: spacing.sm,
     marginTop: spacing.md,
+  },
+  photoActionRow: {
+    gap: spacing.sm,
+  },
+  passportPreviewWrap: {
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    backgroundColor: colors.primaryBlueTint,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+  },
+  passportPreview: {
+    width: '100%',
+    height: 180,
+  },
+  documentPhotoLead: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  documentPhotoNote: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    lineHeight: 18,
   },
   documentNote: {
     color: colors.textMuted,

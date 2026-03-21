@@ -21,6 +21,7 @@ import {
 import { PineappleMark } from '@/brand/PineappleMark';
 import { AppButton } from '@/components/AppButton';
 import { colors, spacing } from '@/constants/theme';
+import { addNotificationResponseListener, consumePendingNotificationTarget, getInitialNotificationTarget, type NotificationTarget } from '@/services/notifications';
 import { useAppStore } from '@/store/useAppStore';
 import { resolveAuthRoute } from '@/utils/authRoutes';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
@@ -87,6 +88,31 @@ function RouteGuard() {
   return null;
 }
 
+function applyNotificationTarget(
+  target: NotificationTarget,
+  options: {
+    isUnlocked: boolean;
+    pinConfigured: boolean;
+    pathname: string;
+    setActiveTrip: (tripId: string | null) => void;
+    router: ReturnType<typeof useRouter>;
+  }
+) {
+  if (target.activeTripId) {
+    options.setActiveTrip(target.activeTripId);
+  }
+
+  if (options.pinConfigured && !options.isUnlocked) {
+    if (options.pathname !== '/lock') {
+      options.router.replace('/lock');
+    }
+    return;
+  }
+
+  consumePendingNotificationTarget();
+  options.router.push(target.href as never);
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -103,7 +129,12 @@ export default function RootLayout() {
   const isBootstrapped = useAppStore((state) => state.isBootstrapped);
   const bootError = useAppStore((state) => state.bootError);
   const privacyOverlayVisible = useAppStore((state) => state.privacyOverlayVisible);
+  const isUnlocked = useAppStore((state) => state.isUnlocked);
+  const pinConfigured = useAppStore((state) => state.security.pinConfigured);
+  const setActiveTrip = useAppStore((state) => state.setActiveTrip);
   const segments = useSegments();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.authBlue).catch(() => undefined);
@@ -136,6 +167,52 @@ export default function RootLayout() {
 
     navigator.serviceWorker.register('/sw.js').catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!isBootstrapped) {
+      return;
+    }
+
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+
+    void getInitialNotificationTarget().then((target) => {
+      if (!cancelled && target) {
+        applyNotificationTarget(target, {
+          isUnlocked,
+          pinConfigured,
+          pathname: pathname || '/',
+          setActiveTrip,
+          router,
+        });
+      }
+    });
+
+    void addNotificationResponseListener((target) => {
+      if (cancelled) {
+        return;
+      }
+
+      applyNotificationTarget(target, {
+        isUnlocked: useAppStore.getState().isUnlocked,
+        pinConfigured: useAppStore.getState().security.pinConfigured,
+        pathname: pathname || '/',
+        setActiveTrip: useAppStore.getState().setActiveTrip,
+        router,
+      });
+    }).then((remove) => {
+      if (cancelled) {
+        remove();
+        return;
+      }
+      unsubscribe = remove;
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [isBootstrapped, isUnlocked, pathname, pinConfigured, router, setActiveTrip]);
 
   if (!fontsLoaded || !isBootstrapped) {
     if (fontsLoaded && bootError) {

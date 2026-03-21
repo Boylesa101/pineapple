@@ -74,7 +74,7 @@ function createSnapshot(): AppDataSnapshot {
       expiryReminderSilent: true,
       structuredDataProtected: true,
       profileName: '',
-      profilePhotoUri: null,
+      profilePhotoUri: 'file:///profile.jpg',
       syncEnabled: false,
       syncMode: 'manual_share',
       syncStatus: 'local_only',
@@ -98,6 +98,8 @@ test('document reminder scheduling creates future reminders for the selected sch
   assert.equal(reminders[0]?.title, 'Travel document reminder');
   assert.equal(reminders[0]?.body.includes('passport'), false);
   assert.equal(reminders[0]?.body.includes('Passport'), false);
+  assert.equal(reminders[0]?.href, '/vault?editDocumentId=doc_1');
+  assert.equal(reminders[0]?.activeTripId, 'trip_1');
 });
 
 test('deleting a document removes its scheduled expiry reminders from generated content', () => {
@@ -105,4 +107,95 @@ test('deleting a document removes its scheduled expiry reminders from generated 
   snapshot.documents = [];
   const reminders = createReminderContent(snapshot);
   assert.equal(reminders.some((item) => item.title === 'Travel document reminder'), false);
+});
+
+test('trip-level reminder settings generate travel, hotel, transfer, travel mode, and sos reminders with routes', () => {
+  const snapshot = createSnapshot();
+  snapshot.appPreferences.profileName = 'Andrew';
+  snapshot.hotelStays = [
+    {
+      id: 'hotel_1',
+      tripId: 'trip_1',
+      hotelName: 'Canopy Palma',
+      address: 'Marina 19',
+      city: 'Palma',
+      country: 'Spain',
+      latitude: null,
+      longitude: null,
+      hotelImageLocalPath: null,
+      hotelImageRemoteUrl: null,
+      hotelImageSource: 'fallback',
+      hotelImageAttributionText: null,
+      hotelImageAttributionMeta: null,
+      hotelImageStatus: 'idle',
+      phone: '',
+      bookingRef: '',
+      checkIn: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      checkOut: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+      notes: '',
+      createdAt: snapshot.appPreferences.createdAt,
+      updatedAt: snapshot.appPreferences.updatedAt,
+    },
+  ];
+  snapshot.trips[0] = {
+    ...snapshot.trips[0],
+    startDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    transferMethod: 'Hotel shuttle',
+    transferLocation: 'PMI arrivals',
+    transferTime: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
+  };
+  snapshot.reminderSettings = [
+    {
+      id: 'trip_today',
+      tripId: 'trip_1',
+      kind: 'trip_today',
+      enabled: true,
+      leadTimeDays: 0,
+      createdAt: snapshot.appPreferences.createdAt,
+      updatedAt: snapshot.appPreferences.updatedAt,
+    },
+    {
+      id: 'hotel_check_in',
+      tripId: 'trip_1',
+      kind: 'hotel_check_in',
+      enabled: true,
+      leadTimeDays: 0,
+      createdAt: snapshot.appPreferences.createdAt,
+      updatedAt: snapshot.appPreferences.updatedAt,
+    },
+    {
+      id: 'transfer_reminder',
+      tripId: 'trip_1',
+      kind: 'transfer_reminder',
+      enabled: true,
+      leadTimeDays: 0,
+      createdAt: snapshot.appPreferences.createdAt,
+      updatedAt: snapshot.appPreferences.updatedAt,
+    },
+    {
+      id: 'travel_mode_reminder',
+      tripId: 'trip_1',
+      kind: 'travel_mode_reminder',
+      enabled: true,
+      leadTimeDays: 0,
+      createdAt: snapshot.appPreferences.createdAt,
+      updatedAt: snapshot.appPreferences.updatedAt,
+    },
+    {
+      id: 'sos_ready',
+      tripId: 'trip_1',
+      kind: 'sos_ready',
+      enabled: true,
+      leadTimeDays: 0,
+      createdAt: snapshot.appPreferences.createdAt,
+      updatedAt: snapshot.appPreferences.updatedAt,
+    },
+  ];
+
+  const reminders = createReminderContent(snapshot);
+  assert.equal(reminders.some((item) => item.href === '/trip/trip_1'), true);
+  assert.equal(reminders.some((item) => item.href === '/trip/trip_1?focus=hotel'), true);
+  assert.equal(reminders.some((item) => item.href === '/trip/trip_1?focus=transfer'), true);
+  assert.equal(reminders.some((item) => item.href === '/trip/trip_1/travel-mode'), true);
+  assert.equal(reminders.some((item) => item.href === '/sos'), true);
 });

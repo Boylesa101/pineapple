@@ -37,10 +37,15 @@ export type ReminderKind =
   | 'ghic_expiry'
   | 'packing_incomplete'
   | 'trip_starts_tomorrow'
+  | 'trip_today'
   | 'insurance_missing'
   | 'flight_check_in'
+  | 'hotel_check_in'
+  | 'transfer_reminder'
+  | 'travel_mode_reminder'
+  | 'sos_ready'
   | 'excursion_reminder';
-export type ReminderLeadTime = 30 | 7 | 1;
+export type ReminderLeadTime = 30 | 7 | 1 | 0;
 export type ParticipantRole = 'owner' | 'editor' | 'viewer';
 export type InviteStatus = 'pending' | 'accepted' | 'revoked';
 export type SyncMode = 'manual_share';
