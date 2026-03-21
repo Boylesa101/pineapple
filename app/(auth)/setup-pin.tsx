@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { PineappleMark } from '@/brand/PineappleMark';
 import { AppScreen } from '@/components/AppScreen';
-import { FingerprintIcon } from '@/components/FingerprintIcon';
 import { PinPad } from '@/components/PinPad';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
@@ -22,14 +21,6 @@ export default function SetupPinScreen() {
   const [confirmation, setConfirmation] = useState('');
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [saving, setSaving] = useState(false);
-  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
-  const [biometricsPreferred, setBiometricsPreferred] = useState(true);
-
-  useEffect(() => {
-    canUseBiometrics()
-      .then(setBiometricsAvailable)
-      .catch(() => setBiometricsAvailable(false));
-  }, []);
 
   const currentValue = step === 'create' ? pin : confirmation;
   const canEnter = useMemo(() => {
@@ -40,7 +31,15 @@ export default function SetupPinScreen() {
     return canConfirmPinSetup(pin, confirmation);
   }, [confirmation, pin, step]);
 
-  function handleCancel() {
+  const handleCreateChange = useCallback((value: string) => {
+    setPin(value);
+  }, []);
+
+  const handleConfirmationChange = useCallback((value: string) => {
+    setConfirmation(value);
+  }, []);
+
+  const handleCancel = useCallback(() => {
     if (saving) {
       return;
     }
@@ -62,9 +61,9 @@ export default function SetupPinScreen() {
 
     setPin('');
     router.replace('/onboarding');
-  }
+  }, [currentValue.length, router, saving, step]);
 
-  async function handleEnter() {
+  const handleEnter = useCallback(async () => {
     if (saving || !canEnter) {
       return;
     }
@@ -85,10 +84,9 @@ export default function SetupPinScreen() {
     setSaving(true);
 
     try {
-      await createPin(pin, pin.length, {
-        biometricEnabled: biometricsAvailable && biometricsPreferred,
-      });
-      router.replace(getPostUnlockRoute(tripCount));
+      await createPin(pin, pin.length);
+      const biometricAvailable = await canUseBiometrics();
+      router.replace(biometricAvailable ? '/biometric-opt-in' : getPostUnlockRoute(tripCount));
     } catch (error) {
       if (__DEV__) {
         console.error('PIN setup failed', error);
@@ -97,7 +95,7 @@ export default function SetupPinScreen() {
     } finally {
       setSaving(false);
     }
-  }
+  }, [canEnter, confirmation, createPin, pin, router, saving, step, tripCount]);
 
   return (
     <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor contentStyle={styles.content}>
@@ -118,8 +116,10 @@ export default function SetupPinScreen() {
             value={currentValue}
             pinLength={step === 'create' ? Math.max(4, pin.length) : Math.max(pin.length, 4)}
             maxLength={step === 'create' ? MAX_PIN_LENGTH : pin.length || MAX_PIN_LENGTH}
-            onChange={step === 'create' ? setPin : setConfirmation}
-            onEnter={handleEnter}
+            onChange={step === 'create' ? handleCreateChange : handleConfirmationChange}
+            onEnter={() => {
+              void handleEnter();
+            }}
             onCancel={handleCancel}
             canEnter={canEnter}
             disabled={saving}
@@ -128,20 +128,7 @@ export default function SetupPinScreen() {
         </View>
 
         <View style={styles.bottomRail}>
-          {biometricsAvailable ? (
-            <Pressable
-              onPress={() => setBiometricsPreferred((value) => !value)}
-              style={styles.biometricButton}
-              disabled={saving}
-            >
-              <View style={[styles.biometricIconWrap, biometricsPreferred ? styles.biometricIconWrapActive : null]}>
-                <FingerprintIcon size={34} color={colors.authBlue} />
-              </View>
-              <Text style={styles.biometricText}>{biometricsPreferred ? 'Biometric unlock on' : 'Biometric unlock off'}</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.biometricSpacer} />
-          )}
+          <Text style={styles.bottomHint}>Biometric unlock comes next if this device already has fingerprint or face unlock set up.</Text>
         </View>
       </View>
     </AppScreen>
@@ -191,34 +178,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bottomRail: {
-    minHeight: 180,
-    gap: spacing.lg,
-    justifyContent: 'center',
-    width: '100%',
-  },
-  biometricButton: {
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  biometricIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    minHeight: 120,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.white,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.65)',
+    paddingHorizontal: spacing.lg,
   },
-  biometricIconWrapActive: {
-    borderColor: colors.pineappleGold,
-  },
-  biometricText: {
-    color: colors.white,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-  },
-  biometricSpacer: {
-    height: 92,
+  bottomHint: {
+    color: 'rgba(255,255,255,0.74)',
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
+    maxWidth: 320,
+    textAlign: 'center',
   },
 });

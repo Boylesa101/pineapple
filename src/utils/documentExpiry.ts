@@ -269,5 +269,7 @@ export function normalizeAppPreferences(input: Partial<AppPreferences> & Pick<Ap
     expiryReminderSchedule: normalizeExpiryReminderSchedule(input.expiryReminderSchedule),
     expiryReminderSilent: input.expiryReminderSilent ?? defaults.expiryReminderSilent,
     structuredDataProtected: input.structuredDataProtected ?? defaults.structuredDataProtected,
+    profileName: input.profileName?.trim() ?? '',
+    profilePhotoUri: input.profilePhotoUri ?? null,
   };
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- First-time setup flow: onboarding now continues through a short setup sequence of name, optional profile photo, optional ID prompt, PIN setup, then biometric opt-in when the device supports enrolled biometrics
+- PIN setup responsiveness: the setup PIN screen now focuses only on create/confirm entry, with biometric detection moved out of the keypad screen to reduce per-keypress work and keep digit entry more immediate
+- Home footer correction: the bottom nav now uses the final four-item shell of `Home`, `Vault`, `Vibe`, and `SOS`, with the old `Account`, `Trips`, `Packing`, and `Itinerary` screens moved out of the tab group instead of merely hidden
+- Vibe tab: Pineapple now has a real `Vibe` footer tab that opens live area suggestions for the current trip and can add items straight into the itinerary
+- Onboarding profile persistence: setup can now save a lightweight account name and optional profile photo before the first trip exists, and the account screen uses that fallback profile state when no traveller records are present
+
 ## 1.7.4 - 2026-03-20
 
 - Home refinement pass: lightened the trip-card image overlay so more of each destination shows through without losing readability

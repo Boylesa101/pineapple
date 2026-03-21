@@ -73,6 +73,8 @@ function createSnapshot(): AppDataSnapshot {
       expiryReminderSchedule: [90, 30, 7, 1, 0],
       expiryReminderSilent: true,
       structuredDataProtected: true,
+      profileName: '',
+      profilePhotoUri: null,
       syncEnabled: false,
       syncMode: 'manual_share',
       syncStatus: 'local_only',

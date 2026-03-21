@@ -84,6 +84,8 @@ const emptySnapshot: AppDataSnapshot = {
     id: 'app',
     notificationsEnabled: false,
     ...defaultAppExpiryPreferences(),
+    profileName: '',
+    profilePhotoUri: null,
     syncEnabled: false,
     syncMode: 'manual_share',
     syncStatus: 'local_only',

@@ -9,7 +9,8 @@ type ResolveAuthRouteOptions = {
 };
 
 export function getPostUnlockRoute(tripCount: number) {
-  return tripCount > 0 ? '/home' : '/create-first-trip';
+  void tripCount;
+  return '/home';
 }
 
 export function resolveAuthRoute({
@@ -27,6 +28,10 @@ export function resolveAuthRoute({
     return currentPath === '/setup-pin' ? null : '/setup-pin';
   }
 
+  if (currentPath === '/biometric-opt-in') {
+    return isUnlocked ? null : '/lock';
+  }
+
   if (!isUnlocked) {
     if (currentPath === '/lock') {
       return null;
@@ -42,10 +47,6 @@ export function resolveAuthRoute({
 
   if (authSetupPaths.has(currentPath)) {
     return postUnlockRoute;
-  }
-
-  if (tripCount === 0 && currentPath !== '/create-first-trip') {
-    return '/create-first-trip';
   }
 
   return null;

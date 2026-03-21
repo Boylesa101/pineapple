@@ -8,6 +8,7 @@ import { colors, radii, spacing } from '@/constants/theme';
 const iconMap = {
   home: 'home',
   vault: 'folder',
+  vibe: 'auto-awesome',
   sos: 'sos',
 } satisfies Record<string, keyof typeof MaterialIcons.glyphMap>;
 
@@ -15,8 +16,8 @@ export function SafeAreaAwareBottomNav({ state, descriptors, navigation }: Botto
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8);
 
-  const visibleRoutes = state.routes.filter((route) => (descriptors[route.key]?.options as { href?: unknown } | undefined)?.href !== null);
-  const isCompact = visibleRoutes.length <= 3;
+  const visibleRoutes = state.routes;
+  const isCompact = visibleRoutes.length <= 4;
 
   return (
     <View style={[styles.outer, { paddingBottom: bottomInset, paddingHorizontal: 12 }]}>

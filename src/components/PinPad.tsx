@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing } from '@/constants/theme';
@@ -29,7 +29,7 @@ const authRows = [
   ['enter', '0', 'cancel'],
 ] as const;
 
-export function PinPad({
+function PinPadComponent({
   value,
   pinLength,
   onChange,
@@ -110,6 +110,8 @@ export function PinPad({
     </View>
   );
 }
+
+export const PinPad = memo(PinPadComponent);
 
 const styles = StyleSheet.create({
   wrapper: {

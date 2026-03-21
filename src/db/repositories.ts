@@ -179,6 +179,8 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
     id: 'app',
     notificationsEnabled: false,
     ...defaultAppExpiryPreferences(),
+    profileName: '',
+    profilePhotoUri: null,
     syncEnabled: false,
     syncMode: 'manual_share',
     syncStatus: 'local_only',
@@ -253,6 +255,8 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         expiryRemindersEnabled: toBool(appPreferencesRaw.expiryRemindersEnabled ?? 1),
         expiryReminderSilent: toBool(appPreferencesRaw.expiryReminderSilent ?? 0),
         structuredDataProtected: toBool(appPreferencesRaw.structuredDataProtected ?? 0),
+        profileName: appPreferencesRaw.profileName ?? '',
+        profilePhotoUri: appPreferencesRaw.profilePhotoUri ?? null,
         syncEnabled: toBool(appPreferencesRaw.syncEnabled),
       })
     : defaultAppPreferences();
@@ -997,14 +1001,16 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const normalized = normalizeAppPreferences(input as any);
 
   await db.runAsync(
-    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, structuredDataProtected, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, structuredDataProtected, profileName, profilePhotoUri, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        notificationsEnabled = excluded.notificationsEnabled,
        expiryRemindersEnabled = excluded.expiryRemindersEnabled,
        expiryReminderSchedule = excluded.expiryReminderSchedule,
        expiryReminderSilent = excluded.expiryReminderSilent,
        structuredDataProtected = excluded.structuredDataProtected,
+       profileName = excluded.profileName,
+       profilePhotoUri = excluded.profilePhotoUri,
        syncEnabled = excluded.syncEnabled,
        syncMode = excluded.syncMode,
        syncStatus = excluded.syncStatus,
@@ -1018,6 +1024,8 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
     serializeExpiryReminderSchedule(normalized.expiryReminderSchedule),
     normalized.expiryReminderSilent ? 1 : 0,
     normalized.structuredDataProtected ? 1 : 0,
+    normalized.profileName,
+    normalized.profilePhotoUri,
     normalized.syncEnabled ? 1 : 0,
     normalized.syncMode,
     normalized.syncStatus,

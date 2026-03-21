@@ -283,6 +283,8 @@ export interface AppPreferences {
   expiryReminderSchedule: ExpiryReminderSchedule;
   expiryReminderSilent: boolean;
   structuredDataProtected: boolean;
+  profileName: string;
+  profilePhotoUri: string | null;
   syncEnabled: boolean;
   syncMode: SyncMode;
   syncStatus: SyncStatus;

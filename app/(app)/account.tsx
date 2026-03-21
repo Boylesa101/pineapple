@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { AvatarBadge } from '@/components/AvatarBadge';
+import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { MiniActionCard } from '@/components/ui/MiniActionCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
@@ -26,7 +27,8 @@ export default function AccountScreen() {
   const { data } = useAppStore();
   const travellers = data.travellers;
   const primaryTraveller = travellers[0] ?? null;
-  const fullName = primaryTraveller?.fullName || 'Pineapple traveller';
+  const fullName = primaryTraveller?.fullName || data.appPreferences.profileName || 'Pineapple traveller';
+  const profilePhotoUri = data.appPreferences.profilePhotoUri;
   const initials = useMemo(() => initialsForName(fullName) || 'P', [fullName]);
 
   return (
@@ -41,7 +43,7 @@ export default function AccountScreen() {
 
       <View style={styles.profileTop}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+          {profilePhotoUri ? <ManagedFileImage uri={profilePhotoUri} style={styles.avatarImage} /> : <Text style={styles.avatarText}>{initials}</Text>}
         </View>
         <Text style={styles.profileName}>{fullName}</Text>
         <Text style={styles.profileSubtitle}>Primary traveller · Offline-first profile</Text>
@@ -141,6 +143,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryBlue,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     color: colors.white,

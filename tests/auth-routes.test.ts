@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 
 import { getPostUnlockRoute, resolveAuthRoute } from '@/utils/authRoutes';
 
-test('post-unlock route uses create-first-trip when no trips exist', () => {
-  assert.equal(getPostUnlockRoute(0), '/create-first-trip');
+test('post-unlock route uses home when no trips exist', () => {
+  assert.equal(getPostUnlockRoute(0), '/home');
 });
 
 test('post-unlock route uses home when trips already exist', () => {
@@ -37,7 +37,7 @@ test('route guard keeps unlocked no-trip users on create-first-trip without boun
   );
 });
 
-test('route guard redirects unlocked no-trip users from auth screens into create-first-trip', () => {
+test('route guard redirects unlocked no-trip users from auth screens into home', () => {
   assert.equal(
     resolveAuthRoute({
       currentPath: '/lock',
@@ -46,7 +46,7 @@ test('route guard redirects unlocked no-trip users from auth screens into create
       isUnlocked: true,
       tripCount: 0,
     }),
-    '/create-first-trip',
+    '/home',
   );
 });
 
@@ -60,6 +60,19 @@ test('route guard redirects unlocked returning users from auth screens into home
       tripCount: 3,
     }),
     '/home',
+  );
+});
+
+test('route guard allows the biometric opt-in screen immediately after PIN setup', () => {
+  assert.equal(
+    resolveAuthRoute({
+      currentPath: '/biometric-opt-in',
+      hasCompletedOnboarding: true,
+      pinConfigured: true,
+      isUnlocked: true,
+      tripCount: 0,
+    }),
+    null,
   );
 });
 
