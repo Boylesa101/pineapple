@@ -11,12 +11,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "strict": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"],
-      "@shared/*": ["../shared/*"]
-    }
+    "strict": true
   },
-  "include": ["src", "vite.config.ts", "../shared/pineappleSiteContent.ts"]
+  "include": ["src", "vite.config.ts", "../src/content/legal.ts"]
 }

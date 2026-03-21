@@ -232,6 +232,10 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="(app)" />
           <Stack.Screen name="getting-started" />
+          <Stack.Screen name="about" />
+          <Stack.Screen name="privacy" />
+          <Stack.Screen name="terms" />
+          <Stack.Screen name="support" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="warnings" />
           <Stack.Screen name="trip/[tripId]" />

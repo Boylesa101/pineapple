@@ -9,7 +9,7 @@ Static marketing and compliance website for Pineapple, built with Vite, React, a
 - Terms of Use page
 - Support page with FAQ
 - Future-proof `delete-account` placeholder page
-- Shared site/legal copy source in [`../shared/pineappleSiteContent.ts`](../shared/pineappleSiteContent.ts)
+- Shared site/legal copy source in [`../src/content/legal.ts`](../src/content/legal.ts)
 
 ## Install
 
@@ -73,11 +73,11 @@ If you want a different Pages project name, edit the script in:
 ## Where to change key site values
 
 - App name, tagline, emails, URLs, and release text:
-  - [`../shared/pineappleSiteContent.ts`](../shared/pineappleSiteContent.ts)
+  - [`../src/content/legal.ts`](../src/content/legal.ts)
 - Future Google Play URL:
-  - `futurePlayStoreUrl` in [`../shared/pineappleSiteContent.ts`](../shared/pineappleSiteContent.ts)
-- Public pages.dev URL:
-  - `siteUrl`, `privacyUrl`, `termsUrl`, and `supportUrl` in [`../shared/pineappleSiteContent.ts`](../shared/pineappleSiteContent.ts)
+  - `legalConfig.futurePlayStoreUrl` in [`../src/content/legal.ts`](../src/content/legal.ts)
+- Public pages.dev URL and contact details:
+  - `legalConfig` in [`../src/content/legal.ts`](../src/content/legal.ts)
 
 ## Release checklist
 

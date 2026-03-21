@@ -1,29 +1,28 @@
 import {
   featureGroups,
   homeHighlights,
+  legalConfig,
   privacySummaryBullets,
-  siteConfig,
   whyPineappleSections,
-} from '@shared/pineappleSiteContent';
-
-import { SurfaceCard } from '@/components/ContentBlocks';
-import { HomePreview } from '@/components/HomePreview';
-import { MaterialIcon, SiteLayout } from '@/components/SiteLayout';
+} from '../../../src/content/legal';
+import { SurfaceCard } from '../components/ContentBlocks';
+import { HomePreview } from '../components/HomePreview';
+import { MaterialIcon, SiteLayout } from '../components/SiteLayout';
 
 export function HomePage() {
-  const playStoreReady = siteConfig.futurePlayStoreUrl !== '#';
+  const playStoreReady = legalConfig.futurePlayStoreUrl !== '#';
 
   return (
     <SiteLayout
       currentPath="/"
       eyebrow="Travel companion app"
-      title={siteConfig.appName}
+      title={legalConfig.appName}
       lede="Store travel documents, organise trips, get expiry reminders, and access SOS help quickly when it matters most."
     >
       <section className="hero-grid">
         <SurfaceCard>
           <div className="hero-copy">
-            <p className="hero-tagline">{siteConfig.tagline}</p>
+            <p className="hero-tagline">{legalConfig.tagline}</p>
             <p>
               Pineapple keeps travel documents, trips, reminders, and emergency travel context together in one calm,
               privacy-aware mobile experience.
@@ -31,7 +30,7 @@ export function HomePage() {
             <div className="cta-row">
               <a
                 className={playStoreReady ? 'button button-primary' : 'button button-primary button-disabled'}
-                href={playStoreReady ? siteConfig.futurePlayStoreUrl : '#'}
+                href={playStoreReady ? legalConfig.futurePlayStoreUrl : '#'}
                 aria-disabled={!playStoreReady}
               >
                 <MaterialIcon name="shop" />

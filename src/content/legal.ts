@@ -1,6 +1,7 @@
 // Replace these placeholder emails and URLs before production release.
-// This file is intended to remain the single source of truth for Pineapple's
-// public-facing site copy and legal/compliance wording.
+// This file is the single source of truth for Pineapple's app and website legal wording.
+// Keep this aligned with the actual shipped app behavior. Do not overstate security,
+// location usage, analytics, or cloud capabilities if the code does not support them.
 
 export type ContentSection = {
   heading: string;
@@ -13,22 +14,30 @@ export type FAQItem = {
   answer: string;
 };
 
-export const siteConfig = {
+export const legalConfig = {
   appName: 'Pineapple',
   tagline: 'Your travel essentials in one secure place — even offline.',
   supportEmail: 'support@pineappleapp.example',
   privacyEmail: 'privacy@pineappleapp.example',
-  siteUrl: 'https://get-pineapple.pages.dev',
-  privacyUrl: 'https://get-pineapple.pages.dev/privacy',
+  websiteUrl: 'https://get-pineapple.pages.dev',
+  privacyPolicyUrl: 'https://get-pineapple.pages.dev/privacy',
   termsUrl: 'https://get-pineapple.pages.dev/terms',
   supportUrl: 'https://get-pineapple.pages.dev/support',
   futurePlayStoreUrl: '#',
+  versionPlaceholder: 'Use the current app version here before release.',
   releaseLabel: 'First public release candidate',
   developerName: 'Pineapple App',
   copyrightName: 'Pineapple App',
   smallPrint:
     'Pineapple is an independent travel companion app and is not affiliated with any government authority.',
 } as const;
+
+export const privacySummaryBullets = [
+  'Your travel documents and trip details are designed to stay on your device.',
+  'Pineapple does not require an account for basic use in the current release.',
+  'Pineapple uses local notifications for reminders when you turn them on.',
+  'The current audited release does not continuously track your location.',
+] as const;
 
 export const homeHighlights = [
   {
@@ -95,31 +104,41 @@ export const whyPineappleSections: ContentSection[] = [
     heading: 'Works offline where it matters',
     paragraphs: [
       'Your core travel records, document entries, and trip details are designed to remain available on the device. That matters when you are in transit, roaming is expensive, or the network is unstable.',
-      'Some optional lookups, such as destination imagery, hotel/address search, or Vibes suggestions, depend on a network connection when you use those features.',
+      'Some optional lookups, such as destination imagery, hotel or address search, or Vibes suggestions, depend on a network connection when you use those features.',
     ],
   },
 ];
 
-export const privacySummaryBullets = [
-  'Pineapple is designed to store your core travel documents and trip details on your device.',
-  'Pineapple does not require an account for basic use in the current audited release.',
-  'Pineapple uses local notifications for reminders when you turn them on.',
-  'The current audited release does not continuously track your location.',
-] as const;
+export const aboutSections: ContentSection[] = [
+  {
+    heading: 'What Pineapple is',
+    paragraphs: [
+      'Pineapple is a privacy-aware travel companion app for keeping travel documents, trip details, reminders, and SOS travel support close at hand.',
+      'It is built around local-first use so your core travel information can stay accessible on the device even when signal is unreliable.',
+    ],
+  },
+  {
+    heading: 'What Pineapple is not',
+    paragraphs: [
+      'Pineapple is not a booking site, not a government service, and not a substitute for checking official travel requirements yourself.',
+      'It helps you stay organised, but you remain responsible for passports, visas, bookings, and official entry rules.',
+    ],
+  },
+];
 
 export const privacySections: ContentSection[] = [
   {
     heading: 'Who we are',
     paragraphs: [
-      `${siteConfig.appName} is a travel companion app published by ${siteConfig.developerName}. This Privacy Policy explains how the app handles information in the current release.`,
-      `If you have privacy questions, contact ${siteConfig.privacyEmail}. Replace this placeholder email before release.`,
+      `${legalConfig.appName} is a travel companion app published by ${legalConfig.developerName}. This Privacy Policy explains how the current release handles information.`,
+      `If you have privacy questions, contact ${legalConfig.privacyEmail}. Replace this placeholder email before release.`,
     ],
   },
   {
     heading: 'What Pineapple is for',
     paragraphs: [
-      'Pineapple helps you store travel documents, organise trip details, view reminders, and keep emergency travel information easy to reach.',
-      'Pineapple is designed around local-first use. The app can work offline for core travel records, but some optional lookups need an internet connection when you choose to use them.',
+      'Pineapple helps you store travel documents, organise trips, view reminders, and keep emergency travel information easy to reach.',
+      'The current release is designed around local-first use. Core travel data stays on the device, although some optional lookups need an internet connection when you choose to use them.',
     ],
   },
   {
@@ -139,7 +158,7 @@ export const privacySections: ContentSection[] = [
     heading: 'What Pineapple does not require at launch',
     paragraphs: [
       'The current audited release does not require you to create an account for basic use.',
-      'The current audited release does not include advertising SDKs, and no analytics or crash-reporting SDKs were found in the audited app code at the time this policy draft was prepared.',
+      'The current audited release does not include advertising SDKs, and no analytics or crash-reporting SDKs were found in the audited app code at the time this draft was written.',
     ],
   },
   {
@@ -154,12 +173,12 @@ export const privacySections: ContentSection[] = [
     heading: 'When information may leave your device',
     paragraphs: [
       'Pineapple is local-first, but some optional features can contact third-party services when you choose to use them.',
-      'Examples found in the current audited release include destination image lookup, hotel/address search, and Vibes/place suggestions. These features may send the search text or destination details needed to fetch results. They are not the same as account-based cloud sync.',
+      'Examples found in the current audited release include destination image lookup, hotel and address search, and Vibes or place suggestions. These features may send the search text or destination details needed to fetch results. This is not the same as account-based cloud sync.',
     ],
     bullets: [
       'Destination and hotel image lookup may use services such as Pexels or Wikimedia Commons',
-      'Hotel/address search may use OpenStreetMap or Nominatim-style lookup services',
-      'Vibes/place suggestions may use TripAdvisor through Pineapple-managed Cloudflare infrastructure',
+      'Hotel and address search may use OpenStreetMap or Nominatim-style lookup services',
+      'Vibes or place suggestions may use TripAdvisor through Pineapple-managed Cloudflare infrastructure',
     ],
   },
   {
@@ -186,14 +205,14 @@ export const privacySections: ContentSection[] = [
   {
     heading: 'Children',
     paragraphs: [
-      'Pineapple is not directed to children. If a parent or guardian believes a child has stored personal information in the app inappropriately, contact the support address and remove the app data from the device.',
+      'Pineapple is not directed to children. If a parent or guardian believes a child has stored personal information in the app inappropriately, remove the app data from the device and contact the support address if needed.',
     ],
   },
   {
     heading: 'Updates to this policy',
     paragraphs: [
       'We may update this Privacy Policy as Pineapple changes. When we do, we will update the wording in the app and on the public website.',
-      `Questions about this policy can be sent to ${siteConfig.privacyEmail}.`,
+      `Questions about this policy can be sent to ${legalConfig.privacyEmail}.`,
     ],
   },
 ];
@@ -202,8 +221,8 @@ export const termsSections: ContentSection[] = [
   {
     heading: 'Using Pineapple',
     paragraphs: [
-      `${siteConfig.appName} is provided as-is and as available. We aim to make it useful and reliable, but we do not guarantee that every feature will always be available, error-free, or suitable for every trip.`,
-      'Pineapple is a travel organiser and document companion. It does not replace your own responsibility to check passport validity, visas, official travel rules, entry requirements, insurance terms, or transport details.',
+      `${legalConfig.appName} is provided as-is and as available. We aim to make it useful and reliable, but we do not guarantee that every feature will always be available, error-free, or suitable for every trip.`,
+      'Pineapple helps organise travel information, but it does not replace your own responsibility to check passport validity, visas, official travel rules, entry requirements, insurance terms, or transport details.',
     ],
   },
   {
@@ -249,7 +268,7 @@ export const termsSections: ContentSection[] = [
   {
     heading: 'Contact',
     paragraphs: [
-      `For support questions, contact ${siteConfig.supportEmail}. Replace this placeholder email before release.`,
+      `For support questions, contact ${legalConfig.supportEmail}. Replace this placeholder email before release.`,
     ],
   },
 ];
@@ -259,7 +278,7 @@ export const supportIntroSections: ContentSection[] = [
     heading: 'Need help with Pineapple?',
     paragraphs: [
       'Use this page for app support, store-reviewer references, and launch-readiness contact details.',
-      `Support contact: ${siteConfig.supportEmail}. Replace this placeholder email before release.`,
+      `Support contact: ${legalConfig.supportEmail}. Replace this placeholder email before release.`,
     ],
   },
 ];
@@ -268,7 +287,7 @@ export const supportFaqs: FAQItem[] = [
   {
     question: 'How do I add a travel document?',
     answer:
-      'Open Vault, tap the add button, and choose the document type or scan/import option you want. The onboarding flow can also add a passport before first unlock.',
+      'Open Vault, tap the add button, and choose the document type or scan or import option you want. The onboarding flow can also add a passport before first unlock.',
   },
   {
     question: 'Does Pineapple work offline?',
@@ -281,12 +300,12 @@ export const supportFaqs: FAQItem[] = [
       'In the current audited release, Pineapple is designed as a local-first app. Your core travel records stay on your device unless you choose to export, share, or use a feature that contacts a third-party lookup service.',
   },
   {
-    question: 'How do expiry reminders work?',
+    question: 'How do reminders work?',
     answer:
       'When reminders are enabled, Pineapple schedules local notifications on your device for supported document expiry and selected trip reminders.',
   },
   {
-    question: 'Does Pineapple share my personal information?',
+    question: 'Does Pineapple collect my personal information?',
     answer:
       'Pineapple does not require an account for basic use in the current release. Some optional lookup features can send the text you enter to third-party services needed to return those results.',
   },
@@ -298,22 +317,17 @@ export const supportFaqs: FAQItem[] = [
   {
     question: 'How do I get help?',
     answer:
-      `Email ${siteConfig.supportEmail} with a short description of the issue, your device model, and the app version you are using.`,
-  },
-  {
-    question: 'Does Pineapple replace official travel advice?',
-    answer:
-      'No. Pineapple helps you organise travel information, but you still need to verify passport, visa, health, and entry requirements with official sources.',
+      `Email ${legalConfig.supportEmail} with a short description of the issue, your device model, and the app version you are using.`,
   },
 ];
 
 export const releaseChecklist = [
   'Replace placeholder support and privacy email addresses.',
-  'Confirm the final Pages.dev or custom domain URLs in the site config.',
-  'Update the future Google Play URL when the listing is live.',
+  'Confirm the final pages.dev or custom domain URLs in legalConfig.',
+  'Update the Google Play link on the website when the listing is live.',
   'Verify whether analytics, crash reporting, or any new SDKs have been added since this draft.',
   'Recheck what data leaves the device for third-party lookups and keep the policy wording aligned.',
-  'Confirm the privacy policy URL is live and visible in both the app and the website.',
+  'Confirm the privacy policy link is live and visible in both the app and the website.',
   'Confirm Google Play Data safety answers against the actual shipped build.',
   'Review SOS wording and any location-related copy before release if nearby help features are added.',
 ] as const;

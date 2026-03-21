@@ -1,5 +1,5 @@
-import { SurfaceCard } from '@/components/ContentBlocks';
-import { MaterialIcon, SiteLayout } from '@/components/SiteLayout';
+import { SurfaceCard } from '../components/ContentBlocks';
+import { MaterialIcon, SiteLayout } from '../components/SiteLayout';
 
 export function DeleteAccountPage() {
   return (

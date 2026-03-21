@@ -1,4 +1,4 @@
-import { renderPage } from '@/lib/renderPage';
-import { SupportPage } from '@/pages/SupportPage';
+import { renderPage } from '../lib/renderPage';
+import { SupportPage } from '../pages/SupportPage';
 
 renderPage(<SupportPage />);

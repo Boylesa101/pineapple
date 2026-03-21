@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 
-import { siteConfig } from '@shared/pineappleSiteContent';
+import { legalConfig } from '../../../src/content/legal';
 
 type SiteLayoutProps = {
-  currentPath: '/' | '/privacy' | '/terms' | '/support';
+  currentPath: '/' | '/privacy' | '/terms' | '/support' | '/delete-account';
   eyebrow?: string;
   title: string;
   lede: string;
@@ -34,8 +34,8 @@ export function SiteLayout({ currentPath, eyebrow, title, lede, children }: Site
             P
           </span>
           <span className="brandmark-wording">
-            <strong>{siteConfig.appName}</strong>
-            <span>{siteConfig.tagline}</span>
+            <strong>{legalConfig.appName}</strong>
+            <span>{legalConfig.tagline}</span>
           </span>
         </a>
         <nav className="topnav" aria-label="Primary">
@@ -63,8 +63,8 @@ export function SiteLayout({ currentPath, eyebrow, title, lede, children }: Site
       <footer className="site-footer">
         <div className="site-footer-grid">
           <div>
-            <strong>{siteConfig.appName}</strong>
-            <p>{siteConfig.tagline}</p>
+            <strong>{legalConfig.appName}</strong>
+            <p>{legalConfig.tagline}</p>
           </div>
           <nav className="footer-links" aria-label="Footer">
             <a href="/">Home</a>
@@ -73,8 +73,8 @@ export function SiteLayout({ currentPath, eyebrow, title, lede, children }: Site
             <a href="/support/">Support</a>
           </nav>
         </div>
-        <p className="footer-small">{siteConfig.smallPrint}</p>
-        <p className="footer-small">© {new Date().getFullYear()} {siteConfig.copyrightName}</p>
+        <p className="footer-small">{legalConfig.smallPrint}</p>
+        <p className="footer-small">© {new Date().getFullYear()} {legalConfig.copyrightName}</p>
       </footer>
     </div>
   );

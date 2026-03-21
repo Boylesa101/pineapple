@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import type { ContentSection, FAQItem } from '@shared/pineappleSiteContent';
+import type { ContentSection, FAQItem } from '../../../src/content/legal';
 
 export function SurfaceCard({
   title,

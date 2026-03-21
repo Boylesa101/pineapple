@@ -1,7 +1,6 @@
-import { releaseChecklist, siteConfig, supportFaqs, supportIntroSections } from '@shared/pineappleSiteContent';
-
-import { FaqList, LegalSections, SurfaceCard } from '@/components/ContentBlocks';
-import { MaterialIcon, SiteLayout } from '@/components/SiteLayout';
+import { legalConfig, releaseChecklist, supportFaqs, supportIntroSections } from '../../../src/content/legal';
+import { FaqList, LegalSections, SurfaceCard } from '../components/ContentBlocks';
+import { MaterialIcon, SiteLayout } from '../components/SiteLayout';
 
 export function SupportPage() {
   return (
@@ -14,9 +13,9 @@ export function SupportPage() {
       <section className="content-section two-up-grid">
         <SurfaceCard title="Support details" icon={<MaterialIcon name="support_agent" />}>
           <p>
-            Email: <a href={`mailto:${siteConfig.supportEmail}`}>{siteConfig.supportEmail}</a>
+            Email: <a href={`mailto:${legalConfig.supportEmail}`}>{legalConfig.supportEmail}</a>
           </p>
-          <p>Release support label: {siteConfig.releaseLabel}</p>
+          <p>Release support label: {legalConfig.releaseLabel}</p>
           <p>Typical help topics: Vault, reminders, onboarding, backups, and trip setup.</p>
         </SurfaceCard>
         <SurfaceCard title="Reviewer note" icon={<MaterialIcon name="checklist" />}>

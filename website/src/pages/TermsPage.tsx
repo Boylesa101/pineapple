@@ -1,7 +1,6 @@
-import { termsSections, siteConfig } from '@shared/pineappleSiteContent';
-
-import { LegalSections, SurfaceCard } from '@/components/ContentBlocks';
-import { MaterialIcon, SiteLayout } from '@/components/SiteLayout';
+import { legalConfig, termsSections } from '../../../src/content/legal';
+import { LegalSections, SurfaceCard } from '../components/ContentBlocks';
+import { MaterialIcon, SiteLayout } from '../components/SiteLayout';
 
 export function TermsPage() {
   return (
@@ -20,7 +19,7 @@ export function TermsPage() {
         </SurfaceCard>
         <SurfaceCard title="Contact" icon={<MaterialIcon name="mail" />}>
           <p>
-            Support: <a href={`mailto:${siteConfig.supportEmail}`}>{siteConfig.supportEmail}</a>
+            Support: <a href={`mailto:${legalConfig.supportEmail}`}>{legalConfig.supportEmail}</a>
           </p>
         </SurfaceCard>
       </section>

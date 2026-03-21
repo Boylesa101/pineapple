@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useRouter } from 'expo-router';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -11,10 +12,12 @@ import { AppTextField } from '@/components/AppTextField';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
+import { ListRow } from '@/components/ListRow';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { HeroCard } from '@/components/ui/HeroCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { legalConfig, privacySummaryBullets } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
 import {
   hasNotificationPermissions,
@@ -39,6 +42,7 @@ const expiryScheduleOptions: Array<{ label: string; value: ExpiryReminderLeadTim
 ];
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const {
     data,
     security,
@@ -445,6 +449,45 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
+      <View style={styles.section}>
+        <SectionHeader title="Privacy and legal" />
+        <AppCard title="Privacy summary" subtitle="Keep the legal wording visible inside the app, not just on the website.">
+          {privacySummaryBullets.map((item) => (
+            <View key={item} style={styles.privacyRow}>
+              <Text style={styles.privacyBullet}>•</Text>
+              <Text style={styles.metaStrong}>{item}</Text>
+            </View>
+          ))}
+        </AppCard>
+
+        <AppCard title="Legal links" subtitle="Open the in-app policy pages or the matching public Pages site.">
+          <ListRow
+            title="About Pineapple"
+            subtitle={legalConfig.tagline}
+            onPress={() => router.push('/about')}
+            right={<Text style={styles.linkText}>Open</Text>}
+          />
+          <ListRow
+            title="Privacy Policy"
+            subtitle="In-app policy aligned with the public website wording."
+            onPress={() => router.push('/privacy')}
+            right={<Text style={styles.linkText}>Open</Text>}
+          />
+          <ListRow
+            title="Terms of Use"
+            subtitle="Travel responsibility, SOS disclaimers, and service terms."
+            onPress={() => router.push('/terms')}
+            right={<Text style={styles.linkText}>Open</Text>}
+          />
+          <ListRow
+            title="Support"
+            subtitle={`Support contact: ${legalConfig.supportEmail}`}
+            onPress={() => router.push('/support')}
+            right={<Text style={styles.linkText}>Open</Text>}
+          />
+        </AppCard>
+      </View>
+
       <AppModal
         visible={backupVisible}
         title={backupAction === 'export' ? 'Export encrypted backup' : 'Restore encrypted backup'}
@@ -507,6 +550,29 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     lineHeight: 19,
+  },
+  metaStrong: {
+    flex: 1,
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+  },
+  privacyBullet: {
+    color: colors.primaryBlue,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 18,
+    lineHeight: 18,
+  },
+  linkText: {
+    color: colors.primaryBlue,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
   },
   chipRow: {
     flexDirection: 'row',

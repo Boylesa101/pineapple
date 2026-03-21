@@ -334,3 +334,11 @@ npx expo export --platform web
 
 - Google Play draft copy and screenshot guidance: [docs/GOOGLE_PLAY_DRAFT.md](docs/GOOGLE_PLAY_DRAFT.md)
 - Internal release-readiness notes: [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md)
+- Legal and compliance release checklist:
+  - Replace placeholder support and privacy emails in `src/content/legal.ts`
+  - Confirm final website URLs in `src/content/legal.ts`
+  - Verify whether analytics or crash reporting are enabled before Play submission
+  - Recheck what data leaves the device for third-party lookups and keep legal wording aligned
+  - Confirm Google Play Data safety answers against the shipped build
+  - Confirm the public privacy policy link is live and visible in both the app and website
+  - Review SOS and location wording before release if nearby SOS features are added

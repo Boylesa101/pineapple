@@ -123,6 +123,12 @@ export default function AccountScreen() {
             description="Manage expiry and trip reminder preferences."
             onPress={() => router.push('/settings')}
           />
+          <MiniActionCard
+            icon={<MaterialIcons name="policy" size={28} color={colors.primaryBlue} />}
+            title="About"
+            description="Privacy summary, support details, and legal pages."
+            onPress={() => router.push('/about')}
+          />
         </View>
       </View>
     </AppScreen>
