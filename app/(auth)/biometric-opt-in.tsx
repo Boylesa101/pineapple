@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -9,13 +9,28 @@ import { FingerprintIcon } from '@/components/FingerprintIcon';
 import { colors, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { getPostUnlockRoute } from '@/utils/authRoutes';
-import { authenticateBiometrics } from '@/utils/security';
+import { authenticateBiometrics, canUseBiometrics } from '@/utils/security';
 
 export default function BiometricOptInScreen() {
   const router = useRouter();
   const tripCount = useAppStore((state) => state.data.trips.length);
   const updateSecurityPreferences = useAppStore((state) => state.updateSecurityPreferences);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void canUseBiometrics().then((available) => {
+      if (!available && !cancelled) {
+        void updateSecurityPreferences({ biometricEnabled: false });
+        router.replace(getPostUnlockRoute(tripCount));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, tripCount, updateSecurityPreferences]);
 
   async function finishSetup(enableBiometrics: boolean) {
     if (submitting) {

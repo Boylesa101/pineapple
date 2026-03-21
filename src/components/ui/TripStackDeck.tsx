@@ -32,8 +32,8 @@ type Props = {
 };
 
 const CARD_HEIGHT = 228;
-const STACK_OFFSETS = [0, 42, 84, 126];
-const STACK_SCALES = [1, 0.988, 0.974, 0.96];
+const STACK_OFFSETS = [0, 54, 102, 146];
+const STACK_SCALES = [1, 0.989, 0.978, 0.966];
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -51,14 +51,14 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
 
   function animateToIndex(nextIndex: number) {
     LayoutAnimation.configureNext({
-      duration: 280,
+      duration: 340,
       create: {
         type: LayoutAnimation.Types.easeInEaseOut,
         property: LayoutAnimation.Properties.opacity,
       },
       update: {
         type: LayoutAnimation.Types.easeInEaseOut,
-        springDamping: 0.82,
+        springDamping: 0.9,
       },
       delete: {
         type: LayoutAnimation.Types.easeInEaseOut,
@@ -78,8 +78,8 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
     const toValue = direction === 'next' ? -CARD_HEIGHT * 0.55 : CARD_HEIGHT * 0.55;
     Animated.timing(dragY, {
       toValue,
-      duration: 240,
-      easing: Easing.bezier(0.22, 1, 0.36, 1),
+      duration: 300,
+      easing: Easing.bezier(0.18, 0.96, 0.22, 1),
       useNativeDriver: true,
     }).start(() => {
       dragY.setValue(0);
@@ -106,18 +106,18 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
           Animated.spring(dragY, {
             toValue: 0,
             useNativeDriver: true,
-            damping: 18,
-            stiffness: 180,
-            mass: 0.9,
+            damping: 21,
+            stiffness: 150,
+            mass: 1,
           }).start();
         },
         onPanResponderTerminate: () => {
           Animated.spring(dragY, {
             toValue: 0,
             useNativeDriver: true,
-            damping: 18,
-            stiffness: 180,
-            mass: 0.9,
+            damping: 21,
+            stiffness: 150,
+            mass: 1,
           }).start();
         },
       }),
@@ -125,7 +125,7 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
   );
 
   const visibleItems = items.slice(currentIndex, currentIndex + 4);
-  const stackHeight = CARD_HEIGHT + Math.max(0, Math.min(items.length - currentIndex - 1, 3)) * 42;
+  const stackHeight = CARD_HEIGHT + Math.max(0, Math.min(items.length - currentIndex - 1, 3)) * 48;
 
   return (
     <View style={[styles.stackWrap, { height: stackHeight }]}>
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   },
   peekTapTarget: {
     ...StyleSheet.absoluteFillObject,
-    top: 118,
+    top: 102,
     zIndex: 1,
   },
   hint: {

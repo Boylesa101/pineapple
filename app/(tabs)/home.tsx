@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   fabWrap: {
     alignItems: 'flex-end',
-    marginBottom: -spacing.xs,
+    marginBottom: -spacing.sm,
   },
   fabButton: {
     borderRadius: radii.pill,

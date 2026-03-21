@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { startTransition, useCallback, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -69,7 +69,9 @@ export default function SetupPinScreen() {
     }
 
     if (step === 'create') {
-      setStep('confirm');
+      startTransition(() => {
+        setStep('confirm');
+      });
       return;
     }
 
@@ -84,6 +86,9 @@ export default function SetupPinScreen() {
     setSaving(true);
 
     try {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
       await createPin(pin, pin.length);
       const biometricAvailable = await canUseBiometrics();
       router.replace(biometricAvailable ? '/biometric-opt-in' : getPostUnlockRoute(tripCount));

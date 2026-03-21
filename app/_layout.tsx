@@ -151,6 +151,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(app)" />
           <Stack.Screen name="getting-started" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="warnings" />
