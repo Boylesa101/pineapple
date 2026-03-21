@@ -21,6 +21,9 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+# local Android signing config
+android/keystore.properties
+
 # debug
 npm-debug.*
 yarn-debug.*

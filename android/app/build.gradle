@@ -3,9 +3,17 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
 
-def readSigningValue(String key) {
-    return findProperty(key) ?: System.getenv(key)
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { stream ->
+        keystoreProperties.load(stream)
+    }
+}
+
+def readSigningValue = { String key ->
+    return findProperty(key) ?: System.getenv(key) ?: keystoreProperties.getProperty(key)
 }
 
 def releaseStoreFile = readSigningValue("PINEAPPLE_UPLOAD_STORE_FILE")
