@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { legalConfig } from '../../../src/content/legal';
+import pineappleLogo from '../../../assets/brand/pineapple-app-icon.svg';
 
 type SiteLayoutProps = {
   currentPath: '/' | '/privacy' | '/terms' | '/support' | '/delete-account';
@@ -44,13 +45,7 @@ export function SiteLayout({
     <div className={shellClassName ? `site-shell ${shellClassName}` : 'site-shell'}>
       <header className={topbarClassName ? `topbar ${topbarClassName}` : 'topbar'}>
         <a className="brandmark" href="/">
-          <span className="brandmark-badge" aria-hidden="true">
-            P
-          </span>
-          <span className="brandmark-wording">
-            <strong>{legalConfig.appName}</strong>
-            <span>{legalConfig.tagline}</span>
-          </span>
+          <img className="brandmark-logo" src={pineappleLogo} alt={legalConfig.appName} />
         </a>
         <nav className="topnav" aria-label="Primary">
           {navItems.map((item) => {

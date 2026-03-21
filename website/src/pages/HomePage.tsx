@@ -24,17 +24,6 @@ export function HomePage() {
     >
       <section className="hero-banner">
         <div className="hero-banner-overlay" />
-        <div className="hero-banner-top">
-          <div className="hero-brand">
-            <span className="hero-brand-badge" aria-hidden="true">
-              P
-            </span>
-            <div className="hero-brand-copy">
-              <strong>{legalConfig.appName}</strong>
-              <span>Travel companion app</span>
-            </div>
-          </div>
-        </div>
         <div className="hero-banner-body">
           <div className="hero-banner-copy">
             <p className="hero-banner-eyebrow">Travel essentials, without the clutter</p>
