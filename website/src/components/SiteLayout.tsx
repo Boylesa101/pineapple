@@ -8,6 +8,10 @@ type SiteLayoutProps = {
   title: string;
   lede: string;
   children: ReactNode;
+  hidePageHero?: boolean;
+  shellClassName?: string;
+  topbarClassName?: string;
+  pageClassName?: string;
 };
 
 const navItems = [
@@ -25,10 +29,20 @@ export function MaterialIcon({ name }: { name: string }) {
   );
 }
 
-export function SiteLayout({ currentPath, eyebrow, title, lede, children }: SiteLayoutProps) {
+export function SiteLayout({
+  currentPath,
+  eyebrow,
+  title,
+  lede,
+  children,
+  hidePageHero = false,
+  shellClassName,
+  topbarClassName,
+  pageClassName,
+}: SiteLayoutProps) {
   return (
-    <div className="site-shell">
-      <header className="topbar">
+    <div className={shellClassName ? `site-shell ${shellClassName}` : 'site-shell'}>
+      <header className={topbarClassName ? `topbar ${topbarClassName}` : 'topbar'}>
         <a className="brandmark" href="/">
           <span className="brandmark-badge" aria-hidden="true">
             P
@@ -51,12 +65,14 @@ export function SiteLayout({ currentPath, eyebrow, title, lede, children }: Site
         </nav>
       </header>
 
-      <main className="page">
-        <section className="page-hero">
-          {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
-          <h1>{title}</h1>
-          <p className="page-lede">{lede}</p>
-        </section>
+      <main className={pageClassName ? `page ${pageClassName}` : 'page'}>
+        {hidePageHero ? null : (
+          <section className="page-hero">
+            {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
+            <h1>{title}</h1>
+            <p className="page-lede">{lede}</p>
+          </section>
+        )}
         {children}
       </main>
 
