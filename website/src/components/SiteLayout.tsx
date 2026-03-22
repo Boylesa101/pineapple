@@ -4,7 +4,7 @@ import { legalConfig } from '../../../src/content/legal';
 import pineappleLogo from '../../../assets/brand/pineapple-app-icon.svg';
 
 type SiteLayoutProps = {
-  currentPath: '/' | '/privacy' | '/terms' | '/support' | '/delete-account';
+  currentPath: '/' | '/product' | '/privacy' | '/terms' | '/support' | '/delete-account';
   eyebrow?: string;
   title: string;
   lede: string;
@@ -17,6 +17,7 @@ type SiteLayoutProps = {
 
 const navItems = [
   { label: 'Home', href: '/' },
+  { label: 'Product', href: '/product/' },
   { label: 'Privacy', href: '/privacy/' },
   { label: 'Terms', href: '/terms/' },
   { label: 'Support', href: '/support/' },
@@ -79,6 +80,7 @@ export function SiteLayout({
           </div>
           <nav className="footer-links" aria-label="Footer">
             <a href="/">Home</a>
+            <a href="/product/">Product</a>
             <a href="/privacy/">Privacy</a>
             <a href="/terms/">Terms</a>
             <a href="/support/">Support</a>
