@@ -566,6 +566,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
       transferMethod: '',
       transferLocation: '',
       transferTime: null,
+      airportTravelDurationMinutes: null,
       transferNotes: '',
       status: 'completed',
     });
@@ -611,6 +612,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
       transferMethod: draft.transferMethod ?? existingTrip?.transferMethod ?? '',
       transferLocation: draft.transferLocation ?? existingTrip?.transferLocation ?? '',
       transferTime: draft.transferTime ?? existingTrip?.transferTime ?? null,
+      airportTravelDurationMinutes: draft.airportTravelDurationMinutes ?? existingTrip?.airportTravelDurationMinutes ?? null,
       transferNotes: draft.transferNotes ?? existingTrip?.transferNotes ?? '',
     };
 

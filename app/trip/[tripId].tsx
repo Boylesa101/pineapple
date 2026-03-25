@@ -25,6 +25,13 @@ import { TransportProviderSearchField } from '@/components/TransportProviderSear
 import { TypedDateField } from '@/components/TypedDateField';
 import { colors, spacing } from '@/constants/theme';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
+import {
+  getAirportSetOffInfo,
+  getDestinationLocalTimeInfo,
+  getDestinationWeatherForecast,
+  type DestinationLocalTimeInfo,
+  type DestinationWeatherForecast,
+} from '@/services/tripInsightsService';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
 import { findTransportProvider } from '@/data/transportProviders';
 import { useAppStore } from '@/store/useAppStore';
@@ -42,7 +49,7 @@ import type {
   TravellerDraft,
 } from '@/types/models';
 import { createShareCode } from '@/utils/shareCodes';
-import { daysLeft, daysUntil, formatDateTime, formatShortDate } from '@/utils/date';
+import { compareIsoDates, daysLeft, daysUntil, formatDateTime, formatShortDate } from '@/utils/date';
 import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { formatAirportDisplay } from '@/utils/airports';
 import { relationshipLabel, tripDateRange } from '@/utils/format';
@@ -57,6 +64,7 @@ type TransferDraft = {
   method: string;
   location: string;
   time: string | null;
+  airportTravelDurationMinutes: string;
   notes: string;
 };
 
@@ -108,6 +116,25 @@ function tripHeroGradient(type: 'country' | 'place' | 'unknown'): readonly [stri
   return ['rgba(13, 59, 102, 0.18)', 'rgba(74, 128, 200, 0.08)'];
 }
 
+function weatherIconName(weatherCode: number | null) {
+  if (weatherCode === null) return 'cloud-off';
+  if (weatherCode === 0) return 'wb-sunny';
+  if (weatherCode === 1 || weatherCode === 2 || weatherCode === 3) return 'cloud';
+  if (weatherCode === 45 || weatherCode === 48) return 'blur-on';
+  if ((weatherCode >= 51 && weatherCode <= 67) || (weatherCode >= 80 && weatherCode <= 82)) return 'umbrella';
+  if ((weatherCode >= 71 && weatherCode <= 77) || weatherCode === 85 || weatherCode === 86) return 'ac-unit';
+  if (weatherCode >= 95) return 'bolt';
+  return 'cloud';
+}
+
+function formatTemperatureRange(minTemp: number | null, maxTemp: number | null) {
+  if (minTemp === null || maxTemp === null) {
+    return 'Temperature unavailable';
+  }
+
+  return `${Math.round(minTemp)}° / ${Math.round(maxTemp)}°`;
+}
+
 export default function TripDetailScreen() {
   const router = useRouter();
   const { tripId, focus } = useLocalSearchParams<{ tripId: string; focus?: string }>();
@@ -130,6 +157,7 @@ export default function TripDetailScreen() {
   const bundle = getTripBundle(data, tripId);
   const missingPrompts = getMissingInfoPrompts(data, tripId);
   const timeline = getUpcomingTimeline(data, tripId);
+  const trip = bundle.trip;
   const [modalKind, setModalKind] = useState<ModalKind>(null);
   const [travellerDraft, setTravellerDraft] = useState<TravellerDraft | null>(null);
   const [segmentDraft, setSegmentDraft] = useState<TravelSegmentDraft | null>(null);
@@ -139,6 +167,9 @@ export default function TripDetailScreen() {
   const [exportOptions, setExportOptions] = useState<PdfExportOptions>(defaultExportOptions);
   const [inviteDraft, setInviteDraft] = useState<TripInviteDraft | null>(null);
   const [activeSection, setActiveSection] = useState<TripSection>('overview');
+  const [destinationTimeInfo, setDestinationTimeInfo] = useState<DestinationLocalTimeInfo | null>(null);
+  const [destinationWeather, setDestinationWeather] = useState<DestinationWeatherForecast | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
 
   const summary = useMemo(
     () => ({
@@ -161,7 +192,7 @@ export default function TripDetailScreen() {
         if (leftOrder !== rightOrder) {
           return leftOrder - rightOrder;
         }
-        return left.departureTime.localeCompare(right.departureTime);
+        return compareIsoDates(left.departureTime, right.departureTime);
       }),
     [bundle.travelSegments]
   );
@@ -173,8 +204,65 @@ export default function TripDetailScreen() {
     }
     setActiveSection('overview');
   }, [focus]);
+  const departureDays = trip ? daysUntil(trip.startDate) : null;
+  const remainingDays = trip ? daysLeft(trip.endDate) : null;
+  const airportSetOffInfo = useMemo(
+    () =>
+      trip
+        ? getAirportSetOffInfo(bundle.travelSegments, trip.airportTravelDurationMinutes)
+        : {
+            status: 'unavailable' as const,
+            timeLabel: 'Set-off time unavailable',
+            helperLabel: 'Trip details are unavailable.',
+          },
+    [bundle.travelSegments, trip]
+  );
 
-  if (!bundle.trip) {
+  useEffect(() => {
+    let cancelled = false;
+    const destination = trip?.destination.trim() ?? '';
+
+    if (!destination) {
+      setDestinationTimeInfo(null);
+      setDestinationWeather(null);
+      setInsightsLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setInsightsLoading(true);
+
+    void Promise.all([getDestinationLocalTimeInfo(destination), getDestinationWeatherForecast(destination)])
+      .then(([timeInfo, weather]) => {
+        if (cancelled) {
+          return;
+        }
+
+        setDestinationTimeInfo(timeInfo);
+        setDestinationWeather(weather);
+      })
+      .catch((error) => {
+        if (__DEV__) {
+          console.error('trip insights lookup failed', error);
+        }
+        if (!cancelled) {
+          setDestinationTimeInfo(null);
+          setDestinationWeather(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setInsightsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trip?.destination]);
+
+  if (!trip) {
     return (
       <AppScreen title="Trip not found">
         <AppCard>
@@ -187,10 +275,7 @@ export default function TripDetailScreen() {
       </AppScreen>
     );
   }
-
-  const trip = bundle.trip;
-  const departureDays = daysUntil(trip.startDate);
-  const remainingDays = daysLeft(trip.endDate);
+  const currentTrip = trip;
 
   function openTravellerEditor(current?: TravellerDraft) {
     setTravellerDraft(
@@ -253,8 +338,8 @@ export default function TripDetailScreen() {
         hotelImageStatus: 'idle',
         phone: '',
         bookingRef: '',
-        checkIn: trip.startDate,
-        checkOut: trip.endDate,
+        checkIn: currentTrip.startDate,
+        checkOut: currentTrip.endDate,
         notes: '',
       }
     );
@@ -263,11 +348,13 @@ export default function TripDetailScreen() {
 
   function openTransferEditor() {
     setTransferDraft({
-      provider: trip.transferProvider,
-      method: trip.transferMethod,
-      location: trip.transferLocation,
-      time: trip.transferTime,
-      notes: trip.transferNotes || trip.transferSummary,
+      provider: currentTrip.transferProvider,
+      method: currentTrip.transferMethod,
+      location: currentTrip.transferLocation,
+      time: currentTrip.transferTime,
+      airportTravelDurationMinutes:
+        currentTrip.airportTravelDurationMinutes !== null ? String(currentTrip.airportTravelDurationMinutes) : '',
+      notes: currentTrip.transferNotes || currentTrip.transferSummary,
     });
     setModalKind('transfer');
   }
@@ -348,7 +435,7 @@ export default function TripDetailScreen() {
       }
       try {
         await saveTrip({
-          ...trip,
+          ...currentTrip,
           transferSummary: [transferDraft.provider, transferDraft.method, transferDraft.location, transferDraft.notes]
             .filter(Boolean)
             .join(' · '),
@@ -356,6 +443,9 @@ export default function TripDetailScreen() {
           transferMethod: transferDraft.method,
           transferLocation: transferDraft.location,
           transferTime: transferDraft.time,
+          airportTravelDurationMinutes: transferDraft.airportTravelDurationMinutes.trim()
+            ? Math.max(0, Math.round(Number(transferDraft.airportTravelDurationMinutes) || 0))
+            : null,
           transferNotes: transferDraft.notes,
         });
         setModalKind(null);
@@ -492,7 +582,7 @@ export default function TripDetailScreen() {
           <ManagedFileImage uri={trip.destinationImageLocalPath ?? trip.coverImageUri} style={styles.cover} />
         ) : null}
         <LinearGradient colors={tripHeroGradient(trip.destinationType)} style={styles.coverFallback} />
-        <LinearGradient colors={['rgba(10, 28, 44, 0.18)', 'rgba(10, 28, 44, 0.82)']} style={styles.coverOverlay} />
+        <LinearGradient colors={['rgba(10, 28, 44, 0.14)', 'rgba(10, 28, 44, 0.74)']} style={styles.coverOverlay} />
         <View style={styles.heroCopy}>
           <Text style={styles.heroDestination}>{trip.destination.toUpperCase()}</Text>
           <Text style={styles.heroTitle}>{trip.name}</Text>
@@ -500,21 +590,75 @@ export default function TripDetailScreen() {
         </View>
       </View>
 
+      <View style={styles.infoCardGrid}>
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardHeader}>
+            <MaterialIcons name="schedule" size={18} color={colors.white} />
+            <Text style={styles.infoCardLabel}>Destination local time</Text>
+          </View>
+          <Text style={styles.infoCardValue}>{destinationTimeInfo?.localTimeLabel ?? (insightsLoading ? 'Checking…' : 'Time unavailable')}</Text>
+          <Text style={styles.infoCardMeta}>{destinationTimeInfo?.offsetLabel ?? 'Timezone unavailable'}</Text>
+          <Text style={styles.infoCardHint}>{destinationTimeInfo?.relativeLabel ?? 'We could not resolve the destination timezone.'}</Text>
+        </View>
+
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardHeader}>
+            <MaterialIcons name="departure-board" size={18} color={colors.white} />
+            <Text style={styles.infoCardLabel}>Airport set-off time</Text>
+          </View>
+          <Text style={styles.infoCardValue}>{airportSetOffInfo.timeLabel}</Text>
+          <Text style={styles.infoCardMeta}>
+            {airportSetOffInfo.status === 'available' ? airportSetOffInfo.departureLabel : 'Departure details needed'}
+          </Text>
+          <Text style={styles.infoCardHint}>{airportSetOffInfo.helperLabel}</Text>
+        </View>
+      </View>
+
+      <AppCard title="7-day weather" subtitle={destinationWeather?.resolvedLabel ?? trip.destination}>
+        {destinationWeather?.days.length ? (
+          <View style={styles.weatherList}>
+            {destinationWeather.days.map((day) => (
+              <View key={day.date} style={styles.weatherRow}>
+                <View style={styles.weatherDay}>
+                  <MaterialIcons name={weatherIconName(day.weatherCode) as any} size={20} color={colors.primaryBlueDark} />
+                  <View style={styles.weatherCopy}>
+                    <Text style={styles.weatherLabel}>{day.dayLabel}</Text>
+                    <Text style={styles.weatherMeta}>{day.conditionLabel}</Text>
+                  </View>
+                </View>
+                <Text style={styles.weatherTemp}>{formatTemperatureRange(day.temperatureMinC, day.temperatureMaxC)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <EmptyState
+            title={insightsLoading ? 'Loading destination weather' : 'Weather unavailable'}
+            description={
+              insightsLoading
+                ? 'Checking the next 7 days for this destination.'
+                : 'We could not load a forecast for this destination right now.'
+            }
+          />
+        )}
+      </AppCard>
+
       <AppCard>
         <View style={styles.chipRow}>
           <InfoChip
             label={
               trip.status === 'completed'
                 ? 'Completed trip'
-                : departureDays > 0
+                : departureDays === null
+                  ? 'Departure date unavailable'
+                  : departureDays > 0
                   ? `${departureDays} day(s) until departure`
                   : 'Trip in progress'
             }
             tone={trip.status === 'completed' ? 'default' : 'blue'}
           />
           <InfoChip
-            label={remainingDays >= 0 ? `${remainingDays} day(s) left` : 'Trip ended'}
-            tone={remainingDays > 0 ? 'gold' : 'default'}
+            label={remainingDays === null ? 'Trip dates unavailable' : remainingDays >= 0 ? `${remainingDays} day(s) left` : 'Trip ended'}
+            tone={remainingDays !== null && remainingDays > 0 ? 'gold' : 'default'}
           />
         </View>
         <View style={styles.participantRow}>
@@ -678,7 +822,22 @@ export default function TripDetailScreen() {
                     {formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} →{' '}
                     {formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}
                   </Text>
-                  <Text style={styles.transportMeta}>{formatDateTime(segment.departureTime)}</Text>
+                  <View style={styles.transportTimingRow}>
+                    <MaterialIcons
+                      name={(segment.transportType === 'flight' ? 'flight-takeoff' : 'schedule') as any}
+                      size={14}
+                      color={colors.primaryBlueDark}
+                    />
+                    <Text style={styles.transportMeta}>Departure {formatDateTime(segment.departureTime)}</Text>
+                  </View>
+                  <View style={styles.transportTimingRow}>
+                    <MaterialIcons
+                      name={(segment.transportType === 'flight' ? 'flight-land' : 'schedule') as any}
+                      size={14}
+                      color={colors.primaryBlueDark}
+                    />
+                    <Text style={styles.transportMeta}>Arrival {formatDateTime(segment.arrivalTime)}</Text>
+                  </View>
                 </View>
                 <View style={styles.iconRow}>
                   <Pressable onPress={() => openSegmentEditor(segment)}>
@@ -770,6 +929,7 @@ export default function TripDetailScreen() {
                     transferMethod: '',
                     transferLocation: '',
                     transferTime: null,
+                    airportTravelDurationMinutes: null,
                     transferNotes: '',
                   })
                 }
@@ -1326,6 +1486,18 @@ export default function TripDetailScreen() {
               onChangeText={(value) => setTransferDraft((current) => (current ? { ...current, notes: value } : current))}
               multiline
             />
+            <AppTextField
+              label="Travel to departure airport (minutes)"
+              value={transferDraft.airportTravelDurationMinutes}
+              onChangeText={(value) =>
+                setTransferDraft((current) =>
+                  current ? { ...current, airportTravelDurationMinutes: value.replace(/[^\d]/g, '').slice(0, 4) } : current
+                )
+              }
+              keyboardType="numeric"
+              placeholder="e.g. 45"
+              helper="Used to calculate the set-off time shown on the trip page."
+            />
             <AppButton label="Save transfer" onPress={saveCurrentModal} />
           </>
         ) : null}
@@ -1509,6 +1681,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  infoCardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  infoCard: {
+    flex: 1,
+    minWidth: 156,
+    backgroundColor: colors.primaryBlue,
+    borderRadius: 22,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  infoCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  infoCardLabel: {
+    flex: 1,
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
+  infoCardValue: {
+    color: colors.white,
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 24,
+  },
+  infoCardMeta: {
+    color: 'rgba(255,255,255,0.92)',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+  },
+  infoCardHint: {
+    color: 'rgba(255,255,255,0.82)',
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
+  },
   notes: {
     color: colors.textMuted,
     fontFamily: 'Inter_400Regular',
@@ -1607,6 +1819,48 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
     lineHeight: 17,
+  },
+  transportTimingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  weatherList: {
+    gap: spacing.xs,
+  },
+  weatherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  weatherDay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  weatherCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  weatherLabel: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  weatherMeta: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+  },
+  weatherTemp: {
+    color: colors.primaryBlueDark,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
   },
   hotelRow: {
     flexDirection: 'row',

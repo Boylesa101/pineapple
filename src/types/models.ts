@@ -77,6 +77,7 @@ export interface Trip {
   transferMethod: string;
   transferLocation: string;
   transferTime: string | null;
+  airportTravelDurationMinutes: number | null;
   transferNotes: string;
   status: TripStatus;
   createdAt: string;

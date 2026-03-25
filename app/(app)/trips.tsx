@@ -42,6 +42,7 @@ const emptyTripDraft: TripDraft = {
   transferMethod: '',
   transferLocation: '',
   transferTime: null,
+  airportTravelDurationMinutes: null,
   transferNotes: '',
   status: 'upcoming',
 };
@@ -210,6 +211,19 @@ export default function TripsScreen() {
           onChangeText={(value) => setDraft((current) => ({ ...current, transferSummary: value }))}
           multiline
           placeholder="Airport transfer booked with Blue Cars at 14:20, meeting point T2 pickup bay 6."
+        />
+        <AppTextField
+          label="Travel to departure airport (minutes)"
+          value={draft.airportTravelDurationMinutes !== null ? String(draft.airportTravelDurationMinutes) : ''}
+          onChangeText={(value) =>
+            setDraft((current) => ({
+              ...current,
+              airportTravelDurationMinutes: value.trim() ? Math.max(0, Math.round(Number(value) || 0)) : null,
+            }))
+          }
+          keyboardType="numeric"
+          placeholder="Optional, e.g. 45"
+          helper="Used for the airport set-off time calculation on the trip page."
         />
         <Text style={styles.autoImageNote}>
           Pineapple picks a destination image automatically from the place you enter and keeps a local cached copy after the first lookup.

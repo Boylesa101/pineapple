@@ -44,7 +44,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Auto-lock after inactivity, persistent PIN cooldown after repeated failures, and best-effort privacy overlay for the app switcher
 - Mockup-matched blue/white shell with a safe-area-aware bottom nav for Home, SOS, and Vault, while trip-specific navigation now lives inside the trip flow itself
 - Home now uses a minimal header plus a stacked trip-card deck, with a single floating `New trip` action instead of the older hero and summary blocks
-- Trip CRUD with searchable destination entry, automatic destination hero imagery, local cached trip covers, and per-trip transfer / pickup notes
+- Trip CRUD with searchable destination entry, automatic destination hero imagery, local cached trip covers, per-trip transfer / pickup notes, and optional stored travel-to-airport duration for departure planning
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
@@ -71,12 +71,16 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Flight / train segment management with outbound/return direction support, searchable airline/operator selection, stored provider codes, and safe airline-logo fallback handling
 - The flight provider picker now bundles 50 common airline brand marks locally so transport selection does not depend on remote logo URLs at runtime
 - Hotel stay management with free OpenStreetMap/Nominatim address search, editable address normalization, automatic free image lookup, and offline cache after the first successful fetch
-- Structured transfer/pickup management with provider, method, location, time, and notes stored directly on the trip
+- Structured transfer/pickup management with provider, method, location, time, notes, and optional travel-to-airport duration stored directly on the trip
 - Automatic trip-card destination images that resolve from country or place text, cache locally after the first fetch, and fall back cleanly when offline or unresolved
+- Trip detail destination insights with live timezone resolution, real local destination time, GMT/UTC difference versus the device timezone, and graceful fallback when the destination cannot be resolved
+- Trip detail airport set-off timing that calculates `departure - 2 hours - airport travel duration` from the stored outbound flight and airport travel minutes
+- Trip detail 7-day destination weather driven by a dedicated live forecast provider with caching and safe failure fallbacks
 - Trip-card destination imagery now prefers Pexels when an optional `EXPO_PUBLIC_PEXELS_API_KEY` is supplied at build time, falls back to Wikimedia Commons otherwise, caches the chosen image locally, and exposes source attribution through a small in-card info action
 - Flight entry now includes a built-in searchable airport picker with stored IATA codes for cleaner travel records
 - Date-of-birth entry now uses direct typed `DD / MM / YYYY` input in traveller, passport, and driving-licence flows instead of the calendar picker
 - Trip detail now uses a contextual footer for `Packing`, `Vibes`, `Flight`, and `Hotel`, keeping those sections in the trip flow instead of the global footer
+- Honest limitation: destination time and weather depend on successful live destination geocoding and forecast lookups, so Pineapple intentionally shows calm fallback states instead of guessed values when those requests fail
 - `Vibes` can fetch live top picks for places to eat, visit, and do from Tripadvisor through the `pinapple-dev.pages.dev/api/vibes` Cloudflare Pages Function proxy and add them directly into the itinerary
 - To enable live Vibes on Cloudflare Pages, add the Pages secret `TRIPADVISOR_API_KEY`, optionally set `TRIPADVISOR_ALLOWED_DOMAIN=pinapple-dev.pages.dev`, and allowlist `pinapple-dev.pages.dev` in Tripadvisor
 - Chronological itinerary timeline

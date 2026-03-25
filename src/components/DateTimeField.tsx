@@ -3,7 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import { colors, radii, spacing } from '@/constants/theme';
-import { formatDateTime, formatShortDate } from '@/utils/date';
+import { coerceDate, formatDateTime, formatShortDate } from '@/utils/date';
 
 type Props = {
   label: string;
@@ -14,7 +14,7 @@ type Props = {
 
 export function DateTimeField({ label, mode, value, onChange }: Props) {
   const [show, setShow] = useState(false);
-  const date = value ? new Date(value) : new Date();
+  const date = coerceDate(value);
 
   function handleChange(event: DateTimePickerEvent, selected?: Date) {
     if (Platform.OS !== 'ios') {

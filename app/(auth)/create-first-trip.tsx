@@ -53,6 +53,7 @@ export default function CreateFirstTripScreen() {
       transferMethod: '',
       transferLocation: '',
       transferTime: null,
+      airportTravelDurationMinutes: null,
       transferNotes: '',
       status: 'upcoming' as const,
     };

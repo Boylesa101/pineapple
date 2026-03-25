@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Stability pass: hardened trip rendering, dashboard selectors, typed date fields, and validation so malformed or missing trip, flight, hotel, and itinerary dates now fall back cleanly instead of crashing screens or downstream calculations
+- Trip insights: trip detail now resolves the destination timezone from live geocoding, shows the real local time plus GMT/UTC offset difference against the device timezone, and falls back to `Time unavailable` when the destination cannot be resolved defensibly
+- Airport timing: trips can now store `Travel to departure airport (minutes)` and the detail screen calculates the real set-off time as `departure - 2 hours - airport travel duration`, with a clean fallback when either the outbound flight or travel duration is missing
+- Destination weather: trip detail now loads a real 7-day forecast through a dedicated provider layer with deterministic destination lookup, in-memory caching, and safe fallback states for lookup or network failures
+- Trip visuals: lightened the trip-detail and trip-card image overlays by roughly 10% so destination photography reads more clearly while keeping text legible
+- Flight rows: added takeoff and landing icons before departure and arrival timing in the trip travel section for clearer scanability
+- Honest limitation: destination local time and weather rely on successful live destination resolution and forecast requests, so Pineapple now prefers graceful fallback states over guessed timezone or weather values when those lookups fail
 - First-time setup flow: onboarding now continues through a short setup sequence of name, optional profile photo, optional ID prompt, PIN setup, then biometric opt-in when the device supports enrolled biometrics
 - PIN setup responsiveness: the setup PIN screen now focuses only on create/confirm entry, with biometric detection moved out of the keypad screen to reduce per-keypress work and keep digit entry more immediate
 - Home footer correction: the bottom nav now uses the final four-item shell of `Home`, `Vault`, `Vibe`, and `SOS`, with the old `Account`, `Trips`, `Packing`, and `Itinerary` screens moved out of the tab group instead of merely hidden

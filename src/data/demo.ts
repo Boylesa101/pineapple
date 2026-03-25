@@ -40,6 +40,7 @@ export function createDemoSnapshot(): AppDataSnapshot {
         transferMethod: 'Hotel shuttle',
         transferLocation: 'PMI arrivals hall exit B',
         transferTime: addHours(outbound, 3).toISOString(),
+        airportTravelDurationMinutes: 55,
         transferNotes: 'Driver holds Moss family sign and has booster seats booked.',
         status: 'upcoming',
         createdAt: now,

@@ -17,6 +17,8 @@ export function validateTrip(input: TripDraft) {
   if (!input.destination.trim()) errors.push('Destination is required.');
   if (!input.startDate) errors.push('Start date is required.');
   if (!input.endDate) errors.push('End date is required.');
+  if (input.startDate && !isValid(parseISO(input.startDate))) errors.push('Start date is invalid.');
+  if (input.endDate && !isValid(parseISO(input.endDate))) errors.push('End date is invalid.');
   if (input.startDate && input.endDate && input.endDate < input.startDate) {
     errors.push('End date must be after the start date.');
   }
@@ -82,6 +84,8 @@ export function validateTravelSegment(input: TravelSegmentDraft) {
   if (!input.arrivalAirport.trim()) errors.push(`${arrivalLabel} is required.`);
   if (!input.departureTime) errors.push('Departure time is required.');
   if (!input.arrivalTime) errors.push('Arrival time is required.');
+  if (input.departureTime && !isValid(parseISO(input.departureTime))) errors.push('Departure time is invalid.');
+  if (input.arrivalTime && !isValid(parseISO(input.arrivalTime))) errors.push('Arrival time is invalid.');
   if (input.arrivalTime && input.departureTime && input.arrivalTime < input.departureTime) {
     errors.push('Arrival time must be after departure time.');
   }
@@ -94,6 +98,8 @@ export function validateHotelStay(input: HotelStayDraft) {
   if (!input.address.trim()) errors.push('Address is required.');
   if (!input.checkIn) errors.push('Check-in date is required.');
   if (!input.checkOut) errors.push('Check-out date is required.');
+  if (input.checkIn && !isValid(parseISO(input.checkIn))) errors.push('Check-in date is invalid.');
+  if (input.checkOut && !isValid(parseISO(input.checkOut))) errors.push('Check-out date is invalid.');
   if (input.checkIn && input.checkOut && input.checkOut < input.checkIn) {
     errors.push('Check-out must be after check-in.');
   }
@@ -104,6 +110,7 @@ export function validateItineraryEvent(input: ItineraryEventDraft) {
   const errors: string[] = [];
   if (!input.title.trim()) errors.push('Title is required.');
   if (!input.dateTime) errors.push('Date and time are required.');
+  if (input.dateTime && !isValid(parseISO(input.dateTime))) errors.push('Date and time are invalid.');
   return errors;
 }
 

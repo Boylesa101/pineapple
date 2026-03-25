@@ -278,6 +278,12 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         transferMethod: (await decryptField(trip.transferMethod)) ?? '',
         transferLocation: (await decryptField(trip.transferLocation)) ?? '',
         transferTime: trip.transferTime ?? null,
+        airportTravelDurationMinutes:
+          typeof trip.airportTravelDurationMinutes === 'number'
+            ? trip.airportTravelDurationMinutes
+            : trip.airportTravelDurationMinutes
+              ? Number(trip.airportTravelDurationMinutes)
+              : null,
         transferNotes: (await decryptField(trip.transferNotes)) ?? '',
       })
     )
@@ -475,9 +481,9 @@ export async function upsertTrip(input: TripDraft) {
 
   await db.runAsync(
     `INSERT INTO trips (
-      id, name, destination, destinationType, startDate, endDate, destinationImageLocalPath, destinationImageRemoteUrl, destinationImageSource, attributionText, attributionMeta, coverImageUri, heroImageRemoteUrl, heroImageStatus, notes, transferSummary, transferProvider, transferMethod, transferLocation, transferTime, transferNotes, status, createdAt, updatedAt
+      id, name, destination, destinationType, startDate, endDate, destinationImageLocalPath, destinationImageRemoteUrl, destinationImageSource, attributionText, attributionMeta, coverImageUri, heroImageRemoteUrl, heroImageStatus, notes, transferSummary, transferProvider, transferMethod, transferLocation, transferTime, airportTravelDurationMinutes, transferNotes, status, createdAt, updatedAt
     )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        destination = excluded.destination,
@@ -498,6 +504,7 @@ export async function upsertTrip(input: TripDraft) {
        transferMethod = excluded.transferMethod,
        transferLocation = excluded.transferLocation,
        transferTime = excluded.transferTime,
+       airportTravelDurationMinutes = excluded.airportTravelDurationMinutes,
        transferNotes = excluded.transferNotes,
        status = excluded.status,
        updatedAt = excluded.updatedAt`,
@@ -521,6 +528,7 @@ export async function upsertTrip(input: TripDraft) {
     encryptedTransferMethod,
     encryptedTransferLocation,
     input.transferTime ?? null,
+    input.airportTravelDurationMinutes ?? null,
     encryptedTransferNotes,
     input.status,
     timestamp,

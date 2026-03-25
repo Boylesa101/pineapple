@@ -90,6 +90,12 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         transferMethod: (await decryptStructuredValue(trip.transferMethod)) ?? '',
         transferLocation: (await decryptStructuredValue(trip.transferLocation)) ?? '',
         transferTime: trip.transferTime ?? null,
+        airportTravelDurationMinutes:
+          typeof trip.airportTravelDurationMinutes === 'number'
+            ? trip.airportTravelDurationMinutes
+            : trip.airportTravelDurationMinutes
+              ? Number(trip.airportTravelDurationMinutes)
+              : null,
         transferNotes: (await decryptStructuredValue(trip.transferNotes)) ?? '',
       }))
     ),
@@ -250,6 +256,7 @@ async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         transferMethod: (await encryptStructuredValue(trip.transferMethod)) ?? '',
         transferLocation: (await encryptStructuredValue(trip.transferLocation)) ?? '',
         transferTime: trip.transferTime ?? null,
+        airportTravelDurationMinutes: trip.airportTravelDurationMinutes ?? null,
         transferNotes: (await encryptStructuredValue(trip.transferNotes)) ?? '',
       }))
     ),
@@ -442,6 +449,7 @@ export async function upsertTrip(input: TripDraft) {
       transferMethod: input.transferMethod ?? '',
       transferLocation: input.transferLocation ?? '',
       transferTime: input.transferTime ?? null,
+      airportTravelDurationMinutes: input.airportTravelDurationMinutes ?? null,
       transferNotes: input.transferNotes ?? '',
       createdAt: snapshot.trips.find((trip) => trip.id === id)?.createdAt ?? timestamp,
       updatedAt: timestamp,

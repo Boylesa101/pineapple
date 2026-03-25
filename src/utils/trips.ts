@@ -42,6 +42,21 @@ function normalizeAttributionMeta(value: unknown): DestinationImageAttribution |
   };
 }
 
+function normalizeAirportTravelDurationMinutes(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+    return Math.round(value);
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return Math.round(parsed);
+    }
+  }
+
+  return null;
+}
+
 export function normalizeTripRecord(record: Partial<Trip> & Pick<Trip, 'id' | 'name' | 'destination' | 'startDate' | 'endDate' | 'status' | 'createdAt' | 'updatedAt'>): Trip {
   const destinationImageLocalPath = record.destinationImageLocalPath ?? record.coverImageUri ?? null;
   const destinationImageRemoteUrl = record.destinationImageRemoteUrl ?? record.heroImageRemoteUrl ?? null;
@@ -63,6 +78,7 @@ export function normalizeTripRecord(record: Partial<Trip> & Pick<Trip, 'id' | 'n
     transferMethod: record.transferMethod ?? '',
     transferLocation: record.transferLocation ?? '',
     transferTime: record.transferTime ?? null,
+    airportTravelDurationMinutes: normalizeAirportTravelDurationMinutes(record.airportTravelDurationMinutes),
     transferNotes: record.transferNotes ?? '',
   };
 }

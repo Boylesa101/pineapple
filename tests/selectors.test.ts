@@ -29,6 +29,7 @@ function createSnapshot(): AppDataSnapshot {
         transferMethod: '',
         transferLocation: '',
         transferTime: null,
+        airportTravelDurationMinutes: null,
         transferNotes: '',
         status: 'upcoming',
         createdAt: now,

@@ -1,10 +1,8 @@
-import { parseISO } from 'date-fns';
-
 import type { AppDataSnapshot, Document, PackingItem, Traveller } from '@/types/models';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import { isPersonalDocumentsTripId } from '@/constants/vault';
 import { formatAirportDisplay } from './airports';
-import { daysLeft, daysUntil } from './date';
+import { compareIsoDates, daysLeft, daysUntil, parseIsoDate } from './date';
 import { getDocumentExpiryRelativeLabel } from './documentExpiry';
 
 const documentTypeLabels = {
@@ -51,22 +49,32 @@ export function getDashboardTrip(snapshot: AppDataSnapshot) {
   const now = new Date();
   const visibleTrips = snapshot.trips.filter((trip) => !isPersonalDocumentsTripId(trip.id));
   const activeTrips = visibleTrips
-    .filter((trip) => trip.status === 'active' || (parseISO(trip.startDate) <= now && parseISO(trip.endDate) >= now))
-    .sort((left, right) => left.startDate.localeCompare(right.startDate));
+    .filter((trip) => {
+      const startDate = parseIsoDate(trip.startDate);
+      const endDate = parseIsoDate(trip.endDate);
+      return trip.status === 'active' || (startDate !== null && endDate !== null && startDate <= now && endDate >= now);
+    })
+    .sort((left, right) => compareIsoDates(left.startDate, right.startDate));
   if (activeTrips.length) {
     return activeTrips[0];
   }
 
   const upcomingTrips = visibleTrips
-    .filter((trip) => parseISO(trip.startDate) > now || trip.status === 'upcoming')
-    .sort((left, right) => left.startDate.localeCompare(right.startDate));
+    .filter((trip) => {
+      const startDate = parseIsoDate(trip.startDate);
+      return (startDate !== null && startDate > now) || trip.status === 'upcoming';
+    })
+    .sort((left, right) => compareIsoDates(left.startDate, right.startDate));
   if (upcomingTrips.length) {
     return upcomingTrips[0];
   }
 
   const completedTrips = visibleTrips
-    .filter((trip) => trip.status === 'completed' || parseISO(trip.endDate) < now)
-    .sort((left, right) => right.endDate.localeCompare(left.endDate));
+    .filter((trip) => {
+      const endDate = parseIsoDate(trip.endDate);
+      return trip.status === 'completed' || (endDate !== null && endDate < now);
+    })
+    .sort((left, right) => compareIsoDates(right.endDate, left.endDate));
   return completedTrips[0] ?? null;
 }
 
@@ -79,7 +87,8 @@ export function getNextFlight(snapshot: AppDataSnapshot, tripId?: string | null)
   return (
     snapshot.travelSegments.find((segment) => {
       if (tripId && segment.tripId !== tripId) return false;
-      return parseISO(segment.departureTime) >= now;
+      const departureTime = parseIsoDate(segment.departureTime);
+      return departureTime !== null && departureTime >= now;
     }) ?? null
   );
 }
@@ -89,7 +98,8 @@ export function getNextHotel(snapshot: AppDataSnapshot, tripId?: string | null) 
   return (
     snapshot.hotelStays.find((hotel) => {
       if (tripId && hotel.tripId !== tripId) return false;
-      return parseISO(hotel.checkIn) >= now;
+      const checkIn = parseIsoDate(hotel.checkIn);
+      return checkIn !== null && checkIn >= now;
     }) ?? null
   );
 }
@@ -99,7 +109,8 @@ export function getNextEvent(snapshot: AppDataSnapshot, tripId?: string | null) 
   return (
     snapshot.itineraryEvents.find((event) => {
       if (tripId && event.tripId !== tripId) return false;
-      return parseISO(event.dateTime) >= now;
+      const dateTime = parseIsoDate(event.dateTime);
+      return dateTime !== null && dateTime >= now;
     }) ?? null
   );
 }
@@ -221,7 +232,8 @@ export function getDashboardAlerts(snapshot: AppDataSnapshot, tripId: string | n
   const trip = bundle.trip;
   if (trip) {
     const packing = getPackingProgress(snapshot, trip.id);
-    if (daysUntil(trip.startDate) <= 3 && packing.total > 0 && packing.packed < packing.total) {
+    const departureDays = daysUntil(trip.startDate);
+    if (departureDays !== null && departureDays <= 3 && packing.total > 0 && packing.packed < packing.total) {
       alerts.push({
         title: 'Packing incomplete',
         subtitle: `${packing.packed} of ${packing.total} items packed with departure close.`,
@@ -273,5 +285,5 @@ export function getUpcomingTimeline(snapshot: AppDataSnapshot, tripId: string | 
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
-    .sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+    .sort((a, b) => compareIsoDates(a.dateTime, b.dateTime));
 }

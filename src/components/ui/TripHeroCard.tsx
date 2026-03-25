@@ -43,6 +43,9 @@ function statusLabel(trip: Trip) {
 
 function daysTillTripLabel(trip: Trip) {
   const days = daysUntil(trip.startDate);
+  if (days === null) {
+    return 'Dates unavailable';
+  }
   if (days < 0) {
     return 'Trip started';
   }
@@ -122,7 +125,7 @@ export function TripHeroCard({
         <View style={styles.card}>
           {imageUri ? <ManagedFileImage uri={imageUri} style={styles.image} /> : null}
           <LinearGradient colors={fallbackGradient(trip.destinationType)} style={styles.fallback} />
-          <LinearGradient colors={['rgba(10, 28, 44, 0.1)', 'rgba(10, 28, 44, 0.61)']} style={styles.overlay} />
+          <LinearGradient colors={['rgba(10, 28, 44, 0.08)', 'rgba(10, 28, 44, 0.55)']} style={styles.overlay} />
 
           <View style={styles.content}>
             <View style={styles.copy}>
