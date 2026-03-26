@@ -24,6 +24,13 @@ type OpenMeteoForecastResponse = {
     weather_code?: number[];
     temperature_2m_max?: number[];
     temperature_2m_min?: number[];
+    sunrise?: string[];
+    sunset?: string[];
+  };
+  hourly?: {
+    time?: string[];
+    weather_code?: number[];
+    temperature_2m?: number[];
   };
 };
 
@@ -89,6 +96,28 @@ export type DestinationQuickFacts = {
   emergencyLabel: string | null;
 };
 
+export type DestinationWeatherHour = {
+  time: string;
+  timeLabel: string;
+  weatherCode: number | null;
+  conditionLabel: string;
+  temperatureC: number | null;
+};
+
+export type DestinationWeatherDetail = {
+  resolvedLabel: string;
+  timezone: string;
+  date: string;
+  dateLabel: string;
+  weatherCode: number | null;
+  conditionLabel: string;
+  temperatureMinC: number | null;
+  temperatureMaxC: number | null;
+  sunriseLabel: string | null;
+  sunsetLabel: string | null;
+  hours: DestinationWeatherHour[];
+};
+
 export type AirportSetOffInfo =
   | {
       status: 'available';
@@ -113,6 +142,7 @@ const QUICK_FACTS_CACHE_TTL_MS = 1000 * 60 * 60 * 12;
 const geocodeCache = new Map<string, { expiresAt: number; value: ResolvedDestinationContext | null }>();
 const weatherCache = new Map<string, { expiresAt: number; value: DestinationWeatherForecast | null }>();
 const quickFactsCache = new Map<string, { expiresAt: number; value: DestinationQuickFacts | null }>();
+const weatherDetailCache = new Map<string, { expiresAt: number; value: DestinationWeatherDetail | null }>();
 
 function getDeviceTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
@@ -280,6 +310,51 @@ function formatDayLabel(dateValue: string) {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+  }).format(parsed);
+}
+
+function formatFullDayLabel(dateValue: string) {
+  const parsed = parseIsoDate(`${dateValue}T12:00:00`);
+  if (!parsed) {
+    return dateValue;
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(parsed);
+}
+
+function formatHourlyLabel(dateValue: string, timeZone: string) {
+  const parsed = parseIsoDate(dateValue);
+  if (!parsed) {
+    return dateValue;
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(parsed);
+}
+
+function formatSunEventLabel(dateValue: string | null | undefined, timeZone: string) {
+  if (!dateValue) {
+    return null;
+  }
+
+  const parsed = parseIsoDate(dateValue);
+  if (!parsed) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
   }).format(parsed);
 }
 
@@ -610,6 +685,81 @@ export async function getDestinationWeatherForecast(destination: string): Promis
       console.error('getDestinationWeatherForecast failed', context.label, error);
     }
     weatherCache.set(cacheKey, {
+      expiresAt: Date.now() + WEATHER_CACHE_TTL_MS,
+      value: null,
+    });
+    return null;
+  }
+}
+
+export async function getDestinationWeatherDetail(destination: string, date: string): Promise<DestinationWeatherDetail | null> {
+  const context = await resolveDestinationContext(destination);
+  if (!context || !parseIsoDate(`${date}T12:00:00`)) {
+    return null;
+  }
+
+  const cacheKey = `${context.label.toLowerCase()}:${date}:detail`;
+  const cached = weatherDetailCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  try {
+    const url = new URL(FORECAST_URL);
+    url.searchParams.set('latitude', String(context.latitude));
+    url.searchParams.set('longitude', String(context.longitude));
+    url.searchParams.set('timezone', context.timezone);
+    url.searchParams.set('start_date', date);
+    url.searchParams.set('end_date', date);
+    url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset');
+    url.searchParams.set('hourly', 'weather_code,temperature_2m');
+
+    const payload = await fetchJson<OpenMeteoForecastResponse>(url.toString());
+    const dailyCodes = payload.daily?.weather_code ?? [];
+    const dailyMaxTemps = payload.daily?.temperature_2m_max ?? [];
+    const dailyMinTemps = payload.daily?.temperature_2m_min ?? [];
+    const sunrises = payload.daily?.sunrise ?? [];
+    const sunsets = payload.daily?.sunset ?? [];
+    const hourlyTimes = payload.hourly?.time ?? [];
+    const hourlyCodes = payload.hourly?.weather_code ?? [];
+    const hourlyTemps = payload.hourly?.temperature_2m ?? [];
+
+    const hours = hourlyTimes.map((timeValue, index) => ({
+      time: timeValue,
+      timeLabel: formatHourlyLabel(timeValue, context.timezone),
+      weatherCode: typeof hourlyCodes[index] === 'number' ? hourlyCodes[index] : null,
+      conditionLabel: describeWeatherCode(hourlyCodes[index]),
+      temperatureC: typeof hourlyTemps[index] === 'number' ? hourlyTemps[index] : null,
+    }));
+
+    const detail =
+      hours.length > 0
+        ? {
+            resolvedLabel: context.resolvedLabel,
+            timezone: context.timezone,
+            date,
+            dateLabel: formatFullDayLabel(date),
+            weatherCode: typeof dailyCodes[0] === 'number' ? dailyCodes[0] : null,
+            conditionLabel: describeWeatherCode(dailyCodes[0]),
+            temperatureMinC: typeof dailyMinTemps[0] === 'number' ? dailyMinTemps[0] : null,
+            temperatureMaxC: typeof dailyMaxTemps[0] === 'number' ? dailyMaxTemps[0] : null,
+            sunriseLabel: formatSunEventLabel(sunrises[0], context.timezone),
+            sunsetLabel: formatSunEventLabel(sunsets[0], context.timezone),
+            hours,
+          }
+        : null;
+
+    weatherDetailCache.set(cacheKey, {
+      expiresAt: Date.now() + WEATHER_CACHE_TTL_MS,
+      value: detail,
+    });
+
+    return detail;
+  } catch (error) {
+    if (__DEV__) {
+      console.error('getDestinationWeatherDetail failed', context.label, date, error);
+    }
+    weatherDetailCache.set(cacheKey, {
       expiresAt: Date.now() + WEATHER_CACHE_TTL_MS,
       value: null,
     });

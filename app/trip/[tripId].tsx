@@ -181,6 +181,7 @@ export default function TripDetailScreen() {
   const [destinationTimeInfo, setDestinationTimeInfo] = useState<DestinationLocalTimeInfo | null>(null);
   const [destinationWeather, setDestinationWeather] = useState<DestinationWeatherForecast | null>(null);
   const [destinationQuickFacts, setDestinationQuickFacts] = useState<DestinationQuickFacts | null>(null);
+  const [selectedWeatherDate, setSelectedWeatherDate] = useState<string | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
   const summary = useMemo(
@@ -277,6 +278,17 @@ export default function TripDetailScreen() {
     };
   }, [trip?.destination]);
 
+  useEffect(() => {
+    if (!destinationWeather?.days.length) {
+      setSelectedWeatherDate(null);
+      return;
+    }
+
+    setSelectedWeatherDate((current) =>
+      current && destinationWeather.days.some((day) => day.date === current) ? current : destinationWeather.days[0]?.date ?? null
+    );
+  }, [destinationWeather]);
+
   if (!trip) {
     return (
       <AppScreen title="Trip not found">
@@ -291,6 +303,8 @@ export default function TripDetailScreen() {
     );
   }
   const currentTrip = trip;
+  const selectedWeatherDay =
+    destinationWeather?.days.find((day) => day.date === selectedWeatherDate) ?? destinationWeather?.days[0] ?? null;
 
   function openTravellerEditor(current?: TravellerDraft) {
     setTravellerDraft(
@@ -607,7 +621,19 @@ export default function TripDetailScreen() {
 
       {destinationWeather?.days.length ? (
         <View style={styles.weatherCard}>
-          <View style={styles.weatherHeroSection}>
+          <Pressable
+            onPress={() => {
+              if (!selectedWeatherDay) {
+                return;
+              }
+
+              router.push({
+                pathname: '/trip/[tripId]/weather',
+                params: { tripId, date: selectedWeatherDay.date },
+              });
+            }}
+            style={styles.weatherHeroSection}
+          >
             <View style={styles.weatherBackground}>
               <View style={styles.weatherCircleLarge} />
               <View style={styles.weatherCircleMedium} />
@@ -615,16 +641,16 @@ export default function TripDetailScreen() {
             </View>
             <View style={styles.weatherHeroLeft}>
               <View style={styles.weatherConditionRow}>
-                <MaterialIcons name={weatherIconName(destinationWeather.days[0]?.weatherCode ?? null) as any} size={28} color={colors.white} />
-                <Text style={styles.weatherConditionLabel}>{destinationWeather.days[0]?.conditionLabel ?? 'Weather unavailable'}</Text>
+                <MaterialIcons name={weatherIconName(selectedWeatherDay?.weatherCode ?? null) as any} size={28} color={colors.white} />
+                <Text style={styles.weatherConditionLabel}>{selectedWeatherDay?.conditionLabel ?? 'Weather unavailable'}</Text>
               </View>
               <Text style={styles.weatherHeadlineTemp}>
-                {destinationWeather.days[0]?.temperatureMaxC !== null && destinationWeather.days[0]?.temperatureMaxC !== undefined
-                  ? `${Math.round(destinationWeather.days[0].temperatureMaxC)}°`
+                {selectedWeatherDay?.temperatureMaxC !== null && selectedWeatherDay?.temperatureMaxC !== undefined
+                  ? `${Math.round(selectedWeatherDay.temperatureMaxC)}°`
                   : '--'}
               </Text>
               <Text style={styles.weatherHeadlineRange}>
-                {formatTemperatureRange(destinationWeather.days[0]?.temperatureMinC ?? null, destinationWeather.days[0]?.temperatureMaxC ?? null)}
+                {formatTemperatureRange(selectedWeatherDay?.temperatureMinC ?? null, selectedWeatherDay?.temperatureMaxC ?? null)}
               </Text>
             </View>
             <View style={styles.weatherHeroRight}>
@@ -637,14 +663,19 @@ export default function TripDetailScreen() {
                     : 'Timezone unavailable'}
               </Text>
               <Text style={styles.weatherHeroPlace}>{destinationWeather.resolvedLabel ?? trip.destination}</Text>
+              <Text style={styles.weatherHeroMeta}>{selectedWeatherDay?.dayLabel ?? 'Today'}</Text>
             </View>
-          </View>
+          </Pressable>
           <View style={styles.weatherDaysSection}>
             {destinationWeather.days.slice(0, 7).map((day) => (
-              <View key={day.date} style={styles.weatherDayButton}>
+              <Pressable
+                key={day.date}
+                onPress={() => setSelectedWeatherDate(day.date)}
+                style={[styles.weatherDayButton, selectedWeatherDay?.date === day.date ? styles.weatherDayButtonActive : null]}
+              >
                 <Text style={styles.weatherDayButtonLabel}>{compactWeatherDayLabel(day.dayLabel)}</Text>
                 <MaterialIcons name={weatherIconName(day.weatherCode) as any} size={18} color={colors.white} />
-              </View>
+              </Pressable>
             ))}
           </View>
         </View>
@@ -2039,6 +2070,9 @@ const styles = StyleSheet.create({
     minHeight: 56,
     backgroundColor: '#A75265',
     paddingVertical: spacing.sm,
+  },
+  weatherDayButtonActive: {
+    backgroundColor: '#8F4055',
   },
   weatherDayButtonLabel: {
     color: 'rgba(255,255,255,0.75)',
