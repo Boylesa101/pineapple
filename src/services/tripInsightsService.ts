@@ -27,6 +27,27 @@ type OpenMeteoForecastResponse = {
   };
 };
 
+type RestCountriesEntry = {
+  name?: {
+    common?: string;
+    official?: string;
+  };
+  currencies?: Record<string, { name?: string; symbol?: string }>;
+  languages?: Record<string, string>;
+  cca2?: string;
+};
+
+type EmergencyNumberApiResponse = {
+  data?: {
+    ambulance?: { all?: string[] | null };
+    fire?: { all?: string[] | null };
+    police?: { all?: string[] | null };
+    dispatch?: { all?: string[] | null };
+    member_112?: boolean;
+    nodata?: boolean;
+  };
+};
+
 export type ResolvedDestinationContext = {
   label: string;
   resolvedLabel: string;
@@ -59,6 +80,15 @@ export type DestinationWeatherForecast = {
   days: DestinationWeatherDay[];
 };
 
+export type DestinationQuickFacts = {
+  resolvedLabel: string;
+  countryLabel: string;
+  languageLabel: string | null;
+  currencyLabel: string | null;
+  plugLabel: string | null;
+  emergencyLabel: string | null;
+};
+
 export type AirportSetOffInfo =
   | {
       status: 'available';
@@ -74,10 +104,15 @@ export type AirportSetOffInfo =
 
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
+const REST_COUNTRIES_NAME_URL = 'https://restcountries.com/v3.1/name';
+const EMERGENCY_NUMBER_URL = 'https://emergencynumberapi.com/api/country';
+const POWER_PLUGS_URL = 'https://www.power-plugs-sockets.com';
 const GEOCODE_CACHE_TTL_MS = 1000 * 60 * 60 * 12;
 const WEATHER_CACHE_TTL_MS = 1000 * 60 * 30;
+const QUICK_FACTS_CACHE_TTL_MS = 1000 * 60 * 60 * 12;
 const geocodeCache = new Map<string, { expiresAt: number; value: ResolvedDestinationContext | null }>();
 const weatherCache = new Map<string, { expiresAt: number; value: DestinationWeatherForecast | null }>();
+const quickFactsCache = new Map<string, { expiresAt: number; value: DestinationQuickFacts | null }>();
 
 function getDeviceTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
@@ -297,6 +332,152 @@ function describeWeatherCode(weatherCode: number | null | undefined) {
   }
 }
 
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&rsquo;/gi, "'")
+    .replace(/&ndash;/gi, '-')
+    .replace(/&mdash;/gi, '-');
+}
+
+function slugifyCountryLabel(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function listFirstNonEmpty(values: Array<string | null | undefined>) {
+  return values.map((value) => value?.trim()).find(Boolean) ?? null;
+}
+
+function formatLanguageLabel(languages: RestCountriesEntry['languages']) {
+  const values = Object.values(languages ?? {}).filter(Boolean);
+  if (!values.length) {
+    return null;
+  }
+  if (values.length <= 2) {
+    return values.join(', ');
+  }
+  return `${values.slice(0, 2).join(', ')} +${values.length - 2}`;
+}
+
+function formatCurrencyLabel(currencies: RestCountriesEntry['currencies']) {
+  const entries = Object.entries(currencies ?? {});
+  if (!entries.length) {
+    return null;
+  }
+
+  return entries
+    .map(([code, details]) => {
+      const name = details?.name?.trim();
+      const symbol = details?.symbol?.trim();
+      if (name && symbol) {
+        return `${code} ${symbol}`;
+      }
+      if (name) {
+        return `${name} (${code})`;
+      }
+      return code;
+    })
+    .join(', ');
+}
+
+function formatEmergencyLabel(payload: EmergencyNumberApiResponse) {
+  const data = payload.data;
+  if (!data || data.nodata) {
+    return null;
+  }
+
+  if (data.member_112) {
+    return '112';
+  }
+
+  const dispatch = listFirstNonEmpty(data.dispatch?.all ?? []);
+  if (dispatch) {
+    return dispatch;
+  }
+
+  const fallbackNumbers = Array.from(
+    new Set(
+      [listFirstNonEmpty(data.police?.all ?? []), listFirstNonEmpty(data.ambulance?.all ?? []), listFirstNonEmpty(data.fire?.all ?? [])].filter(
+        Boolean
+      ) as string[]
+    )
+  );
+
+  if (!fallbackNumbers.length) {
+    return null;
+  }
+
+  return fallbackNumbers.slice(0, 3).join(' / ');
+}
+
+function parsePlugLabelFromHtml(html: string) {
+  const metaMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+  if (!metaMatch?.[1]) {
+    return null;
+  }
+
+  const description = decodeHtmlEntities(metaMatch[1]);
+  const plugMatch = description.match(/type\s+([A-Z](?:,\s*[A-Z])*(?:\s+and\s+[A-Z])?)/i);
+  if (!plugMatch?.[1]) {
+    return null;
+  }
+
+  return `Type ${plugMatch[1].replace(/\s+and\s+/gi, ', ')}`;
+}
+
+async function fetchDestinationCountryProfile(country: string) {
+  const urls = [
+    `${REST_COUNTRIES_NAME_URL}/${encodeURIComponent(country)}?fullText=true&fields=name,currencies,languages,cca2`,
+    `${REST_COUNTRIES_NAME_URL}/${encodeURIComponent(country)}?fields=name,currencies,languages,cca2`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const payload = await fetchJson<RestCountriesEntry[]>(url);
+      const match = payload.find((entry) => entry.cca2) ?? payload[0];
+      if (match) {
+        return match;
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.error('fetchDestinationCountryProfile failed', country, error);
+      }
+    }
+  }
+
+  return null;
+}
+
+async function fetchDestinationPlugLabel(country: string) {
+  const slug = slugifyCountryLabel(country);
+  if (!slug) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${POWER_PLUGS_URL}/${slug}/`);
+    if (!response.ok) {
+      return null;
+    }
+
+    const html = await response.text();
+    return parsePlugLabelFromHtml(html);
+  } catch (error) {
+    if (__DEV__) {
+      console.error('fetchDestinationPlugLabel failed', country, error);
+    }
+    return null;
+  }
+}
+
 export async function resolveDestinationContext(destination: string) {
   const normalized = normalizeDestinationLabel(destination);
   if (!normalized) {
@@ -423,6 +604,54 @@ export async function getDestinationWeatherForecast(destination: string): Promis
     }
     weatherCache.set(cacheKey, {
       expiresAt: Date.now() + WEATHER_CACHE_TTL_MS,
+      value: null,
+    });
+    return null;
+  }
+}
+
+export async function getDestinationQuickFacts(destination: string): Promise<DestinationQuickFacts | null> {
+  const context = await resolveDestinationContext(destination);
+  if (!context?.country) {
+    return null;
+  }
+
+  const cacheKey = context.country.toLowerCase();
+  const cached = quickFactsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  try {
+    const countryProfile = await fetchDestinationCountryProfile(context.country);
+    const countryCode = countryProfile?.cca2?.trim().toUpperCase() ?? null;
+
+    const [plugLabel, emergencyPayload] = await Promise.all([
+      fetchDestinationPlugLabel(context.country),
+      countryCode ? fetchJson<EmergencyNumberApiResponse>(`${EMERGENCY_NUMBER_URL}/${encodeURIComponent(countryCode)}`).catch(() => null) : Promise.resolve(null),
+    ]);
+
+    const quickFacts: DestinationQuickFacts = {
+      resolvedLabel: context.resolvedLabel,
+      countryLabel: countryProfile?.name?.common?.trim() || context.country,
+      languageLabel: formatLanguageLabel(countryProfile?.languages),
+      currencyLabel: formatCurrencyLabel(countryProfile?.currencies),
+      plugLabel,
+      emergencyLabel: emergencyPayload ? formatEmergencyLabel(emergencyPayload) : null,
+    };
+
+    quickFactsCache.set(cacheKey, {
+      expiresAt: Date.now() + QUICK_FACTS_CACHE_TTL_MS,
+      value: quickFacts,
+    });
+
+    return quickFacts;
+  } catch (error) {
+    if (__DEV__) {
+      console.error('getDestinationQuickFacts failed', context.label, error);
+    }
+    quickFactsCache.set(cacheKey, {
+      expiresAt: Date.now() + QUICK_FACTS_CACHE_TTL_MS,
       value: null,
     });
     return null;

@@ -28,8 +28,10 @@ import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import {
   getAirportSetOffInfo,
   getDestinationLocalTimeInfo,
+  getDestinationQuickFacts,
   getDestinationWeatherForecast,
   type DestinationLocalTimeInfo,
+  type DestinationQuickFacts,
   type DestinationWeatherForecast,
 } from '@/services/tripInsightsService';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
@@ -140,6 +142,10 @@ function compactWeatherDayLabel(dayLabel: string) {
   return (token || dayLabel).slice(0, 3).toUpperCase();
 }
 
+function quickFactValue(value: string | null | undefined, fallback = 'Unavailable') {
+  return value?.trim() || fallback;
+}
+
 export default function TripDetailScreen() {
   const router = useRouter();
   const { tripId, focus } = useLocalSearchParams<{ tripId: string; focus?: string }>();
@@ -174,6 +180,7 @@ export default function TripDetailScreen() {
   const [activeSection, setActiveSection] = useState<TripSection>('overview');
   const [destinationTimeInfo, setDestinationTimeInfo] = useState<DestinationLocalTimeInfo | null>(null);
   const [destinationWeather, setDestinationWeather] = useState<DestinationWeatherForecast | null>(null);
+  const [destinationQuickFacts, setDestinationQuickFacts] = useState<DestinationQuickFacts | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
   const summary = useMemo(
@@ -230,6 +237,7 @@ export default function TripDetailScreen() {
     if (!destination) {
       setDestinationTimeInfo(null);
       setDestinationWeather(null);
+      setDestinationQuickFacts(null);
       setInsightsLoading(false);
       return () => {
         cancelled = true;
@@ -238,14 +246,15 @@ export default function TripDetailScreen() {
 
     setInsightsLoading(true);
 
-    void Promise.all([getDestinationLocalTimeInfo(destination), getDestinationWeatherForecast(destination)])
-      .then(([timeInfo, weather]) => {
+    void Promise.all([getDestinationLocalTimeInfo(destination), getDestinationWeatherForecast(destination), getDestinationQuickFacts(destination)])
+      .then(([timeInfo, weather, quickFacts]) => {
         if (cancelled) {
           return;
         }
 
         setDestinationTimeInfo(timeInfo);
         setDestinationWeather(weather);
+        setDestinationQuickFacts(quickFacts);
       })
       .catch((error) => {
         if (__DEV__) {
@@ -254,6 +263,7 @@ export default function TripDetailScreen() {
         if (!cancelled) {
           setDestinationTimeInfo(null);
           setDestinationWeather(null);
+          setDestinationQuickFacts(null);
         }
       })
       .finally(() => {
@@ -618,9 +628,15 @@ export default function TripDetailScreen() {
               </Text>
             </View>
             <View style={styles.weatherHeroRight}>
-              <Text style={styles.weatherHeroEyebrow}>7-day forecast</Text>
+              <Text style={styles.weatherHeroTime}>{destinationTimeInfo?.localTimeLabel ?? '--:--'}</Text>
+              <Text style={styles.weatherHeroOffset}>
+                {destinationTimeInfo
+                  ? `${destinationTimeInfo.offsetLabel}${destinationTimeInfo.relativeLabel ? ` • ${destinationTimeInfo.relativeLabel}` : ''}`
+                  : insightsLoading
+                    ? 'Checking timezone…'
+                    : 'Timezone unavailable'}
+              </Text>
               <Text style={styles.weatherHeroPlace}>{destinationWeather.resolvedLabel ?? trip.destination}</Text>
-              <Text style={styles.weatherHeroMeta}>{destinationWeather.days[0]?.dayLabel ?? 'Today'}</Text>
             </View>
           </View>
           <View style={styles.weatherDaysSection}>
@@ -642,18 +658,38 @@ export default function TripDetailScreen() {
                 : 'We could not load a forecast for this destination right now.'
             }
           />
+          {destinationTimeInfo ? (
+            <Text style={styles.notes}>
+              Local time {destinationTimeInfo.localTimeLabel} • {destinationTimeInfo.offsetLabel}
+            </Text>
+          ) : null}
         </AppCard>
       )}
 
       <View style={styles.infoCardGrid}>
         <View style={styles.infoCard}>
           <View style={styles.infoCardHeader}>
-            <MaterialIcons name="schedule" size={16} color={colors.white} />
-            <Text style={styles.infoCardLabel}>Destination local time</Text>
+            <MaterialIcons name="public" size={16} color={colors.white} />
+            <Text style={styles.infoCardLabel}>Quick facts</Text>
           </View>
-          <Text style={styles.infoCardValue}>{destinationTimeInfo?.localTimeLabel ?? (insightsLoading ? 'Checking…' : 'Time unavailable')}</Text>
-          <Text style={styles.infoCardMeta}>{destinationTimeInfo?.offsetLabel ?? 'Timezone unavailable'}</Text>
-          <Text style={styles.infoCardHint}>{destinationTimeInfo?.relativeLabel ?? 'We could not resolve the destination timezone.'}</Text>
+          <View style={styles.quickFactList}>
+            <View style={styles.quickFactRow}>
+              <Text style={styles.quickFactLabel}>Language</Text>
+              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.languageLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
+            </View>
+            <View style={styles.quickFactRow}>
+              <Text style={styles.quickFactLabel}>Currency</Text>
+              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.currencyLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
+            </View>
+            <View style={styles.quickFactRow}>
+              <Text style={styles.quickFactLabel}>Plug</Text>
+              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.plugLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
+            </View>
+            <View style={styles.quickFactRow}>
+              <Text style={styles.quickFactLabel}>Emergency</Text>
+              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.emergencyLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.infoCard}>
@@ -1751,6 +1787,28 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
   },
+  quickFactList: {
+    gap: 5,
+    marginTop: 2,
+  },
+  quickFactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
+  },
+  quickFactLabel: {
+    color: 'rgba(255,255,255,0.78)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+  },
+  quickFactValue: {
+    flexShrink: 1,
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    textAlign: 'right',
+  },
   notes: {
     color: colors.textMuted,
     fontFamily: 'Inter_400Regular',
@@ -1941,17 +1999,24 @@ const styles = StyleSheet.create({
     maxWidth: '42%',
     zIndex: 1,
   },
-  weatherHeroEyebrow: {
-    color: 'rgba(255,255,255,0.8)',
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1.1,
+  weatherHeroTime: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 28,
+    lineHeight: 30,
+    textAlign: 'right',
+  },
+  weatherHeroOffset: {
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: 'right',
   },
   weatherHeroPlace: {
     color: colors.white,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'right',
   },
   weatherHeroMeta: {
