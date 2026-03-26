@@ -4,6 +4,7 @@ export type HeroImageStatus = 'idle' | 'loading' | 'ready' | 'failed';
 export type DestinationImageSource = 'curated' | 'pexels' | 'wikimedia' | 'fallback';
 export type TransportType = 'flight' | 'train';
 export type TravelDirection = 'outbound' | 'return' | 'other';
+export type VibeCategory = 'eat' | 'drink' | 'visit' | 'do';
 export type DocumentType =
   | 'passport'
   | 'ghic'
@@ -282,6 +283,38 @@ export interface ReminderSetting {
   updatedAt: string;
 }
 
+export interface SavedVibe {
+  id: string;
+  tripId: string;
+  source: 'tripadvisor';
+  sourceItemId: string;
+  name: string;
+  category: VibeCategory;
+  displayCategory: string;
+  address: string;
+  rating: string | null;
+  ranking: string | null;
+  tripadvisorUrl: string | null;
+  websiteUrl: string | null;
+  imageUrl: string | null;
+  savedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VibeCacheEntry {
+  id: string;
+  tripId: string;
+  queryKey: string;
+  areaLabel: string;
+  source: 'tripadvisor';
+  payloadJson: string;
+  fetchedAt: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppPreferences {
   id: 'app';
   notificationsEnabled: boolean;
@@ -376,6 +409,8 @@ export interface AppDataSnapshot {
   itineraryEvents: ItineraryEvent[];
   emergencyInfos: EmergencyInfo[];
   reminderSettings: ReminderSetting[];
+  savedVibes: SavedVibe[];
+  vibeCacheEntries: VibeCacheEntry[];
   appPreferences: AppPreferences;
   tripParticipants: TripParticipant[];
   tripInvites: TripInvite[];
@@ -459,6 +494,8 @@ export type HotelStayDraft = Omit<HotelStay, 'id' | 'createdAt' | 'updatedAt'> &
 export type ItineraryEventDraft = Omit<ItineraryEvent, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type EmergencyInfoDraft = Omit<EmergencyInfo, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type ReminderSettingDraft = Omit<ReminderSetting, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
+export type SavedVibeDraft = Omit<SavedVibe, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
+export type VibeCacheEntryDraft = Omit<VibeCacheEntry, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type AppPreferencesDraft = Omit<AppPreferences, 'createdAt' | 'updatedAt'>;
 export type TripParticipantDraft = Omit<TripParticipant, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
 export type TripInviteDraft = Omit<TripInvite, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };

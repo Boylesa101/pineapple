@@ -7,11 +7,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
 - Expo Go is no longer a supported Pineapple test path; use installable APKs for device testing and `.aab` for Play Store release
 - For a dev-only APK that still expects Metro, run `npm run apk:debug`
-- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.1.2-debug.apk`
+- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.2.0-debug.apk`
 - For the fastest direct phone testing on a modern device, run `npm run apk:release:arm64`
-- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.1.2-release-arm64.apk`
+- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.2.0-release-arm64.apk`
 - For direct phone testing without USB or Metro, run `npm run apk:release`
-- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.1.2-release.apk`
+- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.2.0-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
 - Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
 - When you are ready for Google Play, provide these environment variables before building:
@@ -81,8 +81,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Date-of-birth entry now uses direct typed `DD / MM / YYYY` input in traveller, passport, and driving-licence flows instead of the calendar picker
 - Trip detail now uses a contextual footer for `Packing`, `Vibes`, `Flight`, and `Hotel`, keeping those sections in the trip flow instead of the global footer
 - Honest limitation: destination time and weather depend on successful live destination geocoding and forecast lookups, so Pineapple intentionally shows calm fallback states instead of guessed values when those requests fail
-- `Vibes` can fetch live top picks for places to eat, visit, and do from Tripadvisor through the `pinapple-dev.pages.dev/api/vibes` Cloudflare Pages Function proxy and add them directly into the itinerary
+- `Vibes` is now a premium swipe deck backed by the same Cloudflare + Tripadvisor proxy, with live image-led cards for places to eat, drink, visit, and do plus a per-trip `Mood` shortlist for saved right-swipes
+- `Mood` persists saved Vibes locally per trip, prevents duplicates, and lets the user review saved places, open reliable source links, or add a place into the itinerary later
 - To enable live Vibes on Cloudflare Pages, add the Pages secret `TRIPADVISOR_API_KEY`, optionally set `TRIPADVISOR_ALLOWED_DOMAIN=pinapple-dev.pages.dev`, and allowlist `pinapple-dev.pages.dev` in Tripadvisor
+- Honest limitation: Tripadvisor does not reliably expose first-party social handles through the current Content API, so Pineapple only shows the official website and Tripadvisor links when the live data includes them and never invents social accounts
+- Honest limitation: Tripadvisor publishes stricter storage/display rules than Pineapple’s normal local-first sources, so the current Vibes implementation keeps only a short-lived local deck cache plus the user’s saved Mood shortlist for continuity
 - Chronological itinerary timeline
 - Emergency reference storage per trip
 - High-contrast Travel Mode with family overview, traveller tabs/swipe, quick copy actions, and temporary sensitive reveal

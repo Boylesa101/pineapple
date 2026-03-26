@@ -20,6 +20,7 @@ import type {
   ItineraryEventDraft,
   PackingItemDraft,
   ReminderSettingDraft,
+  SavedVibeDraft,
   SharedTripStateDraft,
   SyncConflictDraft,
   TravelSegmentDraft,
@@ -27,6 +28,7 @@ import type {
   TripDraft,
   TripInviteDraft,
   TripParticipantDraft,
+  VibeCacheEntryDraft,
 } from '@/types/models';
 
 const SNAPSHOT_KEY = 'pineapple.snapshot';
@@ -64,6 +66,8 @@ function emptySnapshot(timestamp = now()): AppDataSnapshot {
     itineraryEvents: [],
     emergencyInfos: [],
     reminderSettings: [],
+    savedVibes: [],
+    vibeCacheEntries: [],
     appPreferences: defaultAppPreferences(timestamp),
     tripParticipants: [],
     tripInvites: [],
@@ -198,6 +202,26 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         embassyConsulateNote: (await decryptStructuredValue(info.embassyConsulateNote)) ?? '',
         travellerMedicalNote: (await decryptStructuredValue(info.travellerMedicalNote)) ?? '',
         emergencyContacts: (await decryptStructuredValue(info.emergencyContacts)) ?? '',
+      }))
+    ),
+    savedVibes: await Promise.all(
+      (snapshot.savedVibes ?? []).map(async (item) => ({
+        ...item,
+        name: (await decryptStructuredValue(item.name)) ?? '',
+        displayCategory: (await decryptStructuredValue(item.displayCategory)) ?? '',
+        address: (await decryptStructuredValue(item.address)) ?? '',
+        rating: await decryptStructuredValue(item.rating),
+        ranking: await decryptStructuredValue(item.ranking),
+        tripadvisorUrl: await decryptStructuredValue(item.tripadvisorUrl),
+        websiteUrl: await decryptStructuredValue(item.websiteUrl),
+        imageUrl: await decryptStructuredValue(item.imageUrl),
+      }))
+    ),
+    vibeCacheEntries: await Promise.all(
+      (snapshot.vibeCacheEntries ?? []).map(async (entry) => ({
+        ...entry,
+        areaLabel: (await decryptStructuredValue(entry.areaLabel)) ?? '',
+        payloadJson: (await decryptStructuredValue(entry.payloadJson)) ?? '[]',
       }))
     ),
     tripParticipants: await Promise.all(
@@ -342,6 +366,26 @@ async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         embassyConsulateNote: (await encryptStructuredValue(info.embassyConsulateNote)) ?? '',
         travellerMedicalNote: (await encryptStructuredValue(info.travellerMedicalNote)) ?? '',
         emergencyContacts: (await encryptStructuredValue(info.emergencyContacts)) ?? '',
+      }))
+    ),
+    savedVibes: await Promise.all(
+      (snapshot.savedVibes ?? []).map(async (item) => ({
+        ...item,
+        name: (await encryptStructuredValue(item.name)) ?? '',
+        displayCategory: (await encryptStructuredValue(item.displayCategory)) ?? '',
+        address: (await encryptStructuredValue(item.address)) ?? '',
+        rating: await encryptStructuredValue(item.rating),
+        ranking: await encryptStructuredValue(item.ranking),
+        tripadvisorUrl: await encryptStructuredValue(item.tripadvisorUrl),
+        websiteUrl: await encryptStructuredValue(item.websiteUrl),
+        imageUrl: await encryptStructuredValue(item.imageUrl),
+      }))
+    ),
+    vibeCacheEntries: await Promise.all(
+      (snapshot.vibeCacheEntries ?? []).map(async (entry) => ({
+        ...entry,
+        areaLabel: (await encryptStructuredValue(entry.areaLabel)) ?? '',
+        payloadJson: (await encryptStructuredValue(entry.payloadJson)) ?? '[]',
       }))
     ),
     tripParticipants: await Promise.all(
@@ -629,6 +673,42 @@ export async function upsertReminderSetting(input: ReminderSettingDraft) {
   return id;
 }
 
+export async function upsertSavedVibe(input: SavedVibeDraft) {
+  const snapshot = await readSnapshot();
+  const timestamp = now();
+  const existing = snapshot.savedVibes.find(
+    (item) => item.tripId === input.tripId && item.source === input.source && item.sourceItemId === input.sourceItemId
+  );
+  const id = existing?.id ?? input.id ?? createId('mood');
+  await writeSnapshot({
+    ...snapshot,
+    savedVibes: withUpsert(snapshot.savedVibes, {
+      ...input,
+      id,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    }),
+  });
+  return id;
+}
+
+export async function upsertVibeCacheEntry(input: VibeCacheEntryDraft) {
+  const snapshot = await readSnapshot();
+  const timestamp = now();
+  const existing = snapshot.vibeCacheEntries.find((item) => item.queryKey === input.queryKey);
+  const id = existing?.id ?? input.id ?? createId('vibe_cache');
+  await writeSnapshot({
+    ...snapshot,
+    vibeCacheEntries: withUpsert(snapshot.vibeCacheEntries, {
+      ...input,
+      id,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    }),
+  });
+  return id;
+}
+
 export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const snapshot = await readSnapshot();
   const normalized = normalizeAppPreferences({
@@ -725,6 +805,8 @@ export async function deleteById(table: string, id: string) {
       next.itineraryEvents = snapshot.itineraryEvents.filter((item) => item.tripId !== id);
       next.emergencyInfos = snapshot.emergencyInfos.filter((item) => item.tripId !== id);
       next.reminderSettings = snapshot.reminderSettings.filter((item) => item.tripId !== id);
+      next.savedVibes = snapshot.savedVibes.filter((item) => item.tripId !== id);
+      next.vibeCacheEntries = snapshot.vibeCacheEntries.filter((item) => item.tripId !== id);
       next.tripParticipants = snapshot.tripParticipants.filter((item) => item.tripId !== id);
       next.tripInvites = snapshot.tripInvites.filter((item) => item.tripId !== id);
       next.sharedTripStates = snapshot.sharedTripStates.filter((item) => item.tripId !== id);
@@ -754,6 +836,12 @@ export async function deleteById(table: string, id: string) {
       break;
     case 'emergency_infos':
       next.emergencyInfos = snapshot.emergencyInfos.filter((item) => item.id !== id);
+      break;
+    case 'saved_vibes':
+      next.savedVibes = snapshot.savedVibes.filter((item) => item.id !== id);
+      break;
+    case 'vibe_cache_entries':
+      next.vibeCacheEntries = snapshot.vibeCacheEntries.filter((item) => item.id !== id);
       break;
     case 'trip_participants':
       next.tripParticipants = snapshot.tripParticipants.filter((item) => item.id !== id);

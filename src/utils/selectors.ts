@@ -38,6 +38,8 @@ export function getTripBundle(snapshot: AppDataSnapshot, tripId: string | null |
     itineraryEvents: snapshot.itineraryEvents.filter((item) => item.tripId === tripId),
     emergencyInfo: snapshot.emergencyInfos.find((item) => item.tripId === tripId) ?? null,
     reminderSettings: snapshot.reminderSettings.filter((item) => item.tripId === tripId || item.tripId === null),
+    savedVibes: snapshot.savedVibes.filter((item) => item.tripId === tripId),
+    vibeCacheEntries: snapshot.vibeCacheEntries.filter((item) => item.tripId === tripId),
     participants: snapshot.tripParticipants.filter((item) => item.tripId === tripId),
     invites: snapshot.tripInvites.filter((item) => item.tripId === tripId),
     sharedTripState: snapshot.sharedTripStates.find((item) => item.tripId === tripId) ?? null,

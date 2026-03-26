@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { createShareCode } from '@/utils/shareCodes';
 
-const DATABASE_VERSION = 18;
+const DATABASE_VERSION = 19;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -184,6 +184,39 @@ CREATE TABLE IF NOT EXISTS reminder_settings (
   updatedAt TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS saved_vibes (
+  id TEXT PRIMARY KEY NOT NULL,
+  tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  source TEXT NOT NULL DEFAULT 'tripadvisor',
+  sourceItemId TEXT NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  displayCategory TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  rating TEXT,
+  ranking TEXT,
+  tripadvisorUrl TEXT,
+  websiteUrl TEXT,
+  imageUrl TEXT,
+  savedAt TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  UNIQUE (tripId, source, sourceItemId)
+);
+
+CREATE TABLE IF NOT EXISTS vibe_cache_entries (
+  id TEXT PRIMARY KEY NOT NULL,
+  tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  queryKey TEXT NOT NULL UNIQUE,
+  areaLabel TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'tripadvisor',
+  payloadJson TEXT NOT NULL DEFAULT '[]',
+  fetchedAt TEXT NOT NULL,
+  expiresAt TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS app_preferences (
   id TEXT PRIMARY KEY NOT NULL,
   notificationsEnabled INTEGER NOT NULL DEFAULT 0,
@@ -258,6 +291,8 @@ CREATE INDEX IF NOT EXISTS idx_documents_expiry ON documents (expiryDate);
 CREATE INDEX IF NOT EXISTS idx_packing_trip ON packing_items (tripId);
 CREATE INDEX IF NOT EXISTS idx_itinerary_trip_datetime ON itinerary_events (tripId, dateTime);
 CREATE INDEX IF NOT EXISTS idx_reminders_trip_kind ON reminder_settings (tripId, kind);
+CREATE INDEX IF NOT EXISTS idx_saved_vibes_trip_savedAt ON saved_vibes (tripId, savedAt DESC);
+CREATE INDEX IF NOT EXISTS idx_vibe_cache_trip_expires ON vibe_cache_entries (tripId, expiresAt DESC);
 CREATE INDEX IF NOT EXISTS idx_participants_trip ON trip_participants (tripId);
 CREATE INDEX IF NOT EXISTS idx_invites_trip ON trip_invites (tripId);
 CREATE INDEX IF NOT EXISTS idx_conflicts_trip_status ON sync_conflicts (tripId, status);
@@ -423,6 +458,46 @@ async function runPhaseEighteenMigration(db: SQLiteDatabase) {
   `);
 }
 
+async function runPhaseNineteenMigration(db: SQLiteDatabase) {
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS saved_vibes (
+      id TEXT PRIMARY KEY NOT NULL,
+      tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+      source TEXT NOT NULL DEFAULT 'tripadvisor',
+      sourceItemId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      displayCategory TEXT NOT NULL DEFAULT '',
+      address TEXT NOT NULL DEFAULT '',
+      rating TEXT,
+      ranking TEXT,
+      tripadvisorUrl TEXT,
+      websiteUrl TEXT,
+      imageUrl TEXT,
+      savedAt TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      UNIQUE (tripId, source, sourceItemId)
+    );
+
+    CREATE TABLE IF NOT EXISTS vibe_cache_entries (
+      id TEXT PRIMARY KEY NOT NULL,
+      tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+      queryKey TEXT NOT NULL UNIQUE,
+      areaLabel TEXT NOT NULL DEFAULT '',
+      source TEXT NOT NULL DEFAULT 'tripadvisor',
+      payloadJson TEXT NOT NULL DEFAULT '[]',
+      fetchedAt TEXT NOT NULL,
+      expiresAt TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_saved_vibes_trip_savedAt ON saved_vibes (tripId, savedAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_vibe_cache_trip_expires ON vibe_cache_entries (tripId, expiresAt DESC);
+  `);
+}
+
 async function runPhaseThreeMigration(db: SQLiteDatabase) {
   await db.execAsync(`
     INSERT OR IGNORE INTO app_preferences (
@@ -557,6 +632,10 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   if (version < 18) {
     await runPhaseEighteenMigration(db);
+  }
+
+  if (version < 19) {
+    await runPhaseNineteenMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

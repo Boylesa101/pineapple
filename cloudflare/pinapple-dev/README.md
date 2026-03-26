@@ -15,3 +15,5 @@ Vibes setup:
 - Add the Pages secret `TRIPADVISOR_API_KEY` to the `pinapple-dev` Cloudflare Pages project
 - Optional: add `TRIPADVISOR_ALLOWED_DOMAIN=pinapple-dev.pages.dev`
 - In Tripadvisor, allowlist the domain `pinapple-dev.pages.dev`
+- The worker keeps the Tripadvisor key server-side and now enriches search results with image, website, and cleaner category metadata before the app renders the native swipe deck
+- Current worker response lanes are `eat`, `drink`, `visit`, and `do`

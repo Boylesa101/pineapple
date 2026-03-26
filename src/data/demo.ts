@@ -328,6 +328,8 @@ export function createDemoSnapshot(): AppDataSnapshot {
         updatedAt: now,
       },
     ],
+    savedVibes: [],
+    vibeCacheEntries: [],
     appPreferences: {
       id: 'app',
       notificationsEnabled: false,

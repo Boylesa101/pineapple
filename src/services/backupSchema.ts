@@ -38,6 +38,8 @@ export function validateBackupPayload(payload: BackupPayload) {
     !Array.isArray(data.itineraryEvents) ||
     !Array.isArray(data.emergencyInfos) ||
     !Array.isArray(data.reminderSettings) ||
+    !Array.isArray(data.savedVibes) ||
+    !Array.isArray(data.vibeCacheEntries) ||
     !data.appPreferences ||
     !Array.isArray(data.tripParticipants) ||
     !Array.isArray(data.tripInvites) ||

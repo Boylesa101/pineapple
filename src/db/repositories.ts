@@ -30,6 +30,7 @@ import type {
   ItineraryEventDraft,
   PackingItemDraft,
   ReminderSettingDraft,
+  SavedVibeDraft,
   SharedTripStateDraft,
   SyncConflictDraft,
   TravelSegmentDraft,
@@ -37,6 +38,7 @@ import type {
   TripDraft,
   TripInviteDraft,
   TripParticipantDraft,
+  VibeCacheEntryDraft,
 } from '@/types/models';
 
 function now() {
@@ -219,6 +221,8 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     itineraryEvents,
     emergencyInfos,
     reminderSettings,
+    savedVibes,
+    vibeCacheEntries,
     appPreferencesRaw,
     tripParticipants,
     tripInvites,
@@ -237,6 +241,8 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     db.getAllAsync<any>('SELECT * FROM itinerary_events ORDER BY dateTime ASC'),
     db.getAllAsync<any>('SELECT * FROM emergency_infos ORDER BY createdAt DESC'),
     db.getAllAsync<any>('SELECT * FROM reminder_settings ORDER BY tripId ASC, kind ASC'),
+    db.getAllAsync<any>('SELECT * FROM saved_vibes ORDER BY savedAt DESC'),
+    db.getAllAsync<any>('SELECT * FROM vibe_cache_entries ORDER BY updatedAt DESC'),
     db.getFirstAsync<any>('SELECT * FROM app_preferences WHERE id = ?', 'app'),
     db.getAllAsync<any>('SELECT * FROM trip_participants ORDER BY tripId ASC, createdAt ASC'),
     db.getAllAsync<any>('SELECT * FROM trip_invites ORDER BY tripId ASC, createdAt ASC'),
@@ -399,6 +405,30 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     }))
   );
 
+  const decryptedSavedVibes = await Promise.all(
+    savedVibes.map(async (item) => ({
+      ...item,
+      source: item.source === 'tripadvisor' ? 'tripadvisor' : 'tripadvisor',
+      name: (await decryptField(item.name)) ?? '',
+      displayCategory: (await decryptField(item.displayCategory)) ?? '',
+      address: (await decryptField(item.address)) ?? '',
+      rating: await decryptField(item.rating),
+      ranking: await decryptField(item.ranking),
+      tripadvisorUrl: await decryptField(item.tripadvisorUrl),
+      websiteUrl: await decryptField(item.websiteUrl),
+      imageUrl: await decryptField(item.imageUrl),
+    }))
+  );
+
+  const decryptedVibeCacheEntries = await Promise.all(
+    vibeCacheEntries.map(async (entry) => ({
+      ...entry,
+      areaLabel: (await decryptField(entry.areaLabel)) ?? '',
+      payloadJson: (await decryptField(entry.payloadJson)) ?? '[]',
+      source: entry.source === 'tripadvisor' ? 'tripadvisor' : 'tripadvisor',
+    }))
+  );
+
   const decryptedTripParticipants = await Promise.all(
     tripParticipants.map(async (participant) => ({
       ...participant,
@@ -447,6 +477,8 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
       ...setting,
       enabled: toBool(setting.enabled),
     })),
+    savedVibes: decryptedSavedVibes,
+    vibeCacheEntries: decryptedVibeCacheEntries,
     appPreferences,
     tripParticipants: decryptedTripParticipants,
     tripInvites: decryptedTripInvites,
@@ -980,6 +1012,102 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
   return id;
 }
 
+export async function upsertSavedVibe(input: SavedVibeDraft) {
+  const db = await getDatabase();
+  const timestamp = now();
+  const existing = await db.getFirstAsync<{ id: string; createdAt: string }>(
+    'SELECT id, createdAt FROM saved_vibes WHERE tripId = ? AND source = ? AND sourceItemId = ?',
+    input.tripId,
+    input.source,
+    input.sourceItemId
+  );
+  const id = existing?.id ?? input.id ?? createId('mood');
+  const createdAt = existing?.createdAt ?? timestamp;
+  const encryptedName = (await encryptField(input.name)) ?? '';
+  const encryptedDisplayCategory = (await encryptField(input.displayCategory)) ?? '';
+  const encryptedAddress = (await encryptField(input.address)) ?? '';
+  const encryptedRating = await encryptField(input.rating);
+  const encryptedRanking = await encryptField(input.ranking);
+  const encryptedTripadvisorUrl = await encryptField(input.tripadvisorUrl);
+  const encryptedWebsiteUrl = await encryptField(input.websiteUrl);
+  const encryptedImageUrl = await encryptField(input.imageUrl);
+
+  await db.runAsync(
+    `INSERT INTO saved_vibes (
+      id, tripId, source, sourceItemId, name, category, displayCategory, address, rating, ranking, tripadvisorUrl, websiteUrl, imageUrl, savedAt, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(tripId, source, sourceItemId) DO UPDATE SET
+      name = excluded.name,
+      category = excluded.category,
+      displayCategory = excluded.displayCategory,
+      address = excluded.address,
+      rating = excluded.rating,
+      ranking = excluded.ranking,
+      tripadvisorUrl = excluded.tripadvisorUrl,
+      websiteUrl = excluded.websiteUrl,
+      imageUrl = excluded.imageUrl,
+      savedAt = excluded.savedAt,
+      updatedAt = excluded.updatedAt`,
+    id,
+    input.tripId,
+    input.source,
+    input.sourceItemId,
+    encryptedName,
+    input.category,
+    encryptedDisplayCategory,
+    encryptedAddress,
+    encryptedRating,
+    encryptedRanking,
+    encryptedTripadvisorUrl,
+    encryptedWebsiteUrl,
+    encryptedImageUrl,
+    input.savedAt,
+    createdAt,
+    timestamp
+  );
+
+  return id;
+}
+
+export async function upsertVibeCacheEntry(input: VibeCacheEntryDraft) {
+  const db = await getDatabase();
+  const timestamp = now();
+  const existing = await db.getFirstAsync<{ id: string; createdAt: string }>(
+    'SELECT id, createdAt FROM vibe_cache_entries WHERE queryKey = ?',
+    input.queryKey
+  );
+  const id = existing?.id ?? input.id ?? createId('vibe_cache');
+  const createdAt = existing?.createdAt ?? timestamp;
+  const encryptedAreaLabel = (await encryptField(input.areaLabel)) ?? '';
+  const encryptedPayloadJson = (await encryptField(input.payloadJson)) ?? '[]';
+
+  await db.runAsync(
+    `INSERT INTO vibe_cache_entries (
+      id, tripId, queryKey, areaLabel, source, payloadJson, fetchedAt, expiresAt, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(queryKey) DO UPDATE SET
+      tripId = excluded.tripId,
+      areaLabel = excluded.areaLabel,
+      source = excluded.source,
+      payloadJson = excluded.payloadJson,
+      fetchedAt = excluded.fetchedAt,
+      expiresAt = excluded.expiresAt,
+      updatedAt = excluded.updatedAt`,
+    id,
+    input.tripId,
+    input.queryKey,
+    encryptedAreaLabel,
+    input.source,
+    encryptedPayloadJson,
+    input.fetchedAt,
+    input.expiresAt,
+    createdAt,
+    timestamp
+  );
+
+  return id;
+}
+
 export async function upsertReminderSetting(input: ReminderSettingDraft) {
   const db = await getDatabase();
   const timestamp = now();
@@ -1252,6 +1380,8 @@ export async function clearAllData() {
     DELETE FROM itinerary_events;
     DELETE FROM hotel_stays;
     DELETE FROM travel_segments;
+    DELETE FROM saved_vibes;
+    DELETE FROM vibe_cache_entries;
     DELETE FROM packing_items;
     DELETE FROM documents;
     DELETE FROM travellers;
@@ -1275,6 +1405,8 @@ export async function persistSnapshot(snapshot: AppDataSnapshot) {
   for (const event of snapshot.itineraryEvents) await upsertItineraryEvent(event);
   for (const emergency of snapshot.emergencyInfos) await upsertEmergencyInfo(emergency);
   for (const reminder of snapshot.reminderSettings) await upsertReminderSetting(reminder);
+  for (const savedVibe of snapshot.savedVibes) await upsertSavedVibe(savedVibe);
+  for (const cacheEntry of snapshot.vibeCacheEntries) await upsertVibeCacheEntry(cacheEntry);
   for (const conflict of snapshot.syncConflicts) await upsertSyncConflict(conflict);
 }
 

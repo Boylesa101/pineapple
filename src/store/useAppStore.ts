@@ -18,12 +18,14 @@ import {
   upsertItineraryEvent,
   upsertPackingItem,
   upsertReminderSetting,
+  upsertSavedVibe,
   upsertSharedTripState,
   upsertTravelSegment,
   upsertTraveller,
   upsertTrip,
   upsertTripInvite,
   upsertTripParticipant,
+  upsertVibeCacheEntry,
 } from '@/db/repositories';
 import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup';
 import { protectStoredFilesAtRest } from '@/services/documentProtection';
@@ -65,12 +67,14 @@ import type {
   PackingItemDraft,
   PdfExportOptions,
   ReminderSettingDraft,
+  SavedVibeDraft,
   StoredSecurityConfig,
   TravelSegmentDraft,
   TravellerDraft,
   TripDraft,
   TripInviteDraft,
   TripParticipantDraft,
+  VibeCacheEntryDraft,
 } from '@/types/models';
 
 const emptySnapshot: AppDataSnapshot = {
@@ -83,6 +87,8 @@ const emptySnapshot: AppDataSnapshot = {
   itineraryEvents: [],
   emergencyInfos: [],
   reminderSettings: [],
+  savedVibes: [],
+  vibeCacheEntries: [],
   appPreferences: {
     id: 'app',
     notificationsEnabled: false,
@@ -153,6 +159,8 @@ type StoreState = {
   saveItineraryEvent: (draft: ItineraryEventDraft) => Promise<string>;
   saveEmergencyInfo: (draft: EmergencyInfoDraft) => Promise<string>;
   saveReminderSetting: (draft: ReminderSettingDraft) => Promise<string>;
+  saveSavedVibe: (draft: SavedVibeDraft) => Promise<string>;
+  saveVibeCacheEntry: (draft: VibeCacheEntryDraft) => Promise<string>;
   exportTripPdfFile: (tripId: string, options: PdfExportOptions) => Promise<string>;
   exportBackupFile: (password: string) => Promise<{ uri: string; exportedAt: string; attachmentCount: number; skippedAttachmentCount: number }>;
   importBackupFile: (encryptedContents: string, password: string) => Promise<void>;
@@ -782,6 +790,16 @@ export const useAppStore = create<StoreState>((set, get) => ({
   },
   saveReminderSetting: async (draft) => {
     const id = await upsertReminderSetting(draft);
+    await get().refreshData();
+    return id;
+  },
+  saveSavedVibe: async (draft) => {
+    const id = await upsertSavedVibe(draft);
+    await get().refreshData();
+    return id;
+  },
+  saveVibeCacheEntry: async (draft) => {
+    const id = await upsertVibeCacheEntry(draft);
     await get().refreshData();
     return id;
   },

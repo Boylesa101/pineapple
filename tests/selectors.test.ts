@@ -103,6 +103,8 @@ function createSnapshot(): AppDataSnapshot {
     itineraryEvents: [],
     emergencyInfos: [],
     reminderSettings: [],
+    savedVibes: [],
+    vibeCacheEntries: [],
     appPreferences: {
       id: 'app',
       notificationsEnabled: true,

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.2.0 - 2026-03-26
+
 - Stability pass: hardened trip rendering, dashboard selectors, typed date fields, and validation so malformed or missing trip, flight, hotel, and itinerary dates now fall back cleanly instead of crashing screens or downstream calculations
 - Trip insights: trip detail now resolves the destination timezone from live geocoding, shows the real local time plus GMT/UTC offset difference against the device timezone, and falls back to `Time unavailable` when the destination cannot be resolved defensibly
 - Airport timing: trips can now store `Travel to departure airport (minutes)` and the detail screen calculates the real set-off time as `departure - 2 hours - airport travel duration`, with a clean fallback when either the outbound flight or travel duration is missing
@@ -11,11 +13,15 @@
 - Flight rows: added takeoff and landing icons before departure and arrival timing in the trip travel section for clearer scanability
 - Trip footer fix: the trip-detail `Flight`, `Hotel`, and deep-linked `Transfer` focus states now scroll to the correct section instead of only changing highlight state
 - Flight editor upgrade: departure and arrival inputs now use Material takeoff and landing icons, and flight forms can add a connecting-flight leg directly after the booking reference
+- Vibes rebuild: replaced the old list-based Vibes screen with a shared native swipe deck for `eat`, `drink`, `visit`, and `do`, with stacked-card gestures, image-led cards, save/skip affordances, and a saved `Mood` section tied to each trip
+- Vibes persistence: Pineapple now keeps a short-lived local Vibes cache per trip query plus a locally persisted Mood shortlist so saved right-swipes survive reloads and can still be added to the itinerary later
+- Cloudflare worker upgrade: the `/api/vibes` proxy now enriches Tripadvisor search results with cleaner category labels, image URLs when available, official website links when available, and a dedicated `drink` lane without moving the API key into the app
+- Honest limitation: Tripadvisor does not reliably expose social handles through the current Content API, so Pineapple only shows official website and Tripadvisor links when the live data includes them and never invents social accounts
 - Honest limitation: destination local time and weather rely on successful live destination resolution and forecast requests, so Pineapple now prefers graceful fallback states over guessed timezone or weather values when those lookups fail
+- Honest limitation: Tripadvisor publishes stricter storage/display rules than Pineapple’s normal local-first data sources, so the current Vibes build keeps only a short-lived local deck cache plus the user’s saved Mood shortlist for continuity
 - First-time setup flow: onboarding now continues through a short setup sequence of name, optional profile photo, optional ID prompt, PIN setup, then biometric opt-in when the device supports enrolled biometrics
 - PIN setup responsiveness: the setup PIN screen now focuses only on create/confirm entry, with biometric detection moved out of the keypad screen to reduce per-keypress work and keep digit entry more immediate
 - Home footer correction: the bottom nav now uses the final four-item shell of `Home`, `Vault`, `Vibe`, and `SOS`, with the old `Account`, `Trips`, `Packing`, and `Itinerary` screens moved out of the tab group instead of merely hidden
-- Vibe tab: Pineapple now has a real `Vibe` footer tab that opens live area suggestions for the current trip and can add items straight into the itinerary
 - Onboarding profile persistence: setup can now save a lightweight account name and optional profile photo before the first trip exists, and the account screen uses that fallback profile state when no traveller records are present
 
 ## 1.7.4 - 2026-03-20
