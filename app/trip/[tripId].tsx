@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
@@ -146,6 +146,58 @@ function quickFactValue(value: string | null | undefined, fallback = 'Unavailabl
   return value?.trim() || fallback;
 }
 
+function createTravelSegmentDraft(
+  tripId: string,
+  currentCount: number,
+  overrides: Partial<TravelSegmentDraft> = {}
+): TravelSegmentDraft {
+  const now = new Date().toISOString();
+
+  return {
+    tripId,
+    transportType: 'flight',
+    travelDirection: currentCount ? 'return' : 'outbound',
+    airline: '',
+    providerCode: '',
+    providerLogoUrl: null,
+    flightNumber: '',
+    departureAirport: '',
+    departureAirportCode: '',
+    arrivalAirport: '',
+    arrivalAirportCode: '',
+    departureTime: now,
+    arrivalTime: now,
+    terminal: '',
+    gate: '',
+    bookingRef: '',
+    notes: '',
+    ...overrides,
+  };
+}
+
+function createConnectingFlightDraft(tripId: string, primaryDraft: TravelSegmentDraft): TravelSegmentDraft {
+  return createTravelSegmentDraft(tripId, 1, {
+    transportType: 'flight',
+    travelDirection: 'other',
+    airline: primaryDraft.airline,
+    providerCode: primaryDraft.providerCode,
+    providerLogoUrl: primaryDraft.providerLogoUrl,
+    bookingRef: primaryDraft.bookingRef,
+    departureAirport: primaryDraft.arrivalAirport,
+    departureAirportCode: primaryDraft.arrivalAirportCode,
+    departureTime: primaryDraft.arrivalTime,
+    arrivalTime: primaryDraft.arrivalTime,
+  });
+}
+
+function segmentDirectionLabel(direction: TravelSegmentDraft['travelDirection'], transportType: TransportType) {
+  if (direction === 'other') {
+    return transportType === 'flight' ? 'connection' : 'other';
+  }
+
+  return direction;
+}
+
 export default function TripDetailScreen() {
   const router = useRouter();
   const { tripId, focus } = useLocalSearchParams<{ tripId: string; focus?: string }>();
@@ -177,12 +229,15 @@ export default function TripDetailScreen() {
   const [emergencyDraft, setEmergencyDraft] = useState<EmergencyInfoDraft | null>(null);
   const [exportOptions, setExportOptions] = useState<PdfExportOptions>(defaultExportOptions);
   const [inviteDraft, setInviteDraft] = useState<TripInviteDraft | null>(null);
+  const [connectionSegmentDraft, setConnectionSegmentDraft] = useState<TravelSegmentDraft | null>(null);
   const [activeSection, setActiveSection] = useState<TripSection>('overview');
   const [destinationTimeInfo, setDestinationTimeInfo] = useState<DestinationLocalTimeInfo | null>(null);
   const [destinationWeather, setDestinationWeather] = useState<DestinationWeatherForecast | null>(null);
   const [destinationQuickFacts, setDestinationQuickFacts] = useState<DestinationQuickFacts | null>(null);
   const [selectedWeatherDate, setSelectedWeatherDate] = useState<string | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const tripScrollRef = useRef<ScrollView | null>(null);
+  const sectionOffsets = useRef<Partial<Record<TripSection, number>>>({});
 
   const summary = useMemo(
     () => ({
@@ -306,6 +361,35 @@ export default function TripDetailScreen() {
   const selectedWeatherDay =
     destinationWeather?.days.find((day) => day.date === selectedWeatherDate) ?? destinationWeather?.days[0] ?? null;
 
+  function scrollToSection(section: TripSection, animated = true) {
+    const offset = sectionOffsets.current[section];
+    if (typeof offset !== 'number') {
+      return;
+    }
+
+    tripScrollRef.current?.scrollTo({
+      y: Math.max(offset - spacing.lg, 0),
+      animated,
+    });
+  }
+
+  function handleSectionLayout(section: TripSection) {
+    return (event: LayoutChangeEvent) => {
+      sectionOffsets.current[section] = event.nativeEvent.layout.y;
+
+      if (activeSection === section && (section === 'travel' || section === 'hotel' || section === 'transfer')) {
+        scrollToSection(section, false);
+      }
+    };
+  }
+
+  useEffect(() => {
+    if (activeSection === 'travel' || activeSection === 'hotel' || activeSection === 'transfer') {
+      const frame = requestAnimationFrame(() => scrollToSection(activeSection));
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [activeSection]);
+
   function openTravellerEditor(current?: TravellerDraft) {
     setTravellerDraft(
       current ?? {
@@ -325,28 +409,26 @@ export default function TripDetailScreen() {
   }
 
   function openSegmentEditor(current?: TravelSegmentDraft) {
-    setSegmentDraft(
-      current ?? {
-        tripId,
-        transportType: 'flight',
-        travelDirection: bundle.travelSegments.length ? 'return' : 'outbound',
-        airline: '',
-        providerCode: '',
-        providerLogoUrl: null,
-        flightNumber: '',
-        departureAirport: '',
-        departureAirportCode: '',
-        arrivalAirport: '',
-        arrivalAirportCode: '',
-        departureTime: new Date().toISOString(),
-        arrivalTime: new Date().toISOString(),
-        terminal: '',
-        gate: '',
-        bookingRef: '',
-        notes: '',
-      }
-    );
+    setSegmentDraft(current ?? createTravelSegmentDraft(tripId, bundle.travelSegments.length));
+    setConnectionSegmentDraft(null);
     setModalKind('segment');
+  }
+
+  function closeModal() {
+    setModalKind(null);
+    setConnectionSegmentDraft(null);
+  }
+
+  function openConnectingFlightEditor() {
+    if (!segmentDraft) {
+      return;
+    }
+
+    setConnectionSegmentDraft((current) => current ?? createConnectingFlightDraft(tripId, segmentDraft));
+  }
+
+  function removeConnectingFlightEditor() {
+    setConnectionSegmentDraft(null);
   }
 
   function openHotelEditor(current?: HotelStayDraft) {
@@ -423,19 +505,27 @@ export default function TripDetailScreen() {
         return;
       }
       await saveTraveller(travellerDraft);
-      setModalKind(null);
+      closeModal();
       return;
     }
 
     if (modalKind === 'segment' && segmentDraft) {
       const errors = validateTravelSegment(segmentDraft);
+      const connectionErrors = connectionSegmentDraft ? validateTravelSegment(connectionSegmentDraft) : [];
       if (errors.length) {
         Alert.alert('Flight details need attention', errors.join('\n'));
         return;
       }
+      if (connectionErrors.length) {
+        Alert.alert('Connecting flight needs attention', connectionErrors.join('\n'));
+        return;
+      }
       try {
         await saveTravelSegment(segmentDraft);
-        setModalKind(null);
+        if (connectionSegmentDraft) {
+          await saveTravelSegment(connectionSegmentDraft);
+        }
+        closeModal();
       } catch (error) {
         Alert.alert('Flight could not be saved', toUserMessage(error, 'Unable to save those flight details right now.'));
       }
@@ -450,7 +540,7 @@ export default function TripDetailScreen() {
       }
       try {
         await saveHotelStay(hotelDraft);
-        setModalKind(null);
+        closeModal();
       } catch (error) {
         Alert.alert('Hotel could not be saved', toUserMessage(error, 'Unable to save that hotel right now.'));
       }
@@ -477,7 +567,7 @@ export default function TripDetailScreen() {
             : null,
           transferNotes: transferDraft.notes,
         });
-        setModalKind(null);
+        closeModal();
       } catch (error) {
         Alert.alert('Transfer details could not be saved', toUserMessage(error, 'Unable to save that transfer right now.'));
       }
@@ -491,7 +581,7 @@ export default function TripDetailScreen() {
         return;
       }
       await saveEmergencyInfo(emergencyDraft);
-      setModalKind(null);
+      closeModal();
       return;
     }
 
@@ -501,7 +591,7 @@ export default function TripDetailScreen() {
         return;
       }
       await saveTripInvite(inviteDraft);
-      setModalKind(null);
+      closeModal();
     }
   }
 
@@ -563,8 +653,215 @@ export default function TripDetailScreen() {
     }
   }
 
+  function renderTravelEditorFields(
+    draft: TravelSegmentDraft,
+    updateDraft: (updater: (current: TravelSegmentDraft) => TravelSegmentDraft) => void,
+    options?: {
+      sectionTitle?: string;
+      sectionSubtitle?: string;
+      allowTransportType?: boolean;
+      allowDirection?: boolean;
+      allowConnectionPrompt?: boolean;
+      onRemoveConnection?: () => void;
+    }
+  ) {
+    const providerBrand = findTransportProvider(draft.providerCode, draft.transportType);
+
+    return (
+      <>
+        {options?.sectionTitle ? (
+          <View style={styles.segmentSectionHeader}>
+            <View style={styles.segmentSectionCopy}>
+              <Text style={styles.segmentSectionTitle}>{options.sectionTitle}</Text>
+              {options.sectionSubtitle ? <Text style={styles.helperText}>{options.sectionSubtitle}</Text> : null}
+            </View>
+            {options.onRemoveConnection ? (
+              <Pressable onPress={options.onRemoveConnection} hitSlop={8}>
+                <MaterialIcons name="close" size={18} color={colors.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+        {options?.allowTransportType !== false ? (
+          <>
+            <Text style={styles.label}>Transport type</Text>
+            <ChoiceChips<TransportType>
+              value={draft.transportType}
+              onChange={(value) => {
+                updateDraft((current) => ({
+                  ...current,
+                  transportType: value,
+                  airline: '',
+                  providerCode: '',
+                  providerLogoUrl: null,
+                  departureAirportCode: value === 'train' ? '' : current.departureAirportCode,
+                  arrivalAirportCode: value === 'train' ? '' : current.arrivalAirportCode,
+                }));
+                if (value !== 'flight') {
+                  setConnectionSegmentDraft(null);
+                }
+              }}
+              options={[
+                { label: 'Flight', value: 'flight' },
+                { label: 'Train', value: 'train' },
+              ]}
+            />
+          </>
+        ) : null}
+        {options?.allowDirection !== false ? (
+          <>
+            <Text style={styles.label}>Direction</Text>
+            <ChoiceChips<TravelSegmentDraft['travelDirection']>
+              value={draft.travelDirection}
+              onChange={(value) => updateDraft((current) => ({ ...current, travelDirection: value }))}
+              options={[
+                { label: 'Outbound', value: 'outbound' },
+                { label: 'Return', value: 'return' },
+                { label: draft.transportType === 'flight' ? 'Connection' : 'Other', value: 'other' },
+              ]}
+            />
+          </>
+        ) : null}
+        <TransportProviderSearchField
+          label={draft.transportType === 'train' ? 'Train operator' : 'Airline'}
+          transportType={draft.transportType}
+          value={draft.airline}
+          onChangeText={(value) => updateDraft((current) => ({ ...current, airline: value, providerCode: '', providerLogoUrl: null }))}
+          onSelectProvider={(provider) =>
+            updateDraft((current) => ({
+              ...current,
+              airline: provider.name,
+              providerCode: provider.code,
+              providerLogoUrl: provider.logoUrl,
+            }))
+          }
+          placeholder={draft.transportType === 'train' ? 'Search train operator' : 'Search airline'}
+          helper={
+            draft.transportType === 'train'
+              ? 'Pick a train operator or type one manually.'
+              : 'Pick an airline to keep the code and logo tidy.'
+          }
+        />
+        {draft.providerLogoUrl || draft.providerCode ? (
+          <View style={styles.providerPreview}>
+            <ProviderLogoBadge
+              name={draft.airline || (draft.transportType === 'train' ? 'Train' : 'Flight')}
+              code={draft.providerCode}
+              logoXml={providerBrand?.logoXml ?? null}
+              logoUrl={draft.providerLogoUrl}
+              accentColor={providerBrand?.accentColor ?? null}
+            />
+            <Text style={styles.providerPreviewText}>
+              {draft.providerCode ? `${draft.providerCode} · ` : ''}
+              {draft.airline || 'Provider'}
+            </Text>
+          </View>
+        ) : null}
+        <AppTextField
+          label={draft.transportType === 'train' ? 'Service number' : 'Flight number'}
+          value={draft.flightNumber}
+          onChangeText={(value) => updateDraft((current) => ({ ...current, flightNumber: value }))}
+        />
+        {draft.transportType === 'flight' ? (
+          <>
+            <AirportSearchField
+              label="Departure airport"
+              iconName="flight-takeoff"
+              value={draft.departureAirport}
+              airportCode={draft.departureAirportCode}
+              onChangeText={(value) =>
+                updateDraft((current) => ({
+                  ...current,
+                  departureAirport: value,
+                  departureAirportCode: current.departureAirport === value ? current.departureAirportCode : '',
+                }))
+              }
+              onSelectAirport={(airport) => updateDraft((current) => ({ ...current, departureAirport: airport.name, departureAirportCode: airport.code }))}
+              placeholder="Search by city, airport, or IATA"
+              helper="Type a place like London, Newcastle, or JFK."
+            />
+            <AirportSearchField
+              label="Arrival airport"
+              iconName="flight-land"
+              value={draft.arrivalAirport}
+              airportCode={draft.arrivalAirportCode}
+              onChangeText={(value) =>
+                updateDraft((current) => ({
+                  ...current,
+                  arrivalAirport: value,
+                  arrivalAirportCode: current.arrivalAirport === value ? current.arrivalAirportCode : '',
+                }))
+              }
+              onSelectAirport={(airport) => updateDraft((current) => ({ ...current, arrivalAirport: airport.name, arrivalAirportCode: airport.code }))}
+              placeholder="Search by city, airport, or IATA"
+              helper="Pick the right airport and Pineapple keeps the IATA code."
+            />
+          </>
+        ) : (
+          <>
+            <AppTextField
+              label="Departure station"
+              value={draft.departureAirport}
+              onChangeText={(value) => updateDraft((current) => ({ ...current, departureAirport: value }))}
+            />
+            <AppTextField
+              label="Arrival station"
+              value={draft.arrivalAirport}
+              onChangeText={(value) => updateDraft((current) => ({ ...current, arrivalAirport: value }))}
+            />
+          </>
+        )}
+        <DateTimeField
+          label="Departure time"
+          iconName={draft.transportType === 'flight' ? 'flight-takeoff' : 'schedule'}
+          mode="datetime"
+          value={draft.departureTime}
+          onChange={(value) => updateDraft((current) => ({ ...current, departureTime: value }))}
+        />
+        <DateTimeField
+          label="Arrival time"
+          iconName={draft.transportType === 'flight' ? 'flight-land' : 'schedule'}
+          mode="datetime"
+          value={draft.arrivalTime}
+          onChange={(value) => updateDraft((current) => ({ ...current, arrivalTime: value }))}
+        />
+        <AppTextField
+          label={draft.transportType === 'train' ? 'Platform / carriage' : 'Terminal'}
+          value={draft.terminal}
+          onChangeText={(value) => updateDraft((current) => ({ ...current, terminal: value }))}
+        />
+        <AppTextField
+          label={draft.transportType === 'train' ? 'Seat / platform note' : 'Gate'}
+          value={draft.gate}
+          onChangeText={(value) => updateDraft((current) => ({ ...current, gate: value }))}
+        />
+        <AppTextField
+          label="Booking ref"
+          value={draft.bookingRef}
+          onChangeText={(value) => updateDraft((current) => ({ ...current, bookingRef: value }))}
+        />
+        {options?.allowConnectionPrompt && draft.transportType === 'flight' && !connectionSegmentDraft ? (
+          <Pressable onPress={openConnectingFlightEditor} style={styles.connectionPrompt}>
+            <MaterialIcons name="connecting-airports" size={20} color={colors.primaryBlueDark} />
+            <View style={styles.connectionPromptCopy}>
+              <Text style={styles.connectionPromptTitle}>Need to add a connecting flight?</Text>
+              <Text style={styles.connectionPromptHint}>Add the next leg and keep the connection details with this trip.</Text>
+            </View>
+          </Pressable>
+        ) : null}
+        <AppTextField
+          label="Notes"
+          value={draft.notes}
+          onChangeText={(value) => updateDraft((current) => ({ ...current, notes: value }))}
+          multiline
+        />
+      </>
+    );
+  }
+
   return (
     <AppScreen
+      scrollRef={tripScrollRef}
       footer={
         <View style={styles.tripFooterNav}>
           <Pressable
@@ -590,14 +887,20 @@ export default function TripDetailScreen() {
             <Text style={styles.tripFooterLabel}>Vibes</Text>
           </Pressable>
           <Pressable
-            onPress={() => setActiveSection('travel')}
+            onPress={() => {
+              setActiveSection('travel');
+              scrollToSection('travel');
+            }}
             style={[styles.tripFooterButton, activeSection === 'travel' ? styles.tripFooterButtonActive : null]}
           >
             <MaterialIcons name="flight" size={22} color={colors.white} />
             <Text style={styles.tripFooterLabel}>Flight</Text>
           </Pressable>
           <Pressable
-            onPress={() => setActiveSection('hotel')}
+            onPress={() => {
+              setActiveSection('hotel');
+              scrollToSection('hotel');
+            }}
             style={[styles.tripFooterButton, activeSection === 'hotel' ? styles.tripFooterButtonActive : null]}
           >
             <MaterialIcons name="hotel" size={22} color={colors.white} />
@@ -642,7 +945,9 @@ export default function TripDetailScreen() {
             <View style={styles.weatherHeroLeft}>
               <View style={styles.weatherConditionRow}>
                 <MaterialIcons name={weatherIconName(selectedWeatherDay?.weatherCode ?? null) as any} size={28} color={colors.white} />
-                <Text style={styles.weatherConditionLabel}>{selectedWeatherDay?.conditionLabel ?? 'Weather unavailable'}</Text>
+                <Text style={styles.weatherConditionLabel} numberOfLines={1} ellipsizeMode="tail">
+                  {selectedWeatherDay?.conditionLabel ?? 'Weather unavailable'}
+                </Text>
               </View>
               <Text style={styles.weatherHeadlineTemp}>
                 {selectedWeatherDay?.temperatureMaxC !== null && selectedWeatherDay?.temperatureMaxC !== undefined
@@ -884,9 +1189,10 @@ export default function TripDetailScreen() {
         />
       </AppCard>
 
+      <View onLayout={handleSectionLayout('travel')}>
       <AppCard
         title="Flight and train info"
-        subtitle="Add outbound, return, or rail travel with provider branding and booking details."
+        subtitle="Add outbound, return, connection, or rail travel with provider branding and booking details."
         right={<AppButton label="Add" tone="secondary" onPress={() => openSegmentEditor()} />}
         style={activeSection === 'travel' ? styles.highlightedCard : null}
       >
@@ -905,7 +1211,7 @@ export default function TripDetailScreen() {
                 <View style={styles.transportCopy}>
                   <View style={styles.transportHeader}>
                     <Text style={styles.transportTitle}>
-                      {segment.transportType === 'train' ? 'Train' : 'Flight'} · {segment.travelDirection}
+                      {segment.transportType === 'train' ? 'Train' : 'Flight'} · {segmentDirectionLabel(segment.travelDirection, segment.transportType)}
                     </Text>
                     <InfoChip label={segment.transportType === 'train' ? 'Train' : 'Flight'} tone="blue" />
                   </View>
@@ -951,7 +1257,9 @@ export default function TripDetailScreen() {
           />
         )}
       </AppCard>
+      </View>
 
+      <View onLayout={handleSectionLayout('hotel')}>
       <AppCard
         title="Hotel info"
         subtitle="Search or enter the stay address, then keep the details and image together."
@@ -994,7 +1302,9 @@ export default function TripDetailScreen() {
           />
         )}
       </AppCard>
+      </View>
 
+      <View onLayout={handleSectionLayout('transfer')}>
       <AppCard
         title="Transfers and pickup"
         subtitle="Airport pickup, rail transfer, local ride, or handoff details."
@@ -1039,6 +1349,7 @@ export default function TripDetailScreen() {
           />
         )}
       </AppCard>
+      </View>
 
       <AppCard title="Packing" subtitle="Category-based list with traveller assignment, templates, and priority flags." style={activeSection === 'packing' ? styles.highlightedCard : null}>
         <ListRow title={`${bundle.packingItems.length} item(s)`} subtitle="Track packed vs unpacked and per-traveller progress." />
@@ -1266,190 +1577,30 @@ export default function TripDetailScreen() {
       <AppModal
         visible={modalKind === 'segment'}
         title={segmentDraft?.id ? 'Edit flight / travel' : 'Add flight / travel'}
-        onClose={() => setModalKind(null)}
+        onClose={closeModal}
       >
         {segmentDraft ? (
           <>
-            <Text style={styles.label}>Transport type</Text>
-            <ChoiceChips<TransportType>
-              value={segmentDraft.transportType}
-              onChange={(value) =>
-                setSegmentDraft((current) =>
-                  current
-                    ? {
-                        ...current,
-                        transportType: value,
-                        airline: '',
-                        providerCode: '',
-                        providerLogoUrl: null,
-                        departureAirportCode: value === 'train' ? '' : current.departureAirportCode,
-                        arrivalAirportCode: value === 'train' ? '' : current.arrivalAirportCode,
-                      }
-                    : current
-                )
-              }
-              options={[
-                { label: 'Flight', value: 'flight' },
-                { label: 'Train', value: 'train' },
-              ]}
-            />
-            <Text style={styles.label}>Direction</Text>
-            <ChoiceChips<TravelSegmentDraft['travelDirection']>
-              value={segmentDraft.travelDirection}
-              onChange={(value) => setSegmentDraft((current) => (current ? { ...current, travelDirection: value } : current))}
-              options={[
-                { label: 'Outbound', value: 'outbound' },
-                { label: 'Return', value: 'return' },
-                { label: 'Other', value: 'other' },
-              ]}
-            />
-            <TransportProviderSearchField
-              label={segmentDraft.transportType === 'train' ? 'Train operator' : 'Airline'}
-              transportType={segmentDraft.transportType}
-              value={segmentDraft.airline}
-              onChangeText={(value) =>
-                setSegmentDraft((current) =>
-                  current ? { ...current, airline: value, providerCode: '', providerLogoUrl: null } : current
-                )
-              }
-              onSelectProvider={(provider) =>
-                setSegmentDraft((current) =>
-                  current
-                    ? {
-                        ...current,
-                        airline: provider.name,
-                        providerCode: provider.code,
-                        providerLogoUrl: provider.logoUrl,
-                      }
-                    : current
-                )
-              }
-              placeholder={segmentDraft.transportType === 'train' ? 'Search train operator' : 'Search airline'}
-              helper={
-                segmentDraft.transportType === 'train'
-                  ? 'Pick a train operator or type one manually.'
-                  : 'Pick an airline to keep the code and logo tidy.'
-              }
-            />
-            {(() => {
-              const providerBrand = findTransportProvider(segmentDraft.providerCode, segmentDraft.transportType);
-              return segmentDraft.providerLogoUrl || segmentDraft.providerCode ? (
-                <View style={styles.providerPreview}>
-                  <ProviderLogoBadge
-                    name={segmentDraft.airline || (segmentDraft.transportType === 'train' ? 'Train' : 'Flight')}
-                    code={segmentDraft.providerCode}
-                    logoXml={providerBrand?.logoXml ?? null}
-                    logoUrl={segmentDraft.providerLogoUrl}
-                    accentColor={providerBrand?.accentColor ?? null}
-                  />
-                  <Text style={styles.providerPreviewText}>
-                    {segmentDraft.providerCode ? `${segmentDraft.providerCode} · ` : ''}
-                    {segmentDraft.airline || 'Provider'}
-                  </Text>
-                </View>
-              ) : null;
-            })()}
-            <AppTextField
-              label={segmentDraft.transportType === 'train' ? 'Service number' : 'Flight number'}
-              value={segmentDraft.flightNumber}
-              onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, flightNumber: value } : current))}
-            />
-            {segmentDraft.transportType === 'flight' ? (
-              <>
-                <AirportSearchField
-                  label="Departure airport"
-                  value={segmentDraft.departureAirport}
-                  airportCode={segmentDraft.departureAirportCode}
-                  onChangeText={(value) =>
-                    setSegmentDraft((current) =>
-                      current
-                        ? {
-                            ...current,
-                            departureAirport: value,
-                            departureAirportCode: current.departureAirport === value ? current.departureAirportCode : '',
-                          }
-                        : current
-                    )
-                  }
-                  onSelectAirport={(airport) =>
-                    setSegmentDraft((current) =>
-                      current ? { ...current, departureAirport: airport.name, departureAirportCode: airport.code } : current
-                    )
-                  }
-                  placeholder="Search by city, airport, or IATA"
-                  helper="Type a place like London, Newcastle, or JFK."
-                />
-                <AirportSearchField
-                  label="Arrival airport"
-                  value={segmentDraft.arrivalAirport}
-                  airportCode={segmentDraft.arrivalAirportCode}
-                  onChangeText={(value) =>
-                    setSegmentDraft((current) =>
-                      current
-                        ? {
-                            ...current,
-                            arrivalAirport: value,
-                            arrivalAirportCode: current.arrivalAirport === value ? current.arrivalAirportCode : '',
-                          }
-                        : current
-                    )
-                  }
-                  onSelectAirport={(airport) =>
-                    setSegmentDraft((current) =>
-                      current ? { ...current, arrivalAirport: airport.name, arrivalAirportCode: airport.code } : current
-                    )
-                  }
-                  placeholder="Search by city, airport, or IATA"
-                  helper="Pick the right airport and Pineapple keeps the IATA code."
-                />
-              </>
-            ) : (
-              <>
-                <AppTextField
-                  label="Departure station"
-                  value={segmentDraft.departureAirport}
-                  onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, departureAirport: value } : current))}
-                />
-                <AppTextField
-                  label="Arrival station"
-                  value={segmentDraft.arrivalAirport}
-                  onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, arrivalAirport: value } : current))}
-                />
-              </>
+            {renderTravelEditorFields(
+              segmentDraft,
+              (updater) => setSegmentDraft((current) => (current ? updater(current) : current)),
+              { allowConnectionPrompt: true }
             )}
-            <DateTimeField
-              label="Departure time"
-              mode="datetime"
-              value={segmentDraft.departureTime}
-              onChange={(value) => setSegmentDraft((current) => (current ? { ...current, departureTime: value } : current))}
-            />
-            <DateTimeField
-              label="Arrival time"
-              mode="datetime"
-              value={segmentDraft.arrivalTime}
-              onChange={(value) => setSegmentDraft((current) => (current ? { ...current, arrivalTime: value } : current))}
-            />
-            <AppTextField
-              label={segmentDraft.transportType === 'train' ? 'Platform / carriage' : 'Terminal'}
-              value={segmentDraft.terminal}
-              onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, terminal: value } : current))}
-            />
-            <AppTextField
-              label={segmentDraft.transportType === 'train' ? 'Seat / platform note' : 'Gate'}
-              value={segmentDraft.gate}
-              onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, gate: value } : current))}
-            />
-            <AppTextField
-              label="Booking ref"
-              value={segmentDraft.bookingRef}
-              onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, bookingRef: value } : current))}
-            />
-            <AppTextField
-              label="Notes"
-              value={segmentDraft.notes}
-              onChangeText={(value) => setSegmentDraft((current) => (current ? { ...current, notes: value } : current))}
-              multiline
-            />
+            {connectionSegmentDraft ? (
+              <View style={styles.connectionSection}>
+                {renderTravelEditorFields(
+                  connectionSegmentDraft,
+                  (updater) => setConnectionSegmentDraft((current) => (current ? updater(current) : current)),
+                  {
+                    sectionTitle: 'Connection details',
+                    sectionSubtitle: 'Save the next flight leg with its own airports, times, and notes.',
+                    allowTransportType: false,
+                    allowDirection: false,
+                    onRemoveConnection: removeConnectingFlightEditor,
+                  }
+                )}
+              </View>
+            ) : null}
             <AppButton label={`Save ${segmentDraft.transportType === 'train' ? 'train' : 'flight'}`} onPress={saveCurrentModal} />
           </>
         ) : null}
@@ -2009,6 +2160,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   weatherConditionLabel: {
+    flex: 1,
     color: colors.white,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
@@ -2205,6 +2357,55 @@ const styles = StyleSheet.create({
     color: colors.primaryBlueText,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
+  },
+  segmentSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  segmentSectionCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  segmentSectionTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
+  },
+  connectionPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#CFE0FF',
+    backgroundColor: colors.primaryBlueTint,
+  },
+  connectionPromptCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  connectionPromptTitle: {
+    color: colors.primaryBlueDark,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+  },
+  connectionPromptHint: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  connectionSection: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: spacing.sm,
   },
   inlineFields: {
     flexDirection: 'row',

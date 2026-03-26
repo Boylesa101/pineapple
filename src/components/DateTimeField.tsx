@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid, type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { colors, radii, spacing } from '@/constants/theme';
 import { coerceDate, formatDateTime, formatShortDate } from '@/utils/date';
@@ -10,6 +11,7 @@ type Props = {
   mode: 'date' | 'datetime';
   value: string | null;
   onChange: (value: string) => void;
+  iconName?: ComponentProps<typeof MaterialIcons>['name'];
 };
 
 function mergeDateAndTime(datePart: Date, timePart: Date) {
@@ -18,7 +20,7 @@ function mergeDateAndTime(datePart: Date, timePart: Date) {
   return merged;
 }
 
-export function DateTimeField({ label, mode, value, onChange }: Props) {
+export function DateTimeField({ label, mode, value, onChange, iconName }: Props) {
   const [show, setShow] = useState(false);
   const date = coerceDate(value);
 
@@ -87,7 +89,10 @@ export function DateTimeField({ label, mode, value, onChange }: Props) {
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
+      <View style={styles.labelRow}>
+        {iconName ? <MaterialIcons name={iconName} size={16} color={colors.primaryBlueDark} /> : null}
+        <Text style={styles.label}>{label}</Text>
+      </View>
       <Pressable onPress={openPicker} style={styles.input}>
         <Text style={styles.value}>{mode === 'date' ? formatShortDate(value) : formatDateTime(value)}</Text>
       </Pressable>
@@ -106,6 +111,11 @@ export function DateTimeField({ label, mode, value, onChange }: Props) {
 const styles = StyleSheet.create({
   wrapper: {
     gap: spacing.xs,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   label: {
     color: colors.nightNavy,

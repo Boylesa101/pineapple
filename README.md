@@ -7,11 +7,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
 - Expo Go is no longer a supported Pineapple test path; use installable APKs for device testing and `.aab` for Play Store release
 - For a dev-only APK that still expects Metro, run `npm run apk:debug`
-- Pineapple copies the finished debug APK to `build/apk/pineapple-v2-debug.apk`
+- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.1.2-debug.apk`
 - For the fastest direct phone testing on a modern device, run `npm run apk:release:arm64`
-- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2-release-arm64.apk`
+- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.1.2-release-arm64.apk`
 - For direct phone testing without USB or Metro, run `npm run apk:release`
-- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2-release.apk`
+- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.1.2-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
 - Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
 - When you are ready for Google Play, provide these environment variables before building:
@@ -75,9 +75,9 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Automatic trip-card destination images that resolve from country or place text, cache locally after the first fetch, and fall back cleanly when offline or unresolved
 - Trip detail destination insights with live timezone resolution, real local destination time, GMT/UTC difference versus the device timezone, and graceful fallback when the destination cannot be resolved
 - Trip detail airport set-off timing that calculates `departure - 2 hours - airport travel duration` from the stored outbound flight and airport travel minutes
-- Trip detail 7-day destination weather driven by a dedicated live forecast provider with caching and safe failure fallbacks
+- Trip detail 7-day destination weather driven by a dedicated live forecast provider with caching and safe failure fallbacks, selectable day summaries, and a dedicated hourly detail page
 - Trip-card destination imagery now prefers Pexels when an optional `EXPO_PUBLIC_PEXELS_API_KEY` is supplied at build time, falls back to Wikimedia Commons otherwise, caches the chosen image locally, and exposes source attribution through a small in-card info action
-- Flight entry now includes a built-in searchable airport picker with stored IATA codes for cleaner travel records
+- Flight entry now includes a built-in searchable airport picker with stored IATA codes, takeoff/landing field icons, and optional connecting-flight capture for cleaner travel records
 - Date-of-birth entry now uses direct typed `DD / MM / YYYY` input in traveller, passport, and driving-licence flows instead of the calendar picker
 - Trip detail now uses a contextual footer for `Packing`, `Vibes`, `Flight`, and `Hotel`, keeping those sections in the trip flow instead of the global footer
 - Honest limitation: destination time and weather depend on successful live destination geocoding and forecast lookups, so Pineapple intentionally shows calm fallback states instead of guessed values when those requests fail

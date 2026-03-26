@@ -1,4 +1,4 @@
-import type { PropsWithChildren, ReactNode } from 'react';
+import type { PropsWithChildren, ReactNode, RefObject } from 'react';
 import { ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ type Props = PropsWithChildren<{
   backgroundColor?: string;
   hideBackgroundDecor?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  scrollRef?: RefObject<ScrollView | null>;
 }>;
 
 export function AppScreen({
@@ -24,6 +25,7 @@ export function AppScreen({
   backgroundColor,
   hideBackgroundDecor = false,
   contentStyle,
+  scrollRef,
 }: Props) {
   const content = (
     <View style={[styles.content, !scroll ? styles.contentFill : null, contentStyle]}>
@@ -49,6 +51,7 @@ export function AppScreen({
       {!hideBackgroundDecor ? <View style={styles.topWash} /> : null}
       {scroll ? (
         <ScrollView
+          ref={scrollRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"

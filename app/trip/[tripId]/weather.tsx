@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 
 import { AppScreen } from '@/components/AppScreen';
 import { EmptyState } from '@/components/EmptyState';
@@ -132,16 +133,28 @@ export default function TripWeatherScreen() {
             <View style={styles.hillFour} />
 
             <View style={[styles.tree, styles.treeOne]}>
-              <View style={styles.treeCrownSoft} />
-              <View style={styles.treeTrunkSoft} />
+              <Svg width={34} height={46} viewBox="0 0 64 64">
+                <Path
+                  fill="#B77873"
+                  d="M32,0C18.148,0,12,23.188,12,32c0,9.656,6.883,17.734,16,19.594V60c0,2.211,1.789,4,4,4s4-1.789,4-4v-8.406 C45.117,49.734,52,41.656,52,32C52,22.891,46.051,0,32,0z"
+                />
+              </Svg>
             </View>
             <View style={[styles.tree, styles.treeTwo]}>
-              <View style={styles.treeCrownSoft} />
-              <View style={styles.treeTrunkSoft} />
+              <Svg width={34} height={46} viewBox="0 0 64 64">
+                <Path
+                  fill="#B77873"
+                  d="M32,0C18.148,0,12,23.188,12,32c0,9.656,6.883,17.734,16,19.594V60c0,2.211,1.789,4,4,4s4-1.789,4-4v-8.406 C45.117,49.734,52,41.656,52,32C52,22.891,46.051,0,32,0z"
+                />
+              </Svg>
             </View>
             <View style={[styles.tree, styles.treeThree]}>
-              <View style={styles.treeCrownDark} />
-              <View style={styles.treeTrunkDark} />
+              <Svg width={40} height={52} viewBox="0 0 64 64">
+                <Path
+                  fill="#A16773"
+                  d="M32,0C18.148,0,12,23.188,12,32c0,9.656,6.883,17.734,16,19.594V60c0,2.211,1.789,4,4,4s4-1.789,4-4v-8.406 C45.117,49.734,52,41.656,52,32C52,22.891,46.051,0,32,0z"
+                />
+              </Svg>
             </View>
 
             <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.32)']} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={styles.filter} />
@@ -149,7 +162,9 @@ export default function TripWeatherScreen() {
             <View style={styles.weatherInfo}>
               <View style={styles.weatherInfoLeft}>
                 <MaterialIcons name={weatherIconName(weatherDetail.weatherCode) as any} size={40} color={colors.white} />
-                <Text style={styles.conditionLabel}>{weatherDetail.conditionLabel}</Text>
+                <Text style={styles.conditionLabel} numberOfLines={1} ellipsizeMode="tail">
+                  {weatherDetail.conditionLabel}
+                </Text>
               </View>
 
               <View style={styles.weatherInfoRight}>
@@ -223,6 +238,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   card: {
+    width: '100%',
+    maxWidth: 360,
+    alignSelf: 'center',
     borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: colors.white,
@@ -382,30 +400,6 @@ const styles = StyleSheet.create({
     bottom: '10%',
     right: '3%',
   },
-  treeCrownSoft: {
-    width: 22,
-    height: 34,
-    borderRadius: 16,
-    backgroundColor: '#B77873',
-  },
-  treeTrunkSoft: {
-    width: 4,
-    height: 24,
-    marginTop: -2,
-    backgroundColor: '#B77873',
-  },
-  treeCrownDark: {
-    width: 28,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#A16773',
-  },
-  treeTrunkDark: {
-    width: 5,
-    height: 28,
-    marginTop: -2,
-    backgroundColor: '#A16773',
-  },
   filter: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 5,
@@ -422,15 +416,16 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   weatherInfoLeft: {
-    width: '28%',
+    width: '34%',
     alignItems: 'center',
     gap: 6,
   },
   conditionLabel: {
     color: colors.white,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
+    fontSize: 13,
     textAlign: 'center',
+    width: '100%',
   },
   weatherInfoRight: {
     alignItems: 'flex-end',

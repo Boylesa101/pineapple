@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { searchAirports, type AirportSuggestion } from '@/data/airports';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
@@ -12,6 +13,7 @@ type Props = {
   onSelectAirport?: (airport: AirportSuggestion) => void;
   placeholder?: string;
   helper?: string;
+  iconName?: ComponentProps<typeof MaterialIcons>['name'];
 };
 
 export function AirportSearchField({
@@ -22,6 +24,7 @@ export function AirportSearchField({
   onSelectAirport,
   placeholder,
   helper,
+  iconName,
 }: Props) {
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<TextInput | null>(null);
@@ -43,7 +46,10 @@ export function AirportSearchField({
   return (
     <View style={styles.wrapper}>
       <View style={styles.labelRow}>
-        <Text style={styles.label}>{label}</Text>
+        <View style={styles.labelGroup}>
+          {iconName ? <MaterialIcons name={iconName} size={16} color={colors.primaryBlueDark} /> : null}
+          <Text style={styles.label}>{label}</Text>
+        </View>
         {airportCode ? <Text style={styles.codeChip}>{airportCode}</Text> : null}
       </View>
       <TextInput
@@ -102,10 +108,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
+  labelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
   label: {
     color: colors.nightNavy,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
+    flexShrink: 1,
   },
   codeChip: {
     borderRadius: radii.pill,
