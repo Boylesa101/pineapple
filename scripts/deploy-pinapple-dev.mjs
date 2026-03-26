@@ -77,17 +77,28 @@ async function resolveApkPath(argApkPath) {
     return resolved;
   }
 
-  const preferredPaths = [
+  const candidateDirectories = [
     path.join(repoRoot, 'new apk'),
     path.join(repoRoot, 'build', 'apk'),
   ];
+  const discoveredApks = [];
 
-  for (const preferredPath of preferredPaths) {
-    const newestApk = await getNewestApk(preferredPath);
+  for (const candidateDirectory of candidateDirectories) {
+    const newestApk = await getNewestApk(candidateDirectory);
 
     if (newestApk) {
-      return newestApk;
+      const stats = await fs.stat(newestApk);
+      discoveredApks.push({
+        absolutePath: newestApk,
+        mtimeMs: stats.mtimeMs,
+      });
     }
+  }
+
+  discoveredApks.sort((left, right) => right.mtimeMs - left.mtimeMs);
+
+  if (discoveredApks[0]) {
+    return discoveredApks[0].absolutePath;
   }
 
   throw new Error(
