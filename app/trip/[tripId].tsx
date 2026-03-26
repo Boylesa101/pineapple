@@ -135,6 +135,11 @@ function formatTemperatureRange(minTemp: number | null, maxTemp: number | null) 
   return `${Math.round(minTemp)}° / ${Math.round(maxTemp)}°`;
 }
 
+function compactWeatherDayLabel(dayLabel: string) {
+  const token = dayLabel.split(' ')[0]?.trim();
+  return (token || dayLabel).slice(0, 3).toUpperCase();
+}
+
 export default function TripDetailScreen() {
   const router = useRouter();
   const { tripId, focus } = useLocalSearchParams<{ tripId: string; focus?: string }>();
@@ -614,23 +619,45 @@ export default function TripDetailScreen() {
         </View>
       </View>
 
-      <AppCard title="7-day weather" subtitle={destinationWeather?.resolvedLabel ?? trip.destination}>
-        {destinationWeather?.days.length ? (
-          <View style={styles.weatherList}>
-            {destinationWeather.days.map((day) => (
-              <View key={day.date} style={styles.weatherRow}>
-                <View style={styles.weatherDay}>
-                  <MaterialIcons name={weatherIconName(day.weatherCode) as any} size={20} color={colors.primaryBlueDark} />
-                  <View style={styles.weatherCopy}>
-                    <Text style={styles.weatherLabel}>{day.dayLabel}</Text>
-                    <Text style={styles.weatherMeta}>{day.conditionLabel}</Text>
-                  </View>
-                </View>
-                <Text style={styles.weatherTemp}>{formatTemperatureRange(day.temperatureMinC, day.temperatureMaxC)}</Text>
+      {destinationWeather?.days.length ? (
+        <View style={styles.weatherCard}>
+          <View style={styles.weatherHeroSection}>
+            <View style={styles.weatherBackground}>
+              <View style={styles.weatherCircleLarge} />
+              <View style={styles.weatherCircleMedium} />
+              <View style={styles.weatherCircleSmall} />
+            </View>
+            <View style={styles.weatherHeroLeft}>
+              <View style={styles.weatherConditionRow}>
+                <MaterialIcons name={weatherIconName(destinationWeather.days[0]?.weatherCode ?? null) as any} size={28} color={colors.white} />
+                <Text style={styles.weatherConditionLabel}>{destinationWeather.days[0]?.conditionLabel ?? 'Weather unavailable'}</Text>
+              </View>
+              <Text style={styles.weatherHeadlineTemp}>
+                {destinationWeather.days[0]?.temperatureMaxC !== null && destinationWeather.days[0]?.temperatureMaxC !== undefined
+                  ? `${Math.round(destinationWeather.days[0].temperatureMaxC)}°`
+                  : '--'}
+              </Text>
+              <Text style={styles.weatherHeadlineRange}>
+                {formatTemperatureRange(destinationWeather.days[0]?.temperatureMinC ?? null, destinationWeather.days[0]?.temperatureMaxC ?? null)}
+              </Text>
+            </View>
+            <View style={styles.weatherHeroRight}>
+              <Text style={styles.weatherHeroEyebrow}>7-day forecast</Text>
+              <Text style={styles.weatherHeroPlace}>{destinationWeather.resolvedLabel ?? trip.destination}</Text>
+              <Text style={styles.weatherHeroMeta}>{destinationWeather.days[0]?.dayLabel ?? 'Today'}</Text>
+            </View>
+          </View>
+          <View style={styles.weatherDaysSection}>
+            {destinationWeather.days.slice(0, 7).map((day) => (
+              <View key={day.date} style={styles.weatherDayButton}>
+                <Text style={styles.weatherDayButtonLabel}>{compactWeatherDayLabel(day.dayLabel)}</Text>
+                <MaterialIcons name={weatherIconName(day.weatherCode) as any} size={18} color={colors.white} />
               </View>
             ))}
           </View>
-        ) : (
+        </View>
+      ) : (
+        <AppCard title="7-day weather" subtitle={trip.destination}>
           <EmptyState
             title={insightsLoading ? 'Loading destination weather' : 'Weather unavailable'}
             description={
@@ -639,8 +666,8 @@ export default function TripDetailScreen() {
                 : 'We could not load a forecast for this destination right now.'
             }
           />
-        )}
-      </AppCard>
+        </AppCard>
+      )}
 
       <AppCard>
         <View style={styles.chipRow}>
@@ -1825,42 +1852,130 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  weatherList: {
-    gap: spacing.xs,
+  weatherCard: {
+    overflow: 'hidden',
+    borderRadius: 25,
+    backgroundColor: '#D7D3D0',
+    shadowColor: 'rgba(0,0,0,0.15)',
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  weatherRow: {
+  weatherHeroSection: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingVertical: spacing.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    minHeight: 140,
+    paddingHorizontal: 18,
+    paddingVertical: spacing.md,
+    backgroundColor: '#EC7263',
+    overflow: 'hidden',
   },
-  weatherDay: {
+  weatherBackground: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  weatherCircleLarge: {
+    position: 'absolute',
+    top: '-80%',
+    right: '-50%',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    opacity: 0.4,
+    backgroundColor: '#EFC745',
+  },
+  weatherCircleMedium: {
+    position: 'absolute',
+    top: '-70%',
+    right: '-30%',
+    width: 210,
+    height: 210,
+    borderRadius: 105,
+    opacity: 0.4,
+    backgroundColor: '#EFC745',
+  },
+  weatherCircleSmall: {
+    position: 'absolute',
+    top: '-35%',
+    right: '-8%',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#EFC745',
+  },
+  weatherHeroLeft: {
+    flex: 1,
+    gap: spacing.sm,
+    zIndex: 1,
+    paddingRight: spacing.sm,
+  },
+  weatherConditionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1,
+    gap: spacing.xs,
   },
-  weatherCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  weatherLabel: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-  },
-  weatherMeta: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-  },
-  weatherTemp: {
-    color: colors.primaryBlueDark,
+  weatherConditionLabel: {
+    color: colors.white,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
+  },
+  weatherHeadlineTemp: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 36,
+    lineHeight: 40,
+  },
+  weatherHeadlineRange: {
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+  },
+  weatherHeroRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+    maxWidth: '42%',
+    zIndex: 1,
+  },
+  weatherHeroEyebrow: {
+    color: 'rgba(255,255,255,0.8)',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+  },
+  weatherHeroPlace: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
+    textAlign: 'right',
+  },
+  weatherHeroMeta: {
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  weatherDaysSection: {
+    flexDirection: 'row',
+    backgroundColor: '#974859',
+    gap: 2,
+    paddingTop: 2,
+  },
+  weatherDayButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    minHeight: 56,
+    backgroundColor: '#A75265',
+    paddingVertical: spacing.sm,
+  },
+  weatherDayButtonLabel: {
+    color: 'rgba(255,255,255,0.75)',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 10,
   },
   hotelRow: {
     flexDirection: 'row',
