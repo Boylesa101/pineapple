@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid, type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import { colors, radii, spacing } from '@/constants/theme';
 import { coerceDate, formatDateTime, formatShortDate } from '@/utils/date';
@@ -11,6 +11,12 @@ type Props = {
   value: string | null;
   onChange: (value: string) => void;
 };
+
+function mergeDateAndTime(datePart: Date, timePart: Date) {
+  const merged = new Date(datePart);
+  merged.setHours(timePart.getHours(), timePart.getMinutes(), 0, 0);
+  return merged;
+}
 
 export function DateTimeField({ label, mode, value, onChange }: Props) {
   const [show, setShow] = useState(false);
@@ -26,10 +32,63 @@ export function DateTimeField({ label, mode, value, onChange }: Props) {
     onChange(selected.toISOString());
   }
 
+  function openAndroidDateTimePicker() {
+    const currentValue = coerceDate(value);
+
+    if (mode === 'date') {
+      DateTimePickerAndroid.open({
+        value: currentValue,
+        mode: 'date',
+        onChange: (event, selected) => {
+          if (event.type === 'dismissed' || !selected) {
+            return;
+          }
+          onChange(selected.toISOString());
+        },
+      });
+      return;
+    }
+
+    DateTimePickerAndroid.open({
+      value: currentValue,
+      mode: 'date',
+      onChange: (dateEvent, selectedDate) => {
+        if (dateEvent.type === 'dismissed' || !selectedDate) {
+          return;
+        }
+
+        const timeSeed = new Date(selectedDate);
+        timeSeed.setHours(currentValue.getHours(), currentValue.getMinutes(), 0, 0);
+
+        DateTimePickerAndroid.open({
+          value: timeSeed,
+          mode: 'time',
+          is24Hour: true,
+          onChange: (timeEvent, selectedTime) => {
+            if (timeEvent.type === 'dismissed' || !selectedTime) {
+              return;
+            }
+
+            onChange(mergeDateAndTime(selectedDate, selectedTime).toISOString());
+          },
+        });
+      },
+    });
+  }
+
+  function openPicker() {
+    if (Platform.OS === 'android') {
+      openAndroidDateTimePicker();
+      return;
+    }
+
+    setShow(true);
+  }
+
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
-      <Pressable onPress={() => setShow(true)} style={styles.input}>
+      <Pressable onPress={openPicker} style={styles.input}>
         <Text style={styles.value}>{mode === 'date' ? formatShortDate(value) : formatDateTime(value)}</Text>
       </Pressable>
       {show ? (

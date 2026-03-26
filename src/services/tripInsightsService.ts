@@ -403,19 +403,26 @@ function formatEmergencyLabel(payload: EmergencyNumberApiResponse) {
     return dispatch;
   }
 
-  const fallbackNumbers = Array.from(
-    new Set(
-      [listFirstNonEmpty(data.police?.all ?? []), listFirstNonEmpty(data.ambulance?.all ?? []), listFirstNonEmpty(data.fire?.all ?? [])].filter(
-        Boolean
-      ) as string[]
-    )
-  );
+  const groupedNumbers = new Map<string, string[]>();
+  const roleEntries = [
+    { label: 'Police', number: listFirstNonEmpty(data.police?.all ?? []) },
+    { label: 'Ambulance', number: listFirstNonEmpty(data.ambulance?.all ?? []) },
+    { label: 'Fire', number: listFirstNonEmpty(data.fire?.all ?? []) },
+  ].filter((entry) => entry.number) as Array<{ label: string; number: string }>;
 
-  if (!fallbackNumbers.length) {
+  for (const entry of roleEntries) {
+    const existing = groupedNumbers.get(entry.number) ?? [];
+    groupedNumbers.set(entry.number, [...existing, entry.label]);
+  }
+
+  if (!groupedNumbers.size) {
     return null;
   }
 
-  return fallbackNumbers.slice(0, 3).join(' / ');
+  return Array.from(groupedNumbers.entries())
+    .slice(0, 3)
+    .map(([number, labels]) => `${labels.join('/')} ${number}`)
+    .join(' • ');
 }
 
 function parsePlugLabelFromHtml(html: string) {
