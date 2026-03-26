@@ -595,30 +595,6 @@ export default function TripDetailScreen() {
         </View>
       </View>
 
-      <View style={styles.infoCardGrid}>
-        <View style={styles.infoCard}>
-          <View style={styles.infoCardHeader}>
-            <MaterialIcons name="schedule" size={18} color={colors.white} />
-            <Text style={styles.infoCardLabel}>Destination local time</Text>
-          </View>
-          <Text style={styles.infoCardValue}>{destinationTimeInfo?.localTimeLabel ?? (insightsLoading ? 'Checking…' : 'Time unavailable')}</Text>
-          <Text style={styles.infoCardMeta}>{destinationTimeInfo?.offsetLabel ?? 'Timezone unavailable'}</Text>
-          <Text style={styles.infoCardHint}>{destinationTimeInfo?.relativeLabel ?? 'We could not resolve the destination timezone.'}</Text>
-        </View>
-
-        <View style={styles.infoCard}>
-          <View style={styles.infoCardHeader}>
-            <MaterialIcons name="departure-board" size={18} color={colors.white} />
-            <Text style={styles.infoCardLabel}>Airport set-off time</Text>
-          </View>
-          <Text style={styles.infoCardValue}>{airportSetOffInfo.timeLabel}</Text>
-          <Text style={styles.infoCardMeta}>
-            {airportSetOffInfo.status === 'available' ? airportSetOffInfo.departureLabel : 'Departure details needed'}
-          </Text>
-          <Text style={styles.infoCardHint}>{airportSetOffInfo.helperLabel}</Text>
-        </View>
-      </View>
-
       {destinationWeather?.days.length ? (
         <View style={styles.weatherCard}>
           <View style={styles.weatherHeroSection}>
@@ -668,6 +644,30 @@ export default function TripDetailScreen() {
           />
         </AppCard>
       )}
+
+      <View style={styles.infoCardGrid}>
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardHeader}>
+            <MaterialIcons name="schedule" size={16} color={colors.white} />
+            <Text style={styles.infoCardLabel}>Destination local time</Text>
+          </View>
+          <Text style={styles.infoCardValue}>{destinationTimeInfo?.localTimeLabel ?? (insightsLoading ? 'Checking…' : 'Time unavailable')}</Text>
+          <Text style={styles.infoCardMeta}>{destinationTimeInfo?.offsetLabel ?? 'Timezone unavailable'}</Text>
+          <Text style={styles.infoCardHint}>{destinationTimeInfo?.relativeLabel ?? 'We could not resolve the destination timezone.'}</Text>
+        </View>
+
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardHeader}>
+            <MaterialIcons name="departure-board" size={16} color={colors.white} />
+            <Text style={styles.infoCardLabel}>Airport set-off time</Text>
+          </View>
+          <Text style={styles.infoCardValue}>{airportSetOffInfo.timeLabel}</Text>
+          <Text style={styles.infoCardMeta}>
+            {airportSetOffInfo.status === 'available' ? airportSetOffInfo.departureLabel : 'Departure details needed'}
+          </Text>
+          <Text style={styles.infoCardHint}>{airportSetOffInfo.helperLabel}</Text>
+        </View>
+      </View>
 
       <AppCard>
         <View style={styles.chipRow}>
@@ -1716,37 +1716,40 @@ const styles = StyleSheet.create({
   infoCard: {
     flex: 1,
     minWidth: 156,
+    minHeight: 110,
     backgroundColor: colors.primaryBlue,
     borderRadius: 22,
-    padding: spacing.md,
-    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 10,
+    gap: 4,
   },
   infoCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 6,
   },
   infoCardLabel: {
     flex: 1,
     color: colors.white,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
+    fontSize: 12,
   },
   infoCardValue: {
     color: colors.white,
     fontFamily: 'Poppins_700Bold',
-    fontSize: 24,
+    fontSize: 20,
+    lineHeight: 24,
   },
   infoCardMeta: {
     color: 'rgba(255,255,255,0.92)',
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
+    fontSize: 11,
   },
   infoCardHint: {
     color: 'rgba(255,255,255,0.82)',
     fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 14,
   },
   notes: {
     color: colors.textMuted,
