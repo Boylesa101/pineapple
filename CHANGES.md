@@ -4,9 +4,11 @@
 
 - Transport reminder audit and rebuild: replaced the old generic `flight_check_in` path with a per-segment `transport_departure` scheduler that now covers flights, ferries, Eurotunnel, trains, and taxis with the required reminder matrix and trip/segment deep links
 - Notification diagnostics: Settings now exposes runtime support, permission state, Android channel visibility and importance, future scheduled count, and the next scheduled transport alerts so lock-screen behavior can be checked from inside the app
-- Transport proof trip: version `2.2.3` seeds a temporary `Transport Notification Proof Trip` with one flight, train, taxi, ferry, and Eurotunnel segment, then compresses the reminder cadence into a short on-device verification window
+- Transport proof trip: version `2.2.4` seeds a temporary `Transport Notification Proof Trip` with one flight, train, taxi, ferry, and Eurotunnel segment, then compresses the reminder cadence into a short on-device verification window
 - Transport trip UX: each saved segment now shows its lock-screen alert summary plus the next few scheduled reminders directly inside the trip travel section
-- Build metadata: bumped the app and APK artifact line to `2.2.3`, added Android notification permissions for testing, and kept the proof build removable after verification
+- Build metadata: bumped the app and APK artifact line to `2.2.4`, added Android notification permissions for testing, and kept the proof build removable after verification
+- Bootstrap fix: the proof-build seed and share-code rotation path no longer uses destructive full-database replacement during startup, which avoids wiping local files and destabilising existing installs
+- Android icon fix: switched the adaptive monochrome icon to a proper transparent glyph asset so themed launcher icons stop rendering blank
 - Account polish: fixed the oversized Account tools container, made the main blue profile circle open the real photo-picker flow, and kept the selected profile image stored locally and rendered immediately
 - Traveller photos: traveller add/edit now supports optional profile images with safe replace and cleanup behavior, and traveller avatars render those stored photos across trip and account surfaces
 - Trip transfer QR fix: Pineapple now generates Pineapple-owned deep-link QR payloads for shared trips, imports them through a dedicated `trip-transfer` route, and keeps QR handoff inside Pineapple instead of bouncing raw text into unrelated scanner apps

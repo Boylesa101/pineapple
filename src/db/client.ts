@@ -7,9 +7,14 @@ let databasePromise: Promise<SQLiteDatabase> | null = null;
 export async function getDatabase() {
   if (!databasePromise) {
     databasePromise = (async () => {
-      const db = await openDatabaseAsync('pineapple.db');
-      await runMigrations(db);
-      return db;
+      try {
+        const db = await openDatabaseAsync('pineapple.db');
+        await runMigrations(db);
+        return db;
+      } catch (error) {
+        databasePromise = null;
+        throw error;
+      }
     })();
   }
 

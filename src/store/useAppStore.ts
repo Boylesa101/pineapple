@@ -320,12 +320,12 @@ export const useAppStore = create<StoreState>((set, get) => ({
       const shareCodeRotationResult = rotateLegacyShareCodes(data);
       if (shareCodeRotationResult.changed) {
         data = shareCodeRotationResult.snapshot;
-        await replaceAllData(data);
+        await persistSnapshot(data);
       }
       const proofBuildResult = prepareSnapshotForCurrentBuild(data);
       if (proofBuildResult.changed) {
         data = proofBuildResult.snapshot;
-        await replaceAllData(data);
+        await persistSnapshot(data);
       }
 
       const visibleTrips = filterVisibleTrips(data.trips);

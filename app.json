@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pineapple",
     "slug": "pineapple",
-    "version": "2.2.3",
+    "version": "2.2.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,10 +15,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pineapple.travel",
-      "buildNumber": "43"
+      "buildNumber": "44"
     },
     "android": {
-      "versionCode": 50,
+      "versionCode": 51,
       "package": "com.pineapple.travel",
       "permissions": [
         "POST_NOTIFICATIONS",
@@ -30,7 +30,7 @@
         "backgroundColor": "#F7E7CE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/icons/pineapple (2)/android/icon-monochrome.png"
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },

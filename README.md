@@ -7,11 +7,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
 - Expo Go is no longer a supported Pineapple test path; use installable APKs for device testing and `.aab` for Play Store release
 - For a dev-only APK that still expects Metro, run `npm run apk:debug`
-- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.2.3-debug.apk`
+- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.2.4-debug.apk`
 - For the fastest direct phone testing on a modern device, run `npm run apk:release:arm64`
-- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.2.3-release-arm64.apk`
+- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.2.4-release-arm64.apk`
 - For direct phone testing without USB or Metro, run `npm run apk:release`
-- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.2.3-release.apk`
+- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.2.4-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
 - Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
 - When you are ready for Google Play, provide these environment variables before building:
@@ -95,8 +95,10 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Sensitive structured record fields are also encrypted before Pineapple writes them into local storage, covering trips, travellers, document metadata, itinerary notes, emergency records, and sync payloads
 - Local reminders and notifications for trip countdown milestones, trip day, passport/GHIC expiry, missing insurance, packing completeness, per-segment transport departures, hotels, transfers, travel mode, SOS readiness, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
-- Version `2.2.3` is a dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
+- Version `2.2.4` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
 - The temporary `Transport Notification Proof Trip` is build-scoped and should be removed again after transport lock-screen verification is complete
+- Bootstrap correction: build-scoped proof-trip seeding now uses a safe in-place snapshot persist instead of a destructive full data replacement, so existing local data is not cleared during startup
+- Android icon correction: the adaptive monochrome icon now uses a proper transparent monochrome glyph asset for themed launcher icons
 - Dedicated expiry warnings screen with filters for all, expiring soon, expired, and notifications off
 - Optional manual-share trip sync with participant roles, invite records, conflict review, and trip-share export/import
 - Expanded settings surface for security, reminders, sync, backup/restore, and privacy masking
