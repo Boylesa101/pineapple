@@ -114,6 +114,7 @@ function createSnapshot(): AppDataSnapshot {
       structuredDataProtected: true,
       profileName: '',
       profilePhotoUri: null,
+      travelStyle: 'mixed',
       syncEnabled: false,
       syncMode: 'manual_share',
       syncStatus: 'local_only',

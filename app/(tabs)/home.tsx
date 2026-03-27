@@ -19,6 +19,7 @@ import { filterVisibleTrips } from '@/utils/tripVisibility';
 export default function HomeScreen() {
   const router = useRouter();
   const { data, setActiveTrip } = useAppStore();
+  const greetingName = data.appPreferences.profileName.trim() || 'traveller';
   const sortedTrips = useMemo(
     () => filterVisibleTrips([...data.trips]).sort((left, right) => left.startDate.localeCompare(right.startDate)),
     [data.trips]
@@ -77,7 +78,7 @@ export default function HomeScreen() {
     >
       <View style={styles.topBar}>
         <View style={styles.topCopy}>
-          <Text style={styles.topGreeting}>Hello Andrew</Text>
+          <Text style={styles.topGreeting}>Hello {greetingName}</Text>
         </View>
         <View style={styles.topActions}>
           <Pressable onPress={() => router.push('/account')} style={styles.topIconButton} accessibilityLabel="Open account">

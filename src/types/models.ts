@@ -58,6 +58,7 @@ export type SyncMode = 'manual_share';
 export type SyncStatus = 'local_only' | 'ready' | 'pending_export' | 'pending_import' | 'conflict';
 export type ConflictStatus = 'open' | 'resolved_keep_local' | 'resolved_use_incoming';
 export type PrivacyMaskingMode = 'always' | 'travel_mode';
+export type TravelStyle = 'family_holidays' | 'city_breaks' | 'road_trips' | 'mixed';
 export type PinLength = number;
 export type VerificationStatus = 'verified' | 'review' | 'unverified';
 export type PassportVerificationStatus = VerificationStatus;
@@ -333,6 +334,7 @@ export interface AppPreferences {
   structuredDataProtected: boolean;
   profileName: string;
   profilePhotoUri: string | null;
+  travelStyle: TravelStyle;
   syncEnabled: boolean;
   syncMode: SyncMode;
   syncStatus: SyncStatus;

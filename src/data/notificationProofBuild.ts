@@ -2,7 +2,7 @@ import { addDays, addHours, addMinutes } from 'date-fns';
 
 import type { AppDataSnapshot, ReminderKind, ReminderSetting, TravelSegment, Trip } from '@/types/models';
 
-export const NOTIFICATION_PROOF_BUILD_VERSION = '2.2.5';
+export const NOTIFICATION_PROOF_BUILD_VERSION = '2.2.6';
 export const NOTIFICATION_PROOF_TRIP_ID = 'trip_transport_notification_proof';
 
 const NOTIFICATION_PROOF_SEGMENTS: Array<{
@@ -181,13 +181,13 @@ export function withNotificationProofTrip(snapshot: AppDataSnapshot, now = new D
     destinationImageLocalPath: null,
     destinationImageRemoteUrl: null,
     destinationImageSource: 'fallback',
-    attributionText: 'Temporary 2.2.5 transport notification verification trip',
-    attributionMeta: { source: 'fallback', sourceLabel: 'Temporary 2.2.5 transport notification verification trip' },
+    attributionText: 'Temporary 2.2.6 transport notification verification trip',
+    attributionMeta: { source: 'fallback', sourceLabel: 'Temporary 2.2.6 transport notification verification trip' },
     coverImageUri: null,
     heroImageRemoteUrl: null,
     heroImageStatus: 'idle',
     notes:
-      'Temporary seeded trip for Pineapple 2.2.5 transport notification verification. Remove after on-device lock-screen proof is confirmed.',
+      'Temporary seeded trip for Pineapple 2.2.6 transport notification verification. Remove after on-device lock-screen proof is confirmed.',
     transferSummary: 'Transport departure proof trip',
     transferProvider: '',
     transferMethod: '',

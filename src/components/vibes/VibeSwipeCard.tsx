@@ -26,7 +26,7 @@ export function VibeSwipeCard({ item, imageUri, onOpen }: Props) {
             <LinearGradient colors={['#0D6EFD', '#2BA6CB', '#F4B400']} style={StyleSheet.absoluteFillObject} />
             <View style={styles.imageFallbackBadge}>
               <MaterialIcons name="photo-camera" size={20} color="rgba(255,255,255,0.92)" />
-              <Text style={styles.imageFallbackLabel}>Venue photo loading</Text>
+              <Text style={styles.imageFallbackLabel}>Official photo unavailable</Text>
             </View>
           </>
         )}

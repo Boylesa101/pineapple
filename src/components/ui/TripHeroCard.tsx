@@ -150,14 +150,38 @@ export function TripHeroCard({
             </View>
 
             <View style={styles.actions}>
-              <Pressable onPress={onOpenFlights} disabled={!onOpenFlights} style={styles.iconButton}>
-                <MaterialIcons name={(transportDisplay?.cardIcon ?? 'flight') as any} size={24} color={colors.white} />
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  onOpenFlights?.();
+                }}
+                disabled={!onOpenFlights}
+                style={styles.actionPill}
+              >
+                <MaterialIcons name={(transportDisplay?.cardIcon ?? 'flight') as any} size={18} color={colors.white} />
+                <Text style={styles.actionLabel}>{transportDisplay?.label ?? 'Flights'}</Text>
               </Pressable>
-              <Pressable onPress={onOpenHotel} disabled={!onOpenHotel} style={styles.iconButton}>
-                <MaterialIcons name="hotel" size={24} color={colors.white} />
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  onOpenHotel?.();
+                }}
+                disabled={!onOpenHotel}
+                style={styles.actionPill}
+              >
+                <MaterialIcons name="hotel" size={18} color={colors.white} />
+                <Text style={styles.actionLabel}>Hotels</Text>
               </Pressable>
-              <Pressable onPress={onOpenTransfers} disabled={!onOpenTransfers} style={styles.iconButton}>
-                <MaterialIcons name="swap-horiz" size={24} color={colors.white} />
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  onOpenTransfers?.();
+                }}
+                disabled={!onOpenTransfers}
+                style={styles.actionPill}
+              >
+                <MaterialIcons name="swap-horiz" size={18} color={colors.white} />
+                <Text style={styles.actionLabel}>Transfers</Text>
               </Pressable>
             </View>
           </View>
@@ -300,17 +324,25 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   actions: {
-    alignItems: 'center',
+    alignItems: 'flex-end',
     gap: spacing.sm,
     paddingBottom: spacing.xl,
   },
-  iconButton: {
-    width: 44,
-    height: 44,
+  actionPill: {
+    minWidth: 122,
+    minHeight: 42,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  actionLabel: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
   },
   infoButton: {
     position: 'absolute',

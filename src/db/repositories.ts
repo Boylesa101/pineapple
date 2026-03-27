@@ -206,6 +206,7 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
     ...defaultAppExpiryPreferences(),
     profileName: '',
     profilePhotoUri: null,
+    travelStyle: 'mixed',
     syncEnabled: false,
     syncMode: 'manual_share',
     syncStatus: 'local_only',
@@ -287,6 +288,7 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         structuredDataProtected: toBool(appPreferencesRaw.structuredDataProtected ?? 0),
         profileName: appPreferencesRaw.profileName ?? '',
         profilePhotoUri: appPreferencesRaw.profilePhotoUri ?? null,
+        travelStyle: appPreferencesRaw.travelStyle ?? 'mixed',
         syncEnabled: toBool(appPreferencesRaw.syncEnabled),
       })
     : defaultAppPreferences();
@@ -1215,8 +1217,8 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const normalized = normalizeAppPreferences(input as any);
 
   await db.runAsync(
-    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, structuredDataProtected, profileName, profilePhotoUri, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, vibesIntroSeenAt, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, structuredDataProtected, profileName, profilePhotoUri, travelStyle, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, vibesIntroSeenAt, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        notificationsEnabled = excluded.notificationsEnabled,
        expiryRemindersEnabled = excluded.expiryRemindersEnabled,
@@ -1225,6 +1227,7 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
        structuredDataProtected = excluded.structuredDataProtected,
        profileName = excluded.profileName,
        profilePhotoUri = excluded.profilePhotoUri,
+       travelStyle = excluded.travelStyle,
        syncEnabled = excluded.syncEnabled,
        syncMode = excluded.syncMode,
        syncStatus = excluded.syncStatus,
@@ -1241,6 +1244,7 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
     normalized.structuredDataProtected ? 1 : 0,
     normalized.profileName,
     normalized.profilePhotoUri,
+    normalized.travelStyle,
     normalized.syncEnabled ? 1 : 0,
     normalized.syncMode,
     normalized.syncStatus,

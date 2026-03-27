@@ -18,10 +18,13 @@ import { PERSONAL_DOCUMENTS_TRIP_ID } from '@/constants/vault';
 import { recognizeDocumentText } from '@/services/documentTextOcr';
 import { isLiveDocumentScannerAvailable, scanDocumentWithLiveEdges } from '@/services/documentScanner';
 import { useAppStore } from '@/store/useAppStore';
+import type { TravelStyle } from '@/types/models';
 import { createEmptyPassportData, ensurePassportDraftData } from '@/utils/passport';
 import { applyPassportOcrToDraft, parsePassportOcrText } from '@/utils/passportOcr';
 import { validateDocument } from '@/utils/validation';
 import { cleanupImportedSource, copyIntoAppStorage, deleteLocalFile } from '@/utils/fileStorage';
+import { createId } from '@/utils/ids';
+import { chooseProfilePhoto, removeProfilePhoto } from '@/utils/profilePhotos';
 
 const slides = [
   {
@@ -61,8 +64,42 @@ const slides = [
   },
 ];
 
-type SetupStep = 'name' | 'photo' | 'document';
+type SetupStep = 'name' | 'preferences' | 'photo' | 'document';
 type DocumentSetupChoice = 'skip' | 'passport_manual' | 'passport_photo';
+type CompanionDraft = {
+  id: string;
+  fullName: string;
+  photoUri: string | null;
+  addPassport: boolean;
+  passportNumber: string;
+  passportNationality: string;
+  passportCountryCode: string;
+  passportDateOfBirth: string | null;
+  passportExpiryDate: string | null;
+};
+
+const travelStyleOptions: Array<{ value: TravelStyle; label: string; body: string }> = [
+  {
+    value: 'family_holidays',
+    label: 'Family holidays',
+    body: 'Keep passports, reminders, and traveller details ready for everyone.',
+  },
+  {
+    value: 'city_breaks',
+    label: 'City breaks',
+    body: 'Stay quick with bookings, weather, and short-trip planning.',
+  },
+  {
+    value: 'road_trips',
+    label: 'Road trips',
+    body: 'Keep driving docs, stops, and on-the-move plans close to hand.',
+  },
+  {
+    value: 'mixed',
+    label: 'A bit of everything',
+    body: 'Use Pineapple flexibly across different kinds of trips.',
+  },
+];
 
 function initialsForName(value: string) {
   return value
@@ -73,11 +110,26 @@ function initialsForName(value: string) {
     .join('');
 }
 
+function createCompanionDraft(): CompanionDraft {
+  return {
+    id: createId('companion'),
+    fullName: '',
+    photoUri: null,
+    addPassport: false,
+    passportNumber: '',
+    passportNationality: '',
+    passportCountryCode: '',
+    passportDateOfBirth: null,
+    passportExpiryDate: null,
+  };
+}
+
 export default function OnboardingScreen() {
   const router = useRouter();
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
   const saveAppPreferences = useAppStore((state) => state.saveAppPreferences);
   const ensurePersonalDocumentsTrip = useAppStore((state) => state.ensurePersonalDocumentsTrip);
+  const saveTraveller = useAppStore((state) => state.saveTraveller);
   const saveDocument = useAppStore((state) => state.saveDocument);
   const appPreferences = useAppStore((state) => state.data.appPreferences);
   const [slideIndex, setSlideIndex] = useState(0);
@@ -85,6 +137,8 @@ export default function OnboardingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profilePhotoUri, setProfilePhotoUri] = useState<string | null>(null);
+  const [travelStyle, setTravelStyle] = useState<TravelStyle>(appPreferences.travelStyle ?? 'mixed');
+  const [wantsReminders, setWantsReminders] = useState(appPreferences.notificationsEnabled);
   const [documentChoice, setDocumentChoice] = useState<DocumentSetupChoice>('skip');
   const [passportHolderName, setPassportHolderName] = useState('');
   const [passportNumber, setPassportNumber] = useState('');
@@ -100,6 +154,7 @@ export default function OnboardingScreen() {
   const [scanGuidance, setScanGuidance] = useState<string | undefined>();
   const [scanDetail, setScanDetail] = useState<string | undefined>();
   const [scanWarningText, setScanWarningText] = useState<string | null>(null);
+  const [companions, setCompanions] = useState<CompanionDraft[]>([]);
 
   const inSlides = slideIndex < slides.length;
   const currentSlide = slides[Math.min(slideIndex, slides.length - 1)];
@@ -112,16 +167,22 @@ export default function OnboardingScreen() {
   async function finalizeOnboarding() {
     setSubmitting(true);
     try {
+      const personalDocumentsTripId =
+        documentChoice === 'passport_manual' || documentChoice === 'passport_photo' || companions.length
+          ? await ensurePersonalDocumentsTrip()
+          : null;
+
       await saveAppPreferences({
         profileName: displayName,
         profilePhotoUri,
+        travelStyle,
+        notificationsEnabled: wantsReminders,
       });
 
       if (documentChoice === 'passport_manual' || documentChoice === 'passport_photo') {
-        await ensurePersonalDocumentsTrip();
         const draft = ensurePassportDraftData(
           {
-            tripId: PERSONAL_DOCUMENTS_TRIP_ID,
+            tripId: personalDocumentsTripId ?? PERSONAL_DOCUMENTS_TRIP_ID,
             travellerId: null,
             holderName: passportHolderDisplay,
             documentType: 'passport',
@@ -162,6 +223,75 @@ export default function OnboardingScreen() {
         }
 
         await saveDocument(draft);
+      }
+
+      for (const companion of companions) {
+        const fullName = companion.fullName.trim();
+        if (!fullName || !personalDocumentsTripId) {
+          continue;
+        }
+
+        const travellerId = await saveTraveller({
+          tripId: personalDocumentsTripId,
+          fullName,
+          photoUri: companion.photoUri,
+          dateOfBirth: companion.passportDateOfBirth,
+          passportNationality: companion.addPassport ? companion.passportNationality.trim() : '',
+          passportNumber: companion.addPassport ? companion.passportNumber.trim() : '',
+          ghicNumber: '',
+          medicalNote: '',
+          notes: '',
+          avatarColor: '#1EAAF0',
+          relationshipType: 'other',
+        });
+
+        if (!companion.addPassport) {
+          continue;
+        }
+
+        const companionPassport = ensurePassportDraftData(
+          {
+            tripId: personalDocumentsTripId,
+            travellerId,
+            holderName: fullName,
+            documentType: 'passport',
+            documentNumber: companion.passportNumber.trim(),
+            issueDate: null,
+            expiryDate: companion.passportExpiryDate,
+            expiryReminderEnabled: true,
+            expiryReminderSchedule: appPreferences.expiryReminderSchedule,
+            expiredStatus: false,
+            expiringSoonStatus: false,
+            notes: '',
+            localFileUri: '',
+            previewUri: null,
+            mimeType: null,
+            passportData: {
+              ...createEmptyPassportData(),
+              countryCode: companion.passportCountryCode.trim().toUpperCase(),
+              nationality: companion.passportNationality.trim(),
+              dateOfBirth: companion.passportDateOfBirth,
+            },
+            secondaryLocalFileUri: null,
+            secondaryPreviewUri: null,
+            secondaryMimeType: null,
+            drivingLicenceData: null,
+            healthCardData: null,
+            paymentCardData: null,
+            formalDocumentData: null,
+            sensitive: true,
+          },
+          null
+        );
+
+        const errors = validateDocument(companionPassport);
+        if (errors.length) {
+          Alert.alert('Traveller passport needs attention', `${fullName}: ${errors.join('\n')}`);
+          setSubmitting(false);
+          return;
+        }
+
+        await saveDocument(companionPassport);
       }
 
       await completeOnboarding();
@@ -379,6 +509,34 @@ export default function OnboardingScreen() {
     }
   }
 
+  function updateCompanion(companionId: string, updater: (current: CompanionDraft) => CompanionDraft) {
+    setCompanions((current) => current.map((item) => (item.id === companionId ? updater(item) : item)));
+  }
+
+  async function chooseCompanionPhoto(companionId: string) {
+    const current = companions.find((item) => item.id === companionId);
+    if (!current) {
+      return;
+    }
+
+    const nextUri = await chooseProfilePhoto(current.photoUri);
+    if (!nextUri) {
+      return;
+    }
+
+    updateCompanion(companionId, (entry) => ({ ...entry, photoUri: nextUri }));
+  }
+
+  async function clearCompanionPhoto(companionId: string) {
+    const current = companions.find((item) => item.id === companionId);
+    if (!current?.photoUri) {
+      return;
+    }
+
+    await removeProfilePhoto(current.photoUri);
+    updateCompanion(companionId, (entry) => ({ ...entry, photoUri: null }));
+  }
+
   const footer = useMemo(() => {
     if (inSlides) {
       return (
@@ -425,7 +583,7 @@ export default function OnboardingScreen() {
             size="large"
             style={styles.footerButton}
             labelStyle={styles.footerButtonLabel}
-            onPress={() => setSetupStep('photo')}
+            onPress={() => setSetupStep('preferences')}
             disabled={!displayName || submitting}
           />
           <AppButton
@@ -437,6 +595,31 @@ export default function OnboardingScreen() {
             onPress={() => {
               setSlideIndex(slides.length - 1);
             }}
+            disabled={submitting}
+          />
+        </View>
+      );
+    }
+
+    if (setupStep === 'preferences') {
+      return (
+        <View style={styles.footer}>
+          <AppButton
+            label="Continue"
+            tone="secondary"
+            size="large"
+            style={styles.footerButton}
+            labelStyle={styles.footerButtonLabel}
+            onPress={() => setSetupStep('photo')}
+            disabled={submitting}
+          />
+          <AppButton
+            label="Back"
+            tone="secondary"
+            size="large"
+            style={styles.footerButton}
+            labelStyle={styles.footerButtonLabel}
+            onPress={() => setSetupStep('name')}
             disabled={submitting}
           />
         </View>
@@ -468,10 +651,23 @@ export default function OnboardingScreen() {
       );
     }
 
+    const companionsReady = companions.every((companion) => {
+      const hasName = Boolean(companion.fullName.trim());
+      if (!hasName) {
+        return false;
+      }
+
+      if (!companion.addPassport) {
+        return true;
+      }
+
+      return Boolean(companion.passportNationality.trim() && companion.passportCountryCode.trim());
+    });
     const documentReady =
       documentChoice === 'skip' ||
       (documentChoice === 'passport_manual' && Boolean(passportHolderDisplay && passportNationality.trim() && passportCountryCode.trim())) ||
       (documentChoice === 'passport_photo' && photoDocumentReady);
+    const readyToFinish = documentReady && companionsReady;
 
     return (
       <View style={styles.footer}>
@@ -485,7 +681,7 @@ export default function OnboardingScreen() {
             void finalizeOnboarding();
           }}
           loading={submitting}
-          disabled={!documentReady}
+          disabled={!readyToFinish}
         />
         <AppButton
           label="Skip for now"
@@ -502,6 +698,7 @@ export default function OnboardingScreen() {
     );
   }, [
     appPreferences.expiryReminderSchedule,
+    companions,
     displayName,
     documentChoice,
     finalizeOnboarding,
@@ -544,6 +741,50 @@ export default function OnboardingScreen() {
         </AppCard>
       ) : null}
 
+      {!inSlides && setupStep === 'preferences' ? (
+        <AppCard>
+          <Text style={styles.heading}>Set Pineapple up your way</Text>
+          <Text style={styles.body}>Tell Pineapple what kind of trips you usually plan and whether you want lock-screen travel reminders later.</Text>
+
+          <View style={styles.preferenceSection}>
+            <Text style={styles.preferenceLabel}>Most of my trips are</Text>
+            <View style={styles.preferenceOptions}>
+              {travelStyleOptions.map((option) => (
+                <Pressable
+                  key={option.value}
+                  style={[styles.preferenceCard, travelStyle === option.value ? styles.preferenceCardActive : null]}
+                  onPress={() => setTravelStyle(option.value)}
+                >
+                  <Text style={[styles.preferenceTitle, travelStyle === option.value ? styles.preferenceTitleActive : null]}>{option.label}</Text>
+                  <Text style={[styles.preferenceBody, travelStyle === option.value ? styles.preferenceBodyActive : null]}>{option.body}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.preferenceSection}>
+            <Text style={styles.preferenceLabel}>Lock-screen travel alerts</Text>
+            <Text style={styles.preferenceHint}>Pineapple can prepare departure and trip reminders, then you can allow Android notifications after setup.</Text>
+            <View style={styles.binaryChoiceRow}>
+              <Pressable
+                style={[styles.binaryChoice, wantsReminders ? styles.binaryChoiceActive : null]}
+                onPress={() => setWantsReminders(true)}
+              >
+                <Text style={[styles.binaryChoiceTitle, wantsReminders ? styles.binaryChoiceTitleActive : null]}>Turn them on</Text>
+                <Text style={[styles.binaryChoiceBody, wantsReminders ? styles.binaryChoiceBodyActive : null]}>Best for family trips and timed transport plans.</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.binaryChoice, !wantsReminders ? styles.binaryChoiceActive : null]}
+                onPress={() => setWantsReminders(false)}
+              >
+                <Text style={[styles.binaryChoiceTitle, !wantsReminders ? styles.binaryChoiceTitleActive : null]}>Not now</Text>
+                <Text style={[styles.binaryChoiceBody, !wantsReminders ? styles.binaryChoiceBodyActive : null]}>You can switch reminders on later from Settings.</Text>
+              </Pressable>
+            </View>
+          </View>
+        </AppCard>
+      ) : null}
+
       {!inSlides && setupStep === 'photo' ? (
         <AppCard>
           <Text style={styles.heading}>Add a profile photo</Text>
@@ -573,8 +814,8 @@ export default function OnboardingScreen() {
           <View style={styles.documentBadge}>
             <MaterialIcons name="badge" size={28} color={colors.primaryBlue} />
           </View>
-          <Text style={styles.heading}>Add your main ID</Text>
-          <Text style={styles.body}>You can add a passport now with a short manual form, or skip and use Vault later.</Text>
+          <Text style={styles.heading}>Add passports and travellers</Text>
+          <Text style={styles.body}>Set up your own passport first, then add anyone else you usually travel with. Everything here is optional except your main profile.</Text>
           <View style={styles.documentChoiceRow}>
             <Pressable
               style={[styles.documentChoiceCard, documentChoice === 'passport_manual' ? styles.documentChoiceCardActive : null]}
@@ -706,6 +947,132 @@ export default function OnboardingScreen() {
               <Text style={styles.documentNote}>Skipping now does not block trips, SOS, or later document setup.</Text>
             </View>
           )}
+
+          <View style={styles.companionSection}>
+            <View style={styles.companionHeader}>
+              <View style={styles.companionHeaderCopy}>
+                <Text style={styles.companionTitle}>Other travellers</Text>
+                <Text style={styles.helperText}>Add family or regular travel companions now, and optionally store a passport record for each.</Text>
+              </View>
+              <AppButton
+                label="Add traveller"
+                tone="outline"
+                onPress={() => setCompanions((current) => [...current, createCompanionDraft()])}
+                icon={<MaterialIcons name="person-add-alt-1" size={18} color={colors.primaryBlue} />}
+              />
+            </View>
+
+            {companions.length ? (
+              <View style={styles.companionList}>
+                {companions.map((companion, index) => (
+                  <View key={companion.id} style={styles.companionCard}>
+                    <View style={styles.companionCardHeader}>
+                      <Text style={styles.companionCardTitle}>Traveller {index + 1}</Text>
+                      <Pressable
+                        onPress={async () => {
+                          if (companion.photoUri) {
+                            await removeProfilePhoto(companion.photoUri);
+                          }
+                          setCompanions((current) => current.filter((item) => item.id !== companion.id));
+                        }}
+                        hitSlop={8}
+                      >
+                        <MaterialIcons name="delete-outline" size={20} color={colors.dangerRed} />
+                      </Pressable>
+                    </View>
+                    <AppTextField
+                      label="Traveller name"
+                      value={companion.fullName}
+                      onChangeText={(value) => updateCompanion(companion.id, (current) => ({ ...current, fullName: value }))}
+                      placeholder="Mum, Dad, Sophie..."
+                    />
+
+                    <View style={styles.companionPhotoRow}>
+                      <View style={styles.companionAvatar}>
+                        {companion.photoUri ? (
+                          <Image source={companion.photoUri} style={styles.companionAvatarImage} contentFit="cover" />
+                        ) : (
+                          <Text style={styles.companionAvatarText}>{initialsForName(companion.fullName) || '?'}</Text>
+                        )}
+                      </View>
+                      <View style={styles.companionPhotoActions}>
+                        <AppButton
+                          label={companion.photoUri ? 'Change photo' : 'Add photo'}
+                          tone="outline"
+                          onPress={() => {
+                            void chooseCompanionPhoto(companion.id);
+                          }}
+                        />
+                        {companion.photoUri ? (
+                          <AppButton
+                            label="Remove photo"
+                            tone="ghost"
+                            onPress={() => {
+                              void clearCompanionPhoto(companion.id);
+                            }}
+                          />
+                        ) : null}
+                      </View>
+                    </View>
+
+                    <View style={styles.binaryChoiceRow}>
+                      <Pressable
+                        style={[styles.binaryChoice, companion.addPassport ? styles.binaryChoiceActive : null]}
+                        onPress={() => updateCompanion(companion.id, (current) => ({ ...current, addPassport: true }))}
+                      >
+                        <Text style={[styles.binaryChoiceTitle, companion.addPassport ? styles.binaryChoiceTitleActive : null]}>Add passport now</Text>
+                        <Text style={[styles.binaryChoiceBody, companion.addPassport ? styles.binaryChoiceBodyActive : null]}>Save the basics now and finish the rest later in Vault.</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.binaryChoice, !companion.addPassport ? styles.binaryChoiceActive : null]}
+                        onPress={() => updateCompanion(companion.id, (current) => ({ ...current, addPassport: false }))}
+                      >
+                        <Text style={[styles.binaryChoiceTitle, !companion.addPassport ? styles.binaryChoiceTitleActive : null]}>Skip passport</Text>
+                        <Text style={[styles.binaryChoiceBody, !companion.addPassport ? styles.binaryChoiceBodyActive : null]}>Create the traveller now and add the passport later.</Text>
+                      </Pressable>
+                    </View>
+
+                    {companion.addPassport ? (
+                      <View style={styles.companionPassportForm}>
+                        <AppTextField
+                          label="Passport number"
+                          value={companion.passportNumber}
+                          onChangeText={(value) => updateCompanion(companion.id, (current) => ({ ...current, passportNumber: value }))}
+                          placeholder="123456789"
+                        />
+                        <AppTextField
+                          label="Nationality"
+                          value={companion.passportNationality}
+                          onChangeText={(value) => updateCompanion(companion.id, (current) => ({ ...current, passportNationality: value }))}
+                          placeholder="British"
+                        />
+                        <AppTextField
+                          label="Issuing country code"
+                          value={companion.passportCountryCode}
+                          onChangeText={(value) => updateCompanion(companion.id, (current) => ({ ...current, passportCountryCode: value }))}
+                          placeholder="GBR"
+                        />
+                        <TypedDateField
+                          label="Date of birth"
+                          value={companion.passportDateOfBirth}
+                          onChange={(value) => updateCompanion(companion.id, (current) => ({ ...current, passportDateOfBirth: value }))}
+                        />
+                        <TypedDateField
+                          label="Expiry date"
+                          value={companion.passportExpiryDate}
+                          onChange={(value) => updateCompanion(companion.id, (current) => ({ ...current, passportExpiryDate: value }))}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.documentNotes}>
+                <Text style={styles.documentNote}>Adding other travellers is optional. You can keep setup focused on yourself and do the rest later.</Text>
+              </View>
+            )}
+          </View>
         </AppCard>
       ) : null}
       <DocumentScanFlowModal
@@ -774,6 +1141,86 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
+  },
+  preferenceSection: {
+    gap: spacing.sm,
+  },
+  preferenceLabel: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  preferenceHint: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  preferenceOptions: {
+    gap: spacing.sm,
+  },
+  preferenceCard: {
+    gap: spacing.xs,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: colors.white,
+    padding: spacing.md,
+  },
+  preferenceCardActive: {
+    backgroundColor: colors.primaryBlue,
+    borderColor: colors.primaryBlue,
+  },
+  preferenceTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+  },
+  preferenceTitleActive: {
+    color: colors.white,
+  },
+  preferenceBody: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  preferenceBodyActive: {
+    color: 'rgba(255,255,255,0.88)',
+  },
+  binaryChoiceRow: {
+    gap: spacing.sm,
+  },
+  binaryChoice: {
+    gap: spacing.xs,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: colors.white,
+    padding: spacing.md,
+  },
+  binaryChoiceActive: {
+    backgroundColor: colors.primaryBlue,
+    borderColor: colors.primaryBlue,
+  },
+  binaryChoiceTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+  },
+  binaryChoiceTitleActive: {
+    color: colors.white,
+  },
+  binaryChoiceBody: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  binaryChoiceBodyActive: {
+    color: 'rgba(255,255,255,0.88)',
   },
   footer: {
     gap: spacing.sm,
@@ -891,5 +1338,81 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
+  },
+  helperText: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  companionSection: {
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.primaryBlueBorder,
+  },
+  companionHeader: {
+    gap: spacing.sm,
+  },
+  companionHeaderCopy: {
+    gap: 4,
+  },
+  companionTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 18,
+  },
+  companionList: {
+    gap: spacing.md,
+  },
+  companionCard: {
+    gap: spacing.sm,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    backgroundColor: '#F9FCFF',
+    padding: spacing.md,
+  },
+  companionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  companionCardTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+  },
+  companionPhotoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  companionAvatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryBlue,
+    overflow: 'hidden',
+  },
+  companionAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  companionAvatarText: {
+    color: colors.white,
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 22,
+  },
+  companionPhotoActions: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  companionPassportForm: {
+    gap: spacing.sm,
   },
 });

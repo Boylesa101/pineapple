@@ -76,7 +76,7 @@ export async function exportSharedTripPacket(snapshot: AppDataSnapshot, tripId: 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/json',
-      dialogTitle: `${packet.data.trip.name} shared trip`,
+      dialogTitle: `${packet.data.trip.name} · Nearby / Quick Share`,
     });
   }
 

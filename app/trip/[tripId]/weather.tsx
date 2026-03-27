@@ -119,12 +119,6 @@ export default function TripWeatherScreen() {
     () => formatLocationLabel(weatherDetail?.resolvedLabel ?? trip?.destination ?? 'Destination'),
     [trip?.destination, weatherDetail?.resolvedLabel]
   );
-  const previewDays = useMemo(() => {
-    const days = weatherForecast?.days ?? [];
-    const withoutSelected = days.filter((day) => day.date !== selectedDate);
-    return (withoutSelected.length ? withoutSelected : days).slice(0, 3);
-  }, [selectedDate, weatherForecast?.days]);
-
   if (!trip) {
     return (
       <AppScreen title="Weather">
@@ -211,32 +205,23 @@ export default function TripWeatherScreen() {
                 <Text style={styles.contentMetaText}>Sunset {weatherDetail.sunsetLabel ?? '--:--'}</Text>
               </View>
 
-              <View style={styles.forecastPreview}>
-                {previewDays.map((day, index) => (
-                  <View key={day.date}>
-                    <View style={styles.forecastPreviewRow}>
-                      <Text style={styles.forecastPreviewLabel}>{day.dayLabel}</Text>
-                      <Text style={styles.forecastPreviewValue}>{formatTemperature(day.temperatureMaxC)}</Text>
+              <View style={styles.hourlyList}>
+                {weatherDetail.hours.map((hour, index) => (
+                  <View key={hour.time}>
+                    <View style={styles.hourlyRow}>
+                      <Text style={styles.hourlyTime}>{hour.timeLabel}</Text>
+                      <View style={styles.hourlyValue}>
+                        <MaterialIcons name={weatherIconName(hour.weatherCode) as any} size={18} color={colors.textMuted} />
+                        <Text style={styles.hourlyCondition}>{hour.conditionLabel}</Text>
+                      </View>
+                      <Text style={styles.hourlyTemp}>{formatTemperature(hour.temperatureC)}</Text>
                     </View>
-                    {index < previewDays.length - 1 ? <View style={styles.forecastSeparator} /> : null}
+                    {index < weatherDetail.hours.length - 1 ? <View style={styles.separator} /> : null}
                   </View>
                 ))}
               </View>
             </View>
           </View>
-
-          <AppCard title="Selected day" subtitle={formatRange(weatherDetail.temperatureMinC, weatherDetail.temperatureMaxC)}>
-            <View style={styles.selectedDayRow}>
-              <View style={styles.selectedDayIcon}>
-                <MaterialIcons name={weatherIconName(weatherDetail.weatherCode) as any} size={22} color={colors.primaryBlueDark} />
-              </View>
-              <View style={styles.selectedDayCopy}>
-                <Text style={styles.selectedDayTitle}>{weatherDetail.conditionLabel}</Text>
-                <Text style={styles.selectedDayMeta}>{weatherDetail.dateLabel}</Text>
-              </View>
-              <Text style={styles.selectedDayTemp}>{formatTemperature(weatherDetail.temperatureMaxC)}</Text>
-            </View>
-          </AppCard>
 
           <AppCard title="7-day forecast" subtitle={weatherForecast?.resolvedLabel ?? locationLabel}>
             <View style={styles.dayList}>
@@ -255,23 +240,6 @@ export default function TripWeatherScreen() {
             </View>
           </AppCard>
 
-          <AppCard title="Hourly outlook" subtitle="Real forecast for the selected trip day.">
-            <View style={styles.hourlyList}>
-              {weatherDetail.hours.map((hour, index) => (
-                <View key={hour.time}>
-                  <View style={styles.hourlyRow}>
-                    <Text style={styles.hourlyTime}>{hour.timeLabel}</Text>
-                    <View style={styles.hourlyValue}>
-                      <MaterialIcons name={weatherIconName(hour.weatherCode) as any} size={18} color={colors.textMuted} />
-                      <Text style={styles.hourlyCondition}>{hour.conditionLabel}</Text>
-                    </View>
-                    <Text style={styles.hourlyTemp}>{formatTemperature(hour.temperatureC)}</Text>
-                  </View>
-                  {index < weatherDetail.hours.length - 1 ? <View style={styles.separator} /> : null}
-                </View>
-              ))}
-            </View>
-          </AppCard>
         </ScrollView>
       ) : (
         <AppCard>

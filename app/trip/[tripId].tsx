@@ -763,7 +763,7 @@ export default function TripDetailScreen() {
   async function handleExportShare() {
     try {
       await exportSharedTripFile(tripId);
-      Alert.alert('Shared trip exported', 'A local share file was created for manual import on another device.');
+      Alert.alert('Trip ready to share', 'Pineapple created a local share file and opened Android sharing so you can use Quick Share, Nearby Share, or another app.');
     } catch (error) {
       Alert.alert('Share export failed', toUserMessage(error, 'Unable to export that shared trip right now.'));
     }
@@ -1621,7 +1621,7 @@ export default function TripDetailScreen() {
         })}
       </AppCard>
 
-      <AppCard title="Sharing and participants" subtitle="Optional manual-share sync with participant roles, QR handoff, and conflict review.">
+      <AppCard title="Sharing and participants" subtitle="Share locally with Pineapple QR transfer, Android Quick Share, or an exported trip file.">
         <View style={styles.chipRow}>
           <InfoChip label={`Share code ${bundle.sharedTripState?.shareCode ?? 'Pending'}`} tone="blue" />
           <InfoChip
@@ -1666,11 +1666,11 @@ export default function TripDetailScreen() {
         <View style={styles.buttonWrap}>
           <AppButton label="Invite by email / code" tone="secondary" onPress={openInviteEditor} />
           <AppButton label="Show transfer QR" tone="secondary" onPress={openTransferQr} />
-          <AppButton label="Export shared trip" onPress={handleExportShare} />
+          <AppButton label="Share with Nearby / Quick Share" onPress={handleExportShare} />
           <AppButton label="Import update" tone="secondary" onPress={handleImportShare} />
         </View>
         <Text style={styles.helperText}>
-          Scan the transfer QR with Pineapple installed. If the trip is too large for QR, use the shared-trip file export instead.
+          Scan the transfer QR with Pineapple installed. If the trip is too large for QR, use the Nearby / Quick Share button to send the local trip file through Android sharing instead.
         </Text>
         {bundle.conflicts.length ? (
           <View style={styles.conflictList}>

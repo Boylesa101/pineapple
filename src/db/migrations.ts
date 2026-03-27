@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { createShareCode } from '@/utils/shareCodes';
 
-const DATABASE_VERSION = 22;
+const DATABASE_VERSION = 23;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -230,6 +230,7 @@ CREATE TABLE IF NOT EXISTS app_preferences (
   structuredDataProtected INTEGER NOT NULL DEFAULT 1,
   profileName TEXT NOT NULL DEFAULT '',
   profilePhotoUri TEXT,
+  travelStyle TEXT NOT NULL DEFAULT 'mixed',
   syncEnabled INTEGER NOT NULL DEFAULT 0,
   syncMode TEXT NOT NULL DEFAULT 'manual_share',
   syncStatus TEXT NOT NULL DEFAULT 'local_only',
@@ -562,6 +563,7 @@ async function runPhaseSixMigration(db: SQLiteDatabase) {
   await ensureColumn(db, 'documents', 'expiryReminderSchedule', "TEXT NOT NULL DEFAULT '[90,30,7,1,0]'");
   await ensureColumn(db, 'app_preferences', 'expiryReminderSchedule', "TEXT NOT NULL DEFAULT '[90,30,7,1,0]'");
   await ensureColumn(db, 'app_preferences', 'expiryReminderSilent', 'INTEGER NOT NULL DEFAULT 0');
+  await ensureColumn(db, 'app_preferences', 'travelStyle', "TEXT NOT NULL DEFAULT 'mixed'");
 }
 
 async function runPhaseSevenMigration(db: SQLiteDatabase) {

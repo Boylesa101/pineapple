@@ -464,10 +464,14 @@ function formatCurrencyLabel(currencies: RestCountriesEntry['currencies']) {
     .join(', ');
 }
 
-function formatEmergencyLabel(payload: EmergencyNumberApiResponse) {
+function formatEmergencyLabel(payload: EmergencyNumberApiResponse, countryCode: string | null) {
   const data = payload.data;
   if (!data || data.nodata) {
     return null;
+  }
+
+  if (countryCode === 'GB') {
+    return '999';
   }
 
   if (data.member_112) {
@@ -795,7 +799,7 @@ export async function getDestinationQuickFacts(destination: string): Promise<Des
       languageLabel: formatLanguageLabel(countryProfile?.languages),
       currencyLabel: formatCurrencyLabel(countryProfile?.currencies),
       plugLabel,
-      emergencyLabel: emergencyPayload ? formatEmergencyLabel(emergencyPayload) : null,
+      emergencyLabel: emergencyPayload ? formatEmergencyLabel(emergencyPayload, countryCode) : null,
     };
 
     quickFactsCache.set(cacheKey, {
