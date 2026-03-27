@@ -15,9 +15,36 @@ const iconMap = {
 export function SafeAreaAwareBottomNav({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8);
+  const currentRoute = state.routes[state.index];
+  const isVibeRoute = currentRoute?.name === 'vibe';
+  const currentParams = (currentRoute?.params ?? {}) as { mode?: string };
+  const vibeMode = currentParams.mode === 'mood' ? 'mood' : 'vibe';
 
   const visibleRoutes = state.routes;
   const isCompact = visibleRoutes.length <= 4;
+
+  if (isVibeRoute) {
+    return (
+      <View style={[styles.outer, { paddingBottom: bottomInset, paddingHorizontal: 12 }]}>
+        <Pressable
+          onPress={() => navigation.navigate('vibe', { mode: 'vibe' })}
+          style={[styles.modeItem, vibeMode === 'vibe' ? styles.modeItemActive : null]}
+          accessibilityRole="button"
+          accessibilityState={vibeMode === 'vibe' ? { selected: true } : {}}
+        >
+          <Text style={[styles.modeLabel, vibeMode === 'vibe' ? styles.modeLabelActive : null]}>Vibe</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => navigation.navigate('vibe', { mode: 'mood' })}
+          style={[styles.modeItem, vibeMode === 'mood' ? styles.modeItemActive : null]}
+          accessibilityRole="button"
+          accessibilityState={vibeMode === 'mood' ? { selected: true } : {}}
+        >
+          <Text style={[styles.modeLabel, vibeMode === 'mood' ? styles.modeLabelActive : null]}>Mood</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.outer, { paddingBottom: bottomInset, paddingHorizontal: 12 }]}>
@@ -73,6 +100,16 @@ const styles = StyleSheet.create({
     minHeight: 76,
     gap: 6,
   },
+  modeItem: {
+    flex: 1,
+    minHeight: 68,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeItemActive: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
   label: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 11,
@@ -80,5 +117,14 @@ const styles = StyleSheet.create({
   },
   labelCompact: {
     fontSize: 12,
+  },
+  modeLabel: {
+    color: 'rgba(255,255,255,0.74)',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  modeLabelActive: {
+    color: colors.white,
   },
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
+import { LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -263,7 +263,6 @@ export function TripStackDeck({ items, onOpenTrip, onOpenFlights, onOpenHotel, o
             onOpenTransfers={onOpenTransfers}
           />
         ))}
-      {items.length > 1 ? <Text style={styles.hint}>Swipe up or down to move through trips</Text> : null}
     </View>
   );
 }
@@ -285,13 +284,5 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     top: 76,
     zIndex: 1,
-  },
-  hint: {
-    position: 'absolute',
-    bottom: -spacing.sm,
-    right: spacing.xs,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: 'rgba(13,59,102,0.56)',
   },
 });

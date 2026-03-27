@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -11,7 +11,8 @@ import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 export default function VibeTabScreen() {
   const router = useRouter();
-  const { data, activeTripId, setActiveTrip } = useAppStore();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { data, activeTripId } = useAppStore();
   const visibleTrips = useMemo(() => filterVisibleTrips(data.trips), [data.trips]);
   const trip = useMemo(() => {
     if (activeTripId && visibleTrips.some((item) => item.id === activeTripId)) {
@@ -23,7 +24,7 @@ export default function VibeTabScreen() {
 
   if (!trip) {
     return (
-      <AppScreen title="Vibe" subtitle="Save a trip first to unlock live destination inspiration.">
+      <AppScreen title="Vibe">
         <AppCard>
           <VibesEmptyState
             icon="travel-explore"
@@ -37,21 +38,8 @@ export default function VibeTabScreen() {
   }
 
   return (
-    <AppScreen
-      title="Vibe"
-      subtitle={`Swipe through live places around ${trip.destination}, then save the best ones into Mood.`}
-      footer={
-        <AppButton
-          label="Open current trip"
-          tone="secondary"
-          onPress={() => {
-            setActiveTrip(trip.id);
-            router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id } });
-          }}
-        />
-      }
-    >
-      <VibesExperience tripId={trip.id} />
+    <AppScreen title="Vibe">
+      <VibesExperience tripId={trip.id} mode={mode === 'mood' ? 'mood' : 'vibe'} />
     </AppScreen>
   );
 }

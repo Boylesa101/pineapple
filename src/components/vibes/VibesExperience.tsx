@@ -26,15 +26,17 @@ import type { SavedVibe, Trip } from '@/types/models';
 
 type Props = {
   tripId: string | null | undefined;
+  mode?: 'vibe' | 'mood';
+  onModeChange?: (mode: 'vibe' | 'mood') => void;
 };
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
-const CATEGORY_SUMMARY: Array<{ key: 'eat' | 'drink' | 'visit' | 'do'; label: string; icon: keyof typeof MaterialIcons.glyphMap }> = [
-  { key: 'eat', label: 'Eat', icon: 'restaurant' as const },
-  { key: 'drink', label: 'Drink', icon: 'local-bar' as const },
-  { key: 'visit', label: 'See', icon: 'photo-camera' as const },
-  { key: 'do', label: 'Do', icon: 'explore' as const },
+const CATEGORY_SUMMARY: Array<{ key: 'eat' | 'drink' | 'visit' | 'do'; label: string }> = [
+  { key: 'eat', label: 'Eat' },
+  { key: 'drink', label: 'Drink' },
+  { key: 'visit', label: 'See' },
+  { key: 'do', label: 'Do' },
 ];
 
 function formatFetchedAt(value: string | null | undefined) {
@@ -108,12 +110,12 @@ async function hydrateTripVibesImages(input: TripVibesResult): Promise<TripVibes
   };
 }
 
-export function VibesExperience({ tripId }: Props) {
+export function VibesExperience({ tripId, mode: modeProp, onModeChange }: Props) {
   const { data, saveAppPreferences, saveItineraryEvent, saveSavedVibe, saveVibeCacheEntry, deleteRecord } = useAppStore();
   const bundle = useMemo(() => getTripBundle(data, tripId), [data, tripId]);
   const trip = bundle.trip;
   const primaryHotel = bundle.hotelStays[0] ?? null;
-  const [mode, setMode] = useState<'vibe' | 'mood'>('vibe');
+  const [internalMode, setInternalMode] = useState<'vibe' | 'mood'>('vibe');
   const [loading, setLoading] = useState(Boolean(trip));
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -159,6 +161,8 @@ export function VibesExperience({ tripId }: Props) {
     [bundle.savedVibes]
   );
   const shouldShowIntro = Boolean(trip && !data.appPreferences.vibesIntroSeenAt && !introDismissed);
+  const mode = modeProp ?? internalMode;
+  const setMode = onModeChange ?? setInternalMode;
 
   useEffect(() => {
     let cancelled = false;
@@ -331,21 +335,11 @@ export function VibesExperience({ tripId }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <AppCard style={styles.heroCard}>
-        <View style={styles.heroTop}>
-          <View style={styles.heroCopy}>
-            <Text style={styles.heroEyebrow}>Vibe</Text>
-            <Text style={styles.heroTitle}>Build the feel of {trip?.destination ?? 'your trip'}</Text>
-            <Text style={styles.heroText}>
-              Find popular places, see what people are doing, and save the best ideas into Mood for later.
-            </Text>
-          </View>
-        </View>
-        <View style={styles.metaRow}>
-          <Text style={styles.metaText}>Swipe right to save. Swipe left to keep moving.</Text>
-          {statusMessage ? <Text style={styles.metaText}>{statusMessage}</Text> : null}
-        </View>
-      </AppCard>
+      <View style={styles.headerCopy}>
+        <Text style={styles.heroTitle}>{trip?.destination ?? 'Your trip'}</Text>
+        <Text style={styles.heroText}>Swipe to save places into Mood and come back later to add them to the itinerary.</Text>
+        {statusMessage ? <Text style={styles.metaText}>{statusMessage}</Text> : null}
+      </View>
 
       {shouldShowIntro ? (
         <AppCard style={styles.introCard}>
@@ -379,15 +373,6 @@ export function VibesExperience({ tripId }: Props) {
         </AppCard>
       ) : null}
 
-      <View style={styles.segmentedWrap}>
-        <Pressable onPress={() => setMode('vibe')} style={[styles.segmentButton, mode === 'vibe' ? styles.segmentButtonActive : null]}>
-          <Text style={[styles.segmentLabel, mode === 'vibe' ? styles.segmentLabelActive : null]}>Vibe</Text>
-        </Pressable>
-        <Pressable onPress={() => setMode('mood')} style={[styles.segmentButton, mode === 'mood' ? styles.segmentButtonActive : null]}>
-          <Text style={[styles.segmentLabel, mode === 'mood' ? styles.segmentLabelActive : null]}>Mood ({savedMoodItems.length})</Text>
-        </Pressable>
-      </View>
-
       {mode === 'vibe' ? (
         <View style={styles.sectionWrap}>
           {loading && !result ? (
@@ -408,21 +393,11 @@ export function VibesExperience({ tripId }: Props) {
               <AppCard style={styles.deckCard}>
                 <View style={styles.deckHeader}>
                   <View>
-                    <Text style={styles.deckTitle}>Swipe right to save, left to pass</Text>
-                    <Text style={styles.deckSubtitle}>Live picks for {result.area}</Text>
+                    <Text style={styles.deckTitle}>Live picks for {result.area}</Text>
+                    <Text style={styles.deckSubtitle}>
+                      {CATEGORY_SUMMARY.map((lane) => `${lane.label} ${result[lane.key].length}`).join(' · ')}
+                    </Text>
                   </View>
-                  <View style={styles.deckCountPill}>
-                    <Text style={styles.deckCountLabel}>{result.items.length} places</Text>
-                  </View>
-                </View>
-                <View style={styles.laneGrid}>
-                  {CATEGORY_SUMMARY.map((lane) => (
-                    <View key={lane.key} style={styles.lanePill}>
-                      <MaterialIcons name={lane.icon} size={18} color={colors.primaryBlue} />
-                      <Text style={styles.laneCount}>{result[lane.key].length}</Text>
-                      <Text style={styles.laneLabel}>{lane.label}</Text>
-                    </View>
-                  ))}
                 </View>
                 <VibeSwipeDeck
                   items={deckItems}
@@ -482,33 +457,21 @@ const styles = StyleSheet.create({
   wrap: {
     gap: spacing.md,
   },
-  heroCard: {
-    gap: spacing.md,
-  },
-  heroTop: {
-    gap: spacing.md,
-  },
-  heroCopy: {
+  headerCopy: {
     gap: spacing.xs,
-  },
-  heroEyebrow: {
-    color: colors.primaryBlue,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    paddingTop: spacing.xs,
   },
   heroTitle: {
     color: colors.primaryBlueText,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 26,
+    lineHeight: 32,
   },
   heroText: {
     color: colors.textMuted,
     fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 19,
   },
   introCard: {
     gap: spacing.md,
@@ -582,31 +545,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
-  segmentedWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: radii.pill,
-    backgroundColor: colors.primaryBlueSurface,
-    padding: 4,
-  },
-  segmentButton: {
-    flex: 1,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-  },
-  segmentButtonActive: {
-    backgroundColor: colors.white,
-  },
-  segmentLabel: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-  },
-  segmentLabelActive: {
-    color: colors.primaryBlueText,
-  },
   sectionWrap: {
     gap: spacing.md,
   },
@@ -614,10 +552,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   deckHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.md,
+    gap: 4,
   },
   deckTitle: {
     color: colors.primaryBlueText,
@@ -629,42 +564,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     lineHeight: 18,
-  },
-  deckCountPill: {
-    borderRadius: radii.pill,
-    backgroundColor: colors.primaryBlueSurface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  deckCountLabel: {
-    color: colors.primaryBlue,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-  },
-  laneGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  lanePill: {
-    width: '23%',
-    borderRadius: radii.md,
-    backgroundColor: colors.primaryBlueSurface,
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: 4,
-  },
-  laneCount: {
-    color: colors.primaryBlueText,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 20,
-  },
-  laneLabel: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   moodList: {
     gap: spacing.md,

@@ -1,5 +1,5 @@
 const TRIPADVISOR_BASE_URL = 'https://api.content.tripadvisor.com/api/v1';
-const RESULTS_PER_BUCKET = 5;
+const RESULTS_PER_BUCKET = 25;
 
 const vibeSearchMap = {
   eat: { category: 'restaurants', searchSuffix: 'restaurants' },
