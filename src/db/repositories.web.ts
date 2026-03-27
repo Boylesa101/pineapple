@@ -77,6 +77,10 @@ function emptySnapshot(timestamp = now()): AppDataSnapshot {
   };
 }
 
+function normalizeScheduledNotificationIds(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
 async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapshot> {
   return {
     ...snapshot,
@@ -143,6 +147,8 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         transportType:
           segment.transportType === 'private_flight' ||
           segment.transportType === 'train' ||
+          segment.transportType === 'ferry' ||
+          segment.transportType === 'eurotunnel' ||
           segment.transportType === 'car' ||
           segment.transportType === 'taxi'
             ? segment.transportType
@@ -157,9 +163,12 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         departureAirportCode: (await decryptStructuredValue(segment.departureAirportCode)) ?? '',
         arrivalAirport: (await decryptStructuredValue(segment.arrivalAirport)) ?? '',
         arrivalAirportCode: (await decryptStructuredValue(segment.arrivalAirportCode)) ?? '',
+        departureTimeZone: segment.departureTimeZone ?? null,
         terminal: (await decryptStructuredValue(segment.terminal)) ?? '',
         gate: (await decryptStructuredValue(segment.gate)) ?? '',
         bookingRef: (await decryptStructuredValue(segment.bookingRef)) ?? '',
+        notificationSummary: (await decryptStructuredValue(segment.notificationSummary)) ?? '',
+        scheduledNotificationIds: normalizeScheduledNotificationIds(segment.scheduledNotificationIds),
         notes: (await decryptStructuredValue(segment.notes)) ?? '',
       }))
     ),
@@ -332,9 +341,12 @@ async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         departureAirportCode: (await encryptStructuredValue(segment.departureAirportCode)) ?? '',
         arrivalAirport: (await encryptStructuredValue(segment.arrivalAirport)) ?? '',
         arrivalAirportCode: (await encryptStructuredValue(segment.arrivalAirportCode)) ?? '',
+        departureTimeZone: segment.departureTimeZone ?? null,
         terminal: (await encryptStructuredValue(segment.terminal)) ?? '',
         gate: (await encryptStructuredValue(segment.gate)) ?? '',
         bookingRef: (await encryptStructuredValue(segment.bookingRef)) ?? '',
+        notificationSummary: (await encryptStructuredValue(segment.notificationSummary)) ?? '',
+        scheduledNotificationIds: normalizeScheduledNotificationIds(segment.scheduledNotificationIds),
         notes: (await encryptStructuredValue(segment.notes)) ?? '',
       }))
     ),
@@ -606,11 +618,39 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
       travelDirection: input.travelDirection ?? 'other',
       providerCode: input.providerCode ?? '',
       providerLogoUrl: input.providerLogoUrl ?? null,
+      departureTimeZone: input.departureTimeZone ?? null,
+      notificationSummary: input.notificationSummary ?? '',
+      scheduledNotificationIds: normalizeScheduledNotificationIds(input.scheduledNotificationIds),
       createdAt: snapshot.travelSegments.find((item) => item.id === id)?.createdAt ?? timestamp,
       updatedAt: timestamp,
     }),
   });
   return id;
+}
+
+export async function updateTravelSegmentNotificationState(
+  segmentId: string,
+  input: {
+    departureTimeZone?: string | null;
+    notificationSummary?: string;
+    scheduledNotificationIds: string[];
+  }
+) {
+  const snapshot = await readSnapshot();
+  const nextSegments = snapshot.travelSegments.map((segment) =>
+    segment.id === segmentId
+      ? {
+          ...segment,
+          departureTimeZone: input.departureTimeZone ?? null,
+          notificationSummary: input.notificationSummary ?? '',
+          scheduledNotificationIds: normalizeScheduledNotificationIds(input.scheduledNotificationIds),
+        }
+      : segment
+  );
+  await writeSnapshot({
+    ...snapshot,
+    travelSegments: nextSegments,
+  });
 }
 
 export async function upsertHotelStay(input: HotelStayDraft) {

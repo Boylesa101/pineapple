@@ -25,8 +25,9 @@ import { TransportProviderSearchField } from '@/components/TransportProviderSear
 import { TypedDateField } from '@/components/TypedDateField';
 import { QRCodeImage } from '@/components/ui/QRCodeImage';
 import { colors, spacing } from '@/constants/theme';
-import { NOTIFICATION_PROOF_BUILD_VERSION, NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES, isNotificationProofTripId } from '@/data/notificationProofBuild';
+import { NOTIFICATION_PROOF_BUILD_VERSION, isNotificationProofTripId } from '@/data/notificationProofBuild';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
+import { createReminderContent, describeTransportReminderMatrix } from '@/services/notificationPlanner';
 import {
   getAirportSetOffInfo,
   getDestinationLocalTimeInfo,
@@ -77,11 +78,14 @@ type TransferDraft = {
   notes: string;
 };
 
-type VisibleTripReminderKind = Exclude<ReminderKind, 'passport_expiry' | 'ghic_expiry' | 'trip_starts_tomorrow'>;
+type VisibleTripReminderKind = Exclude<
+  ReminderKind,
+  'passport_expiry' | 'ghic_expiry' | 'trip_starts_tomorrow' | 'flight_check_in'
+>;
 
 const reminderMeta: Record<
   VisibleTripReminderKind,
-  { label: string; leadTimeDays: ReminderLeadTime; legacyKinds?: ReminderKind[] }
+  { label: string; leadTimeDays: ReminderLeadTime; legacyKinds?: ReminderKind[]; subtitle?: string }
 > = {
   trip_countdown_30_days: { label: '30 days to trip', leadTimeDays: 30 },
   trip_countdown_7_days: { label: '7 days to trip', leadTimeDays: 7 },
@@ -90,7 +94,12 @@ const reminderMeta: Record<
   trip_countdown_1_day: { label: '1 day to trip', leadTimeDays: 1, legacyKinds: ['trip_starts_tomorrow'] },
   trip_today: { label: 'Trip day reminder', leadTimeDays: 0 },
   insurance_missing: { label: 'Missing insurance warning', leadTimeDays: 7 },
-  flight_check_in: { label: 'Flight check-in reminder', leadTimeDays: 1 },
+  transport_departure: {
+    label: 'Transport departure alerts',
+    leadTimeDays: 0,
+    legacyKinds: ['flight_check_in'],
+    subtitle: 'Flights, ferries, Eurotunnel: 7d, 3d, 2d, 1d, 2h, 1h, 15m. Trains and taxis: 1h, 15m.',
+  },
   hotel_check_in: { label: 'Hotel check-in reminder', leadTimeDays: 0 },
   transfer_reminder: { label: 'Transfer reminder', leadTimeDays: 0 },
   travel_mode_reminder: { label: 'Travel mode reminder', leadTimeDays: 0 },
@@ -181,10 +190,13 @@ function createTravelSegmentDraft(
     arrivalAirport: '',
     arrivalAirportCode: '',
     departureTime: now,
+    departureTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London',
     arrivalTime: now,
     terminal: '',
     gate: '',
     bookingRef: '',
+    notificationSummary: '',
+    scheduledNotificationIds: [],
     notes: '',
     ...overrides,
   };
@@ -214,9 +226,19 @@ function segmentDirectionLabel(direction: TravelSegmentDraft['travelDirection'],
   return direction;
 }
 
+function formatReminderLeadTimeLabel(leadTimeDays: number) {
+  if (leadTimeDays === 0) {
+    return 'On the day';
+  }
+  if (leadTimeDays === 1) {
+    return '1 day before';
+  }
+  return `${leadTimeDays} days before`;
+}
+
 export default function TripDetailScreen() {
   const router = useRouter();
-  const { tripId, focus } = useLocalSearchParams<{ tripId: string; focus?: string }>();
+  const { tripId, focus, segmentId } = useLocalSearchParams<{ tripId: string; focus?: string; segmentId?: string }>();
   const {
     data,
     setActiveTrip,
@@ -257,28 +279,7 @@ export default function TripDetailScreen() {
   const tripScrollRef = useRef<ScrollView | null>(null);
   const sectionOffsets = useRef<Partial<Record<TripSection, number>>>({});
   const isNotificationProofTrip = isNotificationProofTripId(tripId);
-  const notificationProofSchedule = useMemo(
-    () =>
-      [
-        ['trip_countdown_30_days', '30 days to trip'],
-        ['trip_countdown_7_days', '7 days to trip'],
-        ['packing_incomplete', 'Packing reminder'],
-        ['trip_countdown_3_days', '3 days to trip'],
-        ['insurance_missing', 'Insurance reminder'],
-        ['trip_countdown_1_day', '1 day to trip'],
-        ['trip_today', 'Trip day reminder'],
-        ['flight_check_in', 'Flight check-in'],
-        ['hotel_check_in', 'Hotel check-in'],
-        ['transfer_reminder', 'Transfer reminder'],
-        ['travel_mode_reminder', 'Travel mode reminder'],
-        ['sos_ready', 'SOS reminder'],
-        ['excursion_reminder', 'Excursion reminder'],
-      ].map(([kind, label]) => ({
-        label,
-        offsetMinutes: NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES[kind as keyof typeof NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES],
-      })),
-    []
-  );
+  const highlightedSegmentId = typeof segmentId === 'string' ? segmentId : null;
 
   const summary = useMemo(
     () => ({
@@ -309,6 +310,33 @@ export default function TripDetailScreen() {
   const primaryTransportDisplay = useMemo(
     () => (primaryTransportType ? getTransportDisplay(primaryTransportType) : null),
     [primaryTransportType]
+  );
+  const plannedTransportReminders = useMemo(
+    () => createReminderContent(data, { now: new Date() }).filter((item) => item.transportSegmentId && item.activeTripId === tripId),
+    [data, tripId]
+  );
+  const transportReminderPreviewBySegment = useMemo(() => {
+    const preview = new Map<string, typeof plannedTransportReminders>();
+    for (const reminder of plannedTransportReminders) {
+      const targetSegmentId = reminder.transportSegmentId;
+      if (!targetSegmentId) {
+        continue;
+      }
+      const entries = preview.get(targetSegmentId) ?? [];
+      entries.push(reminder);
+      preview.set(targetSegmentId, entries);
+    }
+    return preview;
+  }, [plannedTransportReminders]);
+  const notificationProofSchedule = useMemo(
+    () =>
+      orderedTravelSegments.flatMap((segment) =>
+        (transportReminderPreviewBySegment.get(segment.id) ?? []).slice(0, 3).map((reminder) => ({
+          label: reminder.title,
+          at: formatDateTime(reminder.date.toISOString()),
+        }))
+      ),
+    [orderedTravelSegments, transportReminderPreviewBySegment]
   );
 
   useEffect(() => {
@@ -826,6 +854,8 @@ export default function TripDetailScreen() {
                 { label: 'Flight', value: 'flight' },
                 { label: 'Private flight', value: 'private_flight' },
                 { label: 'Train', value: 'train' },
+                { label: 'Ferry', value: 'ferry' },
+                { label: 'Eurotunnel', value: 'eurotunnel' },
                 { label: 'Drive', value: 'car' },
                 { label: 'Taxi', value: 'taxi' },
               ]}
@@ -936,7 +966,13 @@ export default function TripDetailScreen() {
           iconName={transportDisplay.departureIcon}
           mode="datetime"
           value={draft.departureTime}
-          onChange={(value) => updateDraft((current) => ({ ...current, departureTime: value }))}
+          onChange={(value) =>
+            updateDraft((current) => ({
+              ...current,
+              departureTime: value,
+              departureTimeZone: current.departureTimeZone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || null),
+            }))
+          }
         />
         <DateTimeField
           label="Arrival time"
@@ -1320,8 +1356,13 @@ export default function TripDetailScreen() {
           orderedTravelSegments.map((segment) => {
             const providerBrand = findTransportProvider(segment.providerCode, segment.transportType);
             const transportDisplay = getTransportDisplay(segment.transportType);
+            const segmentReminderPreview = transportReminderPreviewBySegment.get(segment.id) ?? [];
+            const isHighlightedSegment = highlightedSegmentId === segment.id;
             return (
-              <View key={segment.id} style={styles.transportRow}>
+              <View
+                key={segment.id}
+                style={[styles.transportRow, isHighlightedSegment ? styles.highlightedTransportRow : null]}
+              >
                 <ProviderLogoBadge
                   name={segment.airline || transportDisplay.shortLabel}
                   code={segment.providerCode}
@@ -1359,6 +1400,20 @@ export default function TripDetailScreen() {
                     />
                     <Text style={styles.transportMeta}>Arrival {formatDateTime(segment.arrivalTime)}</Text>
                   </View>
+                  <Text style={styles.transportAlertSummary}>
+                    {segment.notificationSummary || `Lock screen alerts ${describeTransportReminderMatrix(segment.transportType)}`}
+                  </Text>
+                  {segmentReminderPreview.length ? (
+                    <View style={styles.transportReminderList}>
+                      {segmentReminderPreview.slice(0, 3).map((reminder) => (
+                        <Text key={reminder.key} style={styles.transportReminderText}>
+                          Next: {reminder.title} • {formatDateTime(reminder.date.toISOString())}
+                        </Text>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.transportReminderText}>No future alerts are scheduled for this segment right now.</Text>
+                  )}
                 </View>
                 <View style={styles.iconRow}>
                   <Pressable onPress={() => openSegmentEditor(segment)}>
@@ -1527,14 +1582,23 @@ export default function TripDetailScreen() {
             Turn on `Enable local reminders`, keep this trip’s reminders enabled, then lock the phone. Pineapple compresses the normal reminder windows
             into a short local test run so you can verify multiple notifications in minutes on the installed APK.
           </Text>
-          <Text style={styles.notes}>
-            Expected cadence: {notificationProofSchedule.map((entry) => `${entry.label} in ${entry.offsetMinutes} min`).join(' • ')}.
-          </Text>
+          {notificationProofSchedule.length ? (
+            <View style={styles.proofScheduleList}>
+              {notificationProofSchedule.slice(0, 8).map((entry) => (
+                <Text key={`${entry.label}:${entry.at}`} style={styles.notes}>
+                  • {entry.label} at {entry.at}
+                </Text>
+              ))}
+            </View>
+          ) : null}
           <Text style={styles.notes}>This seeded trip is temporary and should be removed again after notification proofing is complete.</Text>
         </AppCard>
       ) : null}
 
-      <AppCard title="Trip reminders" subtitle="Trip-level local reminders for countdowns, packing, flights, hotels, transfers, and excursions.">
+      <AppCard
+        title="Trip reminders"
+        subtitle="Transport alerts appear on the lock screen when device notifications are allowed. Edit any segment and Pineapple replaces its old alerts with the new schedule."
+      >
         {Object.entries(reminderMeta).map(([kind, meta]) => {
           const enabled =
             bundle.reminderSettings.find(
@@ -1544,7 +1608,7 @@ export default function TripDetailScreen() {
             <ListRow
               key={kind}
               title={meta.label}
-              subtitle={`Lead time ${meta.leadTimeDays} day(s)`}
+              subtitle={meta.subtitle ?? formatReminderLeadTimeLabel(meta.leadTimeDays)}
               right={
                 <AppButton
                   label={enabled ? 'On' : 'Off'}
@@ -2254,6 +2318,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
+  highlightedTransportRow: {
+    borderRadius: 18,
+    backgroundColor: '#F5FAFF',
+    paddingHorizontal: spacing.xs,
+  },
   transportCopy: {
     flex: 1,
     gap: 4,
@@ -2274,6 +2343,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
     lineHeight: 17,
+  },
+  transportAlertSummary: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  transportReminderList: {
+    gap: 2,
+  },
+  transportReminderText: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  proofScheduleList: {
+    gap: 4,
   },
   transportTimingRow: {
     flexDirection: 'row',

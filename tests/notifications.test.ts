@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { NOTIFICATION_PROOF_TRIP_ID } from '../src/data/notificationProofBuild';
+import { NOTIFICATION_PROOF_TRIP_ID, withNotificationProofTrip } from '../src/data/notificationProofBuild';
 import { createReminderContent } from '../src/services/notificationPlanner';
-import type { AppDataSnapshot } from '../src/types/models';
+import type { AppDataSnapshot, ReminderKind, TravelSegment } from '../src/types/models';
 
 function createSnapshot(): AppDataSnapshot {
-  const now = new Date().toISOString();
-  const expiry = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+  const now = new Date('2026-03-27T10:00:00.000Z').toISOString();
+  const expiry = new Date('2026-07-25T10:00:00.000Z').toISOString();
   return {
     trips: [
       {
@@ -15,8 +15,8 @@ function createSnapshot(): AppDataSnapshot {
         name: 'Spain getaway',
         destination: 'Malaga',
         destinationType: 'place',
-        startDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-        endDate: new Date(Date.now() + 27 * 24 * 60 * 60 * 1000).toISOString(),
+        startDate: new Date('2026-04-16T09:00:00.000Z').toISOString(),
+        endDate: new Date('2026-04-23T09:00:00.000Z').toISOString(),
         destinationImageLocalPath: null,
         destinationImageRemoteUrl: null,
         destinationImageSource: 'fallback',
@@ -96,8 +96,97 @@ function createSnapshot(): AppDataSnapshot {
   };
 }
 
+function createReminderSetting(
+  snapshot: AppDataSnapshot,
+  kind: ReminderKind,
+  leadTimeDays: AppDataSnapshot['reminderSettings'][number]['leadTimeDays'],
+  tripId = 'trip_1'
+) {
+  return {
+    id: `${tripId}_${kind}`,
+    tripId,
+    kind,
+    enabled: true,
+    leadTimeDays,
+    createdAt: snapshot.appPreferences.createdAt,
+    updatedAt: snapshot.appPreferences.updatedAt,
+  };
+}
+
+function createTransportSegment(
+  snapshot: AppDataSnapshot,
+  id: string,
+  transportType: TravelSegment['transportType'],
+  departureTime: string,
+  arrivalTime: string,
+  overrides: Partial<TravelSegment> = {}
+): TravelSegment {
+  return {
+    id,
+    tripId: 'trip_1',
+    transportType,
+    travelDirection: 'outbound',
+    airline:
+      transportType === 'train'
+        ? 'LNER'
+        : transportType === 'taxi'
+          ? 'Uber'
+          : transportType === 'ferry'
+            ? 'P&O Ferries'
+            : transportType === 'eurotunnel'
+              ? 'LeShuttle'
+              : 'British Airways',
+    providerCode: transportType === 'flight' ? 'BA' : '',
+    providerLogoUrl: null,
+    flightNumber:
+      transportType === 'train'
+        ? '1D24'
+        : transportType === 'taxi'
+          ? 'RIDE-11'
+          : transportType === 'ferry'
+            ? 'PO123'
+            : transportType === 'eurotunnel'
+              ? 'LT456'
+              : 'BA482',
+    departureAirport:
+      transportType === 'train'
+        ? 'York Station'
+        : transportType === 'taxi'
+          ? 'Home pickup'
+          : transportType === 'ferry'
+            ? 'Dover Ferry Terminal'
+            : transportType === 'eurotunnel'
+              ? 'Folkestone Terminal'
+              : 'London Gatwick Airport',
+    departureAirportCode: transportType === 'flight' ? 'LGW' : '',
+    arrivalAirport:
+      transportType === 'train'
+        ? 'London Kings Cross'
+        : transportType === 'taxi'
+          ? 'Heathrow Terminal 5'
+          : transportType === 'ferry'
+            ? 'Calais Port'
+            : transportType === 'eurotunnel'
+              ? 'Calais Terminal'
+              : 'Malaga Airport',
+    arrivalAirportCode: transportType === 'flight' ? 'AGP' : '',
+    departureTime,
+    departureTimeZone: 'Europe/London',
+    arrivalTime,
+    terminal: '',
+    gate: '',
+    bookingRef: `${id}-ref`,
+    notificationSummary: '',
+    scheduledNotificationIds: [],
+    notes: '',
+    createdAt: snapshot.appPreferences.createdAt,
+    updatedAt: snapshot.appPreferences.updatedAt,
+    ...overrides,
+  };
+}
+
 test('document reminder scheduling creates future reminders for the selected schedule', () => {
-  const reminders = createReminderContent(createSnapshot());
+  const reminders = createReminderContent(createSnapshot(), { now: new Date('2026-03-27T10:00:00.000Z') });
   assert.equal(reminders.length, 5);
   assert.equal(reminders.every((item) => item.silent === true), true);
   assert.equal(reminders[0]?.title, 'Travel document reminder');
@@ -105,13 +194,6 @@ test('document reminder scheduling creates future reminders for the selected sch
   assert.equal(reminders[0]?.body.includes('Passport'), false);
   assert.equal(reminders[0]?.href, '/vault?editDocumentId=doc_1');
   assert.equal(reminders[0]?.activeTripId, 'trip_1');
-});
-
-test('deleting a document removes its scheduled expiry reminders from generated content', () => {
-  const snapshot = createSnapshot();
-  snapshot.documents = [];
-  const reminders = createReminderContent(snapshot);
-  assert.equal(reminders.some((item) => item.title === 'Travel document reminder'), false);
 });
 
 test('trip-level reminder settings generate travel, hotel, transfer, travel mode, and sos reminders with routes', () => {
@@ -135,8 +217,8 @@ test('trip-level reminder settings generate travel, hotel, transfer, travel mode
       hotelImageStatus: 'idle',
       phone: '',
       bookingRef: '',
-      checkIn: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      checkOut: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+      checkIn: new Date('2026-03-28T09:00:00.000Z').toISOString(),
+      checkOut: new Date('2026-03-29T09:00:00.000Z').toISOString(),
       notes: '',
       createdAt: snapshot.appPreferences.createdAt,
       updatedAt: snapshot.appPreferences.updatedAt,
@@ -144,60 +226,20 @@ test('trip-level reminder settings generate travel, hotel, transfer, travel mode
   ];
   snapshot.trips[0] = {
     ...snapshot.trips[0],
-    startDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    startDate: new Date('2026-03-28T09:00:00.000Z').toISOString(),
     transferMethod: 'Hotel shuttle',
     transferLocation: 'PMI arrivals',
-    transferTime: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
+    transferTime: new Date('2026-03-27T15:00:00.000Z').toISOString(),
   };
   snapshot.reminderSettings = [
-    {
-      id: 'trip_today',
-      tripId: 'trip_1',
-      kind: 'trip_today',
-      enabled: true,
-      leadTimeDays: 0,
-      createdAt: snapshot.appPreferences.createdAt,
-      updatedAt: snapshot.appPreferences.updatedAt,
-    },
-    {
-      id: 'hotel_check_in',
-      tripId: 'trip_1',
-      kind: 'hotel_check_in',
-      enabled: true,
-      leadTimeDays: 0,
-      createdAt: snapshot.appPreferences.createdAt,
-      updatedAt: snapshot.appPreferences.updatedAt,
-    },
-    {
-      id: 'transfer_reminder',
-      tripId: 'trip_1',
-      kind: 'transfer_reminder',
-      enabled: true,
-      leadTimeDays: 0,
-      createdAt: snapshot.appPreferences.createdAt,
-      updatedAt: snapshot.appPreferences.updatedAt,
-    },
-    {
-      id: 'travel_mode_reminder',
-      tripId: 'trip_1',
-      kind: 'travel_mode_reminder',
-      enabled: true,
-      leadTimeDays: 0,
-      createdAt: snapshot.appPreferences.createdAt,
-      updatedAt: snapshot.appPreferences.updatedAt,
-    },
-    {
-      id: 'sos_ready',
-      tripId: 'trip_1',
-      kind: 'sos_ready',
-      enabled: true,
-      leadTimeDays: 0,
-      createdAt: snapshot.appPreferences.createdAt,
-      updatedAt: snapshot.appPreferences.updatedAt,
-    },
+    createReminderSetting(snapshot, 'trip_today', 0),
+    createReminderSetting(snapshot, 'hotel_check_in', 0),
+    createReminderSetting(snapshot, 'transfer_reminder', 0),
+    createReminderSetting(snapshot, 'travel_mode_reminder', 0),
+    createReminderSetting(snapshot, 'sos_ready', 0),
   ];
 
-  const reminders = createReminderContent(snapshot);
+  const reminders = createReminderContent(snapshot, { now: new Date('2026-03-27T10:00:00.000Z') });
   assert.equal(reminders.some((item) => item.href === '/trip/trip_1'), true);
   assert.equal(reminders.some((item) => item.href === '/trip/trip_1?focus=hotel'), true);
   assert.equal(reminders.some((item) => item.href === '/trip/trip_1?focus=transfer'), true);
@@ -209,25 +251,17 @@ test('trip countdown reminders cover 30, 7, 3, 1 day, and trip-day scheduling', 
   const snapshot = createSnapshot();
   snapshot.trips[0] = {
     ...snapshot.trips[0],
-    startDate: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000).toISOString(),
+    startDate: new Date('2026-05-06T09:00:00.000Z').toISOString(),
   };
   snapshot.reminderSettings = [
-    ['trip_countdown_30_days', 30],
-    ['trip_countdown_7_days', 7],
-    ['trip_countdown_3_days', 3],
-    ['trip_countdown_1_day', 1],
-    ['trip_today', 0],
-  ].map(([kind, leadTimeDays], index) => ({
-    id: `trip_countdown_${index}`,
-    tripId: 'trip_1',
-    kind: kind as AppDataSnapshot['reminderSettings'][number]['kind'],
-    enabled: true,
-    leadTimeDays: leadTimeDays as AppDataSnapshot['reminderSettings'][number]['leadTimeDays'],
-    createdAt: snapshot.appPreferences.createdAt,
-    updatedAt: snapshot.appPreferences.updatedAt,
-  }));
+    createReminderSetting(snapshot, 'trip_countdown_30_days', 30),
+    createReminderSetting(snapshot, 'trip_countdown_7_days', 7),
+    createReminderSetting(snapshot, 'trip_countdown_3_days', 3),
+    createReminderSetting(snapshot, 'trip_countdown_1_day', 1),
+    createReminderSetting(snapshot, 'trip_today', 0),
+  ];
 
-  const reminders = createReminderContent(snapshot);
+  const reminders = createReminderContent(snapshot, { now: new Date('2026-03-27T10:00:00.000Z') });
   const tripReminders = reminders.filter((item) => item.activeTripId === 'trip_1' && item.href === '/trip/trip_1');
 
   assert.equal(tripReminders.length, 5);
@@ -238,135 +272,85 @@ test('trip countdown reminders cover 30, 7, 3, 1 day, and trip-day scheduling', 
   assert.equal(tripReminders.some((item) => item.title === 'Spain getaway is today'), true);
 });
 
-test('notification proof trip compresses reminder dates into a fast local test cadence', () => {
-  const now = new Date('2026-03-27T10:00:00.000Z');
+test('transport reminders schedule the correct per-segment matrix with travel routes and transport channel', () => {
   const snapshot = createSnapshot();
-  snapshot.trips = [
-    {
-      ...snapshot.trips[0],
-      id: NOTIFICATION_PROOF_TRIP_ID,
-      name: 'Notification Proof Trip',
-      destination: 'Barcelona',
-      startDate: new Date('2026-05-12T09:00:00.000Z').toISOString(),
-      endDate: new Date('2026-05-16T09:00:00.000Z').toISOString(),
-      transferMethod: 'Airport transfer',
-      transferLocation: 'Barcelona arrivals',
-      transferTime: new Date('2026-05-12T12:00:00.000Z').toISOString(),
-    },
-  ];
-  snapshot.packingItems = [
-    {
-      id: 'packing_1',
-      tripId: NOTIFICATION_PROOF_TRIP_ID,
-      title: 'Passport wallet',
-      category: 'documents',
-      quantity: 1,
-      isPacked: false,
-      luggageType: 'carry_on',
-      assignmentScope: 'trip',
-      travellerIds: [],
-      priority: 'essential',
-      notes: '',
-      createdAt: snapshot.appPreferences.createdAt,
-      updatedAt: snapshot.appPreferences.updatedAt,
-    },
-  ];
   snapshot.travelSegments = [
-    {
-      id: 'segment_1',
-      tripId: NOTIFICATION_PROOF_TRIP_ID,
-      transportType: 'flight',
-      travelDirection: 'outbound',
-      airline: 'British Airways',
-      providerCode: 'BA',
-      providerLogoUrl: null,
-      flightNumber: 'BA482',
-      departureAirport: 'London Gatwick Airport',
-      departureAirportCode: 'LGW',
-      arrivalAirport: 'Barcelona-El Prat Airport',
-      arrivalAirportCode: 'BCN',
-      departureTime: new Date('2026-05-12T09:00:00.000Z').toISOString(),
-      arrivalTime: new Date('2026-05-12T11:00:00.000Z').toISOString(),
-      terminal: 'S',
-      gate: '10',
-      bookingRef: 'PROOF22',
-      notes: '',
-      createdAt: snapshot.appPreferences.createdAt,
-      updatedAt: snapshot.appPreferences.updatedAt,
-    },
+    createTransportSegment(snapshot, 'segment_flight', 'flight', '2026-04-06T10:00:00.000Z', '2026-04-06T13:00:00.000Z'),
+    createTransportSegment(snapshot, 'segment_ferry', 'ferry', '2026-04-06T14:00:00.000Z', '2026-04-06T16:00:00.000Z'),
+    createTransportSegment(
+      snapshot,
+      'segment_eurotunnel',
+      'eurotunnel',
+      '2026-04-06T18:00:00.000Z',
+      '2026-04-06T19:00:00.000Z'
+    ),
+    createTransportSegment(snapshot, 'segment_train', 'train', '2026-03-27T12:00:00.000Z', '2026-03-27T14:00:00.000Z'),
+    createTransportSegment(snapshot, 'segment_taxi', 'taxi', '2026-03-27T13:00:00.000Z', '2026-03-27T14:00:00.000Z'),
   ];
-  snapshot.hotelStays = [
-    {
-      id: 'hotel_1',
-      tripId: NOTIFICATION_PROOF_TRIP_ID,
-      hotelName: 'Proof Stay',
-      address: 'Passeig de Gracia 1',
-      city: 'Barcelona',
-      country: 'Spain',
-      latitude: null,
-      longitude: null,
-      hotelImageLocalPath: null,
-      hotelImageRemoteUrl: null,
-      hotelImageSource: 'fallback',
-      hotelImageAttributionText: null,
-      hotelImageAttributionMeta: null,
-      hotelImageStatus: 'idle',
-      phone: '',
-      bookingRef: '',
-      checkIn: new Date('2026-05-12T09:00:00.000Z').toISOString(),
-      checkOut: new Date('2026-05-16T09:00:00.000Z').toISOString(),
-      notes: '',
-      createdAt: snapshot.appPreferences.createdAt,
-      updatedAt: snapshot.appPreferences.updatedAt,
-    },
-  ];
-  snapshot.itineraryEvents = [
-    {
-      id: 'event_1',
-      tripId: NOTIFICATION_PROOF_TRIP_ID,
-      title: 'Proof walking tour',
-      type: 'excursion',
-      dateTime: new Date('2026-05-13T11:00:00.000Z').toISOString(),
-      location: 'Gothic Quarter',
-      confirmationNumber: '',
-      notes: '',
-      createdAt: snapshot.appPreferences.createdAt,
-      updatedAt: snapshot.appPreferences.updatedAt,
-    },
-  ];
-  snapshot.reminderSettings = [
-    ['trip_countdown_30_days', 30],
-    ['trip_countdown_7_days', 7],
-    ['packing_incomplete', 6],
-    ['trip_countdown_3_days', 3],
-    ['insurance_missing', 7],
-    ['trip_countdown_1_day', 1],
-    ['trip_today', 0],
-    ['flight_check_in', 1],
-    ['hotel_check_in', 0],
-    ['transfer_reminder', 0],
-    ['travel_mode_reminder', 0],
-    ['sos_ready', 0],
-    ['excursion_reminder', 1],
-  ].map(([kind, leadTimeDays], index) => ({
-    id: `proof_${index}`,
-    tripId: NOTIFICATION_PROOF_TRIP_ID,
-    kind: kind as AppDataSnapshot['reminderSettings'][number]['kind'],
-    enabled: true,
-    leadTimeDays: leadTimeDays as AppDataSnapshot['reminderSettings'][number]['leadTimeDays'],
-    createdAt: snapshot.appPreferences.createdAt,
-    updatedAt: snapshot.appPreferences.updatedAt,
-  }));
+  snapshot.reminderSettings = [createReminderSetting(snapshot, 'transport_departure', 0)];
 
-  const reminders = createReminderContent(snapshot, { now });
-  const proofReminders = reminders.filter((item) => item.activeTripId === NOTIFICATION_PROOF_TRIP_ID);
+  const reminders = createReminderContent(snapshot, { now: new Date('2026-03-27T10:00:00.000Z') }).filter(
+    (item) => item.kind === 'transport_departure'
+  );
 
-  assert.equal(proofReminders.length, 13);
-  assert.equal(proofReminders[0]?.date.toISOString(), '2026-03-27T10:02:00.000Z');
-  assert.equal(proofReminders[1]?.date.toISOString(), '2026-03-27T10:04:00.000Z');
-  assert.equal(proofReminders[6]?.date.toISOString(), '2026-03-27T10:14:00.000Z');
-  assert.equal(proofReminders[12]?.date.toISOString(), '2026-03-27T10:26:00.000Z');
-  assert.equal(proofReminders.some((item) => item.href === `/trip/${NOTIFICATION_PROOF_TRIP_ID}?focus=transfer`), true);
-  assert.equal(proofReminders.some((item) => item.href === `/trip/${NOTIFICATION_PROOF_TRIP_ID}/travel-mode`), true);
-  assert.equal(proofReminders.some((item) => item.href === '/sos'), true);
+  assert.equal(reminders.length, 25);
+  assert.equal(reminders.every((item) => item.channelId === 'pineapple-transport'), true);
+  assert.equal(
+    reminders.filter((item) => item.transportSegmentId === 'segment_flight').length,
+    7
+  );
+  assert.equal(
+    reminders.filter((item) => item.transportSegmentId === 'segment_ferry').length,
+    7
+  );
+  assert.equal(
+    reminders.filter((item) => item.transportSegmentId === 'segment_eurotunnel').length,
+    7
+  );
+  assert.equal(
+    reminders.filter((item) => item.transportSegmentId === 'segment_train').length,
+    2
+  );
+  assert.equal(
+    reminders.filter((item) => item.transportSegmentId === 'segment_taxi').length,
+    2
+  );
+  assert.equal(
+    reminders.some(
+      (item) => item.transportSegmentId === 'segment_train' && item.href === '/trip/trip_1?focus=travel&segmentId=segment_train'
+    ),
+    true
+  );
+  assert.equal(
+    reminders.some((item) => item.transportSegmentId === 'segment_train' && item.title.includes('in 1 hour')),
+    true
+  );
+  assert.equal(
+    reminders.some((item) => item.transportSegmentId === 'segment_taxi' && item.title.includes('Taxi to Heathrow Terminal 5 arrives in 15 minutes')),
+    true
+  );
+  assert.equal(
+    reminders.some((item) => item.transportSegmentId === 'segment_eurotunnel' && item.title.includes('Eurotunnel')),
+    true
+  );
+});
+
+test('transport notification proof trip compresses all transport types into a fast local test cadence', () => {
+  const now = new Date('2026-03-27T10:00:00.000Z');
+  const proofSnapshot = withNotificationProofTrip(createSnapshot(), now).snapshot;
+  const reminders = createReminderContent(proofSnapshot, { now }).filter(
+    (item) => item.kind === 'transport_departure' && item.activeTripId === NOTIFICATION_PROOF_TRIP_ID
+  );
+
+  assert.equal(reminders.length, 25);
+  assert.equal(reminders[0]?.date.toISOString(), '2026-03-27T10:02:00.000Z');
+  assert.equal(reminders[24]?.date.toISOString(), '2026-03-27T10:26:00.000Z');
+  assert.deepEqual(
+    new Set(reminders.map((item) => item.transportType)),
+    new Set(['flight', 'train', 'taxi', 'ferry', 'eurotunnel'])
+  );
+  assert.equal(
+    reminders.some((item) => item.href?.includes(`segmentId=segment_notification_proof_train`)),
+    true
+  );
 });

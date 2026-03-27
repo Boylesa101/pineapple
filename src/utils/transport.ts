@@ -73,6 +73,40 @@ const DISPLAY_BY_TRANSPORT: Record<TransportType, TransportDisplay> = {
     detailIcon: 'train',
     directionOtherLabel: 'Other',
   },
+  ferry: {
+    label: 'Ferry',
+    shortLabel: 'Ferry',
+    providerLabel: 'Ferry operator',
+    providerPlaceholder: 'Add ferry operator',
+    providerHelper: 'Add the ferry line or a manual operator note.',
+    serviceNumberLabel: 'Sailing / booking ref',
+    departureLabel: 'Departure port',
+    arrivalLabel: 'Arrival port',
+    terminalLabel: 'Terminal / boarding note',
+    gateLabel: 'Lane / gate note',
+    departureIcon: 'directions-boat',
+    arrivalIcon: 'directions-boat',
+    cardIcon: 'directions-boat',
+    detailIcon: 'directions-boat',
+    directionOtherLabel: 'Other',
+  },
+  eurotunnel: {
+    label: 'Eurotunnel',
+    shortLabel: 'Tunnel',
+    providerLabel: 'Operator',
+    providerPlaceholder: 'Add Eurotunnel booking or operator',
+    providerHelper: 'Use LeShuttle or add a manual booking note.',
+    serviceNumberLabel: 'Booking / crossing ref',
+    departureLabel: 'Departure terminal',
+    arrivalLabel: 'Arrival terminal',
+    terminalLabel: 'Lane / check-in',
+    gateLabel: 'Vehicle / boarding note',
+    departureIcon: 'commute',
+    arrivalIcon: 'commute',
+    cardIcon: 'commute',
+    detailIcon: 'commute',
+    directionOtherLabel: 'Other',
+  },
   car: {
     label: 'Driving holiday',
     shortLabel: 'Drive',
@@ -113,6 +147,8 @@ export function normalizeTransportType(value: string | null | undefined): Transp
   if (
     value === 'private_flight' ||
     value === 'train' ||
+    value === 'ferry' ||
+    value === 'eurotunnel' ||
     value === 'car' ||
     value === 'taxi'
   ) {

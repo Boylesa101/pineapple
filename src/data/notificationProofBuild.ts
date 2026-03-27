@@ -1,16 +1,109 @@
 import { addDays, addHours, addMinutes } from 'date-fns';
 
-import type { AppDataSnapshot, HotelStay, ItineraryEvent, PackingItem, ReminderKind, ReminderSetting, TravelSegment, Trip } from '@/types/models';
+import type { AppDataSnapshot, ReminderKind, ReminderSetting, TravelSegment, Trip } from '@/types/models';
 
-export const NOTIFICATION_PROOF_BUILD_VERSION = '2.2.2';
-export const NOTIFICATION_PROOF_TRIP_ID = 'trip_notification_proof';
+export const NOTIFICATION_PROOF_BUILD_VERSION = '2.2.3';
+export const NOTIFICATION_PROOF_TRIP_ID = 'trip_transport_notification_proof';
 
-const NOTIFICATION_PROOF_SEGMENT_ID = 'segment_notification_proof';
-const NOTIFICATION_PROOF_HOTEL_ID = 'hotel_notification_proof';
-const NOTIFICATION_PROOF_PACKING_ID = 'packing_notification_proof';
-const NOTIFICATION_PROOF_EVENT_ID = 'event_notification_proof';
+const NOTIFICATION_PROOF_SEGMENTS: Array<{
+  id: string;
+  transportType: TravelSegment['transportType'];
+  airline: string;
+  providerCode: string;
+  flightNumber: string;
+  departureAirport: string;
+  departureAirportCode: string;
+  arrivalAirport: string;
+  arrivalAirportCode: string;
+  departureOffsetHours: number;
+  arrivalOffsetHours: number;
+  terminal: string;
+  gate: string;
+  bookingRef: string;
+}> = [
+  {
+    id: 'segment_notification_proof_flight',
+    transportType: 'flight',
+    airline: 'British Airways',
+    providerCode: 'BA',
+    flightNumber: 'BA0482',
+    departureAirport: 'London Gatwick Airport',
+    departureAirportCode: 'LGW',
+    arrivalAirport: 'Malaga Airport',
+    arrivalAirportCode: 'AGP',
+    departureOffsetHours: 9,
+    arrivalOffsetHours: 12,
+    terminal: 'S',
+    gate: '26',
+    bookingRef: 'PROOF-FLT',
+  },
+  {
+    id: 'segment_notification_proof_train',
+    transportType: 'train',
+    airline: 'LNER',
+    providerCode: 'LNER',
+    flightNumber: '1D24',
+    departureAirport: 'York Station',
+    departureAirportCode: '',
+    arrivalAirport: 'London Kings Cross',
+    arrivalAirportCode: '',
+    departureOffsetHours: 13,
+    arrivalOffsetHours: 15,
+    terminal: 'Platform 4',
+    gate: 'Coach B',
+    bookingRef: 'PROOF-TRN',
+  },
+  {
+    id: 'segment_notification_proof_taxi',
+    transportType: 'taxi',
+    airline: 'Uber',
+    providerCode: '',
+    flightNumber: 'RIDE-11',
+    departureAirport: 'Home pickup',
+    departureAirportCode: '',
+    arrivalAirport: 'Heathrow Terminal 5',
+    arrivalAirportCode: '',
+    departureOffsetHours: 16,
+    arrivalOffsetHours: 17,
+    terminal: 'Outside front door',
+    gate: 'Blue Toyota',
+    bookingRef: 'PROOF-TAXI',
+  },
+  {
+    id: 'segment_notification_proof_ferry',
+    transportType: 'ferry',
+    airline: 'P&O Ferries',
+    providerCode: '',
+    flightNumber: 'PO123',
+    departureAirport: 'Dover Ferry Terminal',
+    departureAirportCode: '',
+    arrivalAirport: 'Calais Port',
+    arrivalAirportCode: '',
+    departureOffsetHours: 18,
+    arrivalOffsetHours: 20,
+    terminal: 'Check-in lane A',
+    gate: 'Lane 8',
+    bookingRef: 'PROOF-FRY',
+  },
+  {
+    id: 'segment_notification_proof_eurotunnel',
+    transportType: 'eurotunnel',
+    airline: 'LeShuttle',
+    providerCode: '',
+    flightNumber: 'LT456',
+    departureAirport: 'Folkestone Terminal',
+    departureAirportCode: '',
+    arrivalAirport: 'Calais Terminal',
+    arrivalAirportCode: '',
+    departureOffsetHours: 21,
+    arrivalOffsetHours: 22,
+    terminal: 'Check-in booth',
+    gate: 'Lane C',
+    bookingRef: 'PROOF-EURO',
+  },
+];
 
-export const NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES: Partial<Record<ReminderKind, number>> = {
+const LEGACY_REMINDER_OFFSETS_MINUTES: Partial<Record<ReminderKind, number>> = {
   trip_countdown_30_days: 2,
   trip_countdown_7_days: 4,
   packing_incomplete: 6,
@@ -18,13 +111,24 @@ export const NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES: Partial<Record<Reminde
   insurance_missing: 10,
   trip_countdown_1_day: 12,
   trip_today: 14,
-  flight_check_in: 16,
-  hotel_check_in: 18,
-  transfer_reminder: 20,
-  travel_mode_reminder: 22,
-  sos_ready: 24,
-  excursion_reminder: 26,
+  hotel_check_in: 16,
+  transfer_reminder: 18,
+  travel_mode_reminder: 20,
+  sos_ready: 22,
+  excursion_reminder: 24,
 };
+
+function getTransportSummary(transportType: TravelSegment['transportType']) {
+  if (transportType === 'train' || transportType === 'taxi') {
+    return 'Lock screen alerts 1h • 15m';
+  }
+
+  if (transportType === 'flight' || transportType === 'private_flight' || transportType === 'ferry' || transportType === 'eurotunnel') {
+    return 'Lock screen alerts 7d • 3d • 2d • 1d • 2h • 1h • 15m';
+  }
+
+  return 'No automatic transport alerts';
+}
 
 export function isNotificationProofBuildVersion(version: string | null | undefined) {
   return version === NOTIFICATION_PROOF_BUILD_VERSION;
@@ -35,7 +139,11 @@ export function isNotificationProofTripId(tripId: string | null | undefined) {
 }
 
 export function getNotificationProofReminderDate(kind: ReminderKind, now: Date, occurrenceIndex = 0) {
-  const baseOffset = NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES[kind];
+  if (kind === 'transport_departure') {
+    return addMinutes(now, 2 + occurrenceIndex);
+  }
+
+  const baseOffset = LEGACY_REMINDER_OFFSETS_MINUTES[kind];
   if (baseOffset === undefined) {
     return null;
   }
@@ -63,130 +171,77 @@ export function withNotificationProofTrip(snapshot: AppDataSnapshot, now = new D
   const nowIso = now.toISOString();
   const start = addDays(now, 45);
   const end = addDays(start, 4);
-  const outbound = addHours(start, 9);
   const proofTrip: Trip = {
     id: NOTIFICATION_PROOF_TRIP_ID,
-    name: 'Notification Proof Trip',
-    destination: 'Barcelona',
+    name: 'Transport Notification Proof Trip',
+    destination: 'Calais',
     destinationType: 'place',
     startDate: start.toISOString(),
     endDate: end.toISOString(),
     destinationImageLocalPath: null,
     destinationImageRemoteUrl: null,
     destinationImageSource: 'fallback',
-    attributionText: 'Temporary 2.2.2 notification verification trip',
-    attributionMeta: { source: 'fallback', sourceLabel: 'Temporary 2.2.2 notification verification trip' },
+    attributionText: 'Temporary 2.2.3 transport notification verification trip',
+    attributionMeta: { source: 'fallback', sourceLabel: 'Temporary 2.2.3 transport notification verification trip' },
     coverImageUri: null,
     heroImageRemoteUrl: null,
     heroImageStatus: 'idle',
-    notes: 'Temporary seeded trip for Pineapple 2.2.2 notification verification. Remove after on-device lock-screen proof is confirmed.',
-    transferSummary: 'Demo airport pickup for notification verification.',
-    transferProvider: 'Pineapple test transfer',
-    transferMethod: 'Airport transfer',
-    transferLocation: 'Barcelona arrivals meeting point',
-    transferTime: addHours(outbound, 3).toISOString(),
+    notes:
+      'Temporary seeded trip for Pineapple 2.2.3 transport notification verification. Remove after on-device lock-screen proof is confirmed.',
+    transferSummary: 'Transport departure proof trip',
+    transferProvider: '',
+    transferMethod: '',
+    transferLocation: '',
+    transferTime: null,
     airportTravelDurationMinutes: 75,
-    transferNotes: 'Temporary proof-only transfer timing for notification testing.',
+    transferNotes: '',
     status: 'upcoming',
     createdAt: nowIso,
     updatedAt: nowIso,
   };
-  const proofPackingItem: PackingItem = {
-    id: NOTIFICATION_PROOF_PACKING_ID,
-    tripId: NOTIFICATION_PROOF_TRIP_ID,
-    title: 'Passport wallet',
-    category: 'documents',
-    quantity: 1,
-    isPacked: false,
-    luggageType: 'carry_on',
-    assignmentScope: 'trip',
-    travellerIds: [],
-    priority: 'essential',
-    notes: 'Left unpacked on purpose so the proof reminder can trigger.',
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  };
-  const proofTravelSegment: TravelSegment = {
-    id: NOTIFICATION_PROOF_SEGMENT_ID,
-    tripId: NOTIFICATION_PROOF_TRIP_ID,
-    transportType: 'flight',
-    travelDirection: 'outbound',
-    airline: 'British Airways',
-    providerCode: 'BA',
-    providerLogoUrl: null,
-    flightNumber: 'BA0482',
-    departureAirport: 'London Gatwick Airport',
-    departureAirportCode: 'LGW',
-    arrivalAirport: 'Barcelona-El Prat Airport',
-    arrivalAirportCode: 'BCN',
-    departureTime: outbound.toISOString(),
-    arrivalTime: addHours(outbound, 2).toISOString(),
-    terminal: 'S',
-    gate: '26',
-    bookingRef: 'PROOF22',
-    notes: 'Proof-only travel segment for notification scheduling.',
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  };
-  const proofHotelStay: HotelStay = {
-    id: NOTIFICATION_PROOF_HOTEL_ID,
-    tripId: NOTIFICATION_PROOF_TRIP_ID,
-    hotelName: 'Pineapple Proof Stay',
-    address: 'Passeig de Gracia 1, Barcelona',
-    city: 'Barcelona',
-    country: 'Spain',
-    latitude: null,
-    longitude: null,
-    hotelImageLocalPath: null,
-    hotelImageRemoteUrl: null,
-    hotelImageSource: 'fallback',
-    hotelImageAttributionText: 'Temporary 2.2.2 notification verification hotel',
-    hotelImageAttributionMeta: { source: 'fallback', sourceLabel: 'Temporary 2.2.2 notification verification hotel' },
-    hotelImageStatus: 'idle',
-    phone: '+34 93 000 0000',
-    bookingRef: 'PROOF-HOTEL',
-    checkIn: start.toISOString(),
-    checkOut: end.toISOString(),
-    notes: 'Proof-only hotel stay for local reminder verification.',
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  };
-  const proofEvent: ItineraryEvent = {
-    id: NOTIFICATION_PROOF_EVENT_ID,
-    tripId: NOTIFICATION_PROOF_TRIP_ID,
-    title: 'Proof walking tour',
-    type: 'excursion',
-    dateTime: addDays(start, 1).toISOString(),
-    location: 'Gothic Quarter',
-    confirmationNumber: 'PROOF-EXCURSION',
-    notes: 'Proof-only excursion so itinerary reminders can be verified.',
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  };
+
+  const proofTravelSegments: TravelSegment[] = NOTIFICATION_PROOF_SEGMENTS.map((segment, index) => {
+    const departureTime = addHours(start, segment.departureOffsetHours + index);
+    const travelSegment: TravelSegment = {
+      id: segment.id,
+      tripId: NOTIFICATION_PROOF_TRIP_ID,
+      transportType: segment.transportType,
+      travelDirection: index === 0 ? 'outbound' : 'other',
+      airline: segment.airline,
+      providerCode: segment.providerCode,
+      providerLogoUrl: null,
+      flightNumber: segment.flightNumber,
+      departureAirport: segment.departureAirport,
+      departureAirportCode: segment.departureAirportCode,
+      arrivalAirport: segment.arrivalAirport,
+      arrivalAirportCode: segment.arrivalAirportCode,
+      departureTime: departureTime.toISOString(),
+      departureTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London',
+      arrivalTime: addHours(start, segment.arrivalOffsetHours + index).toISOString(),
+      terminal: segment.terminal,
+      gate: segment.gate,
+      bookingRef: segment.bookingRef,
+      notificationSummary: '',
+      scheduledNotificationIds: [],
+      notes: 'Proof-only transport segment for local departure alert verification.',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    return {
+      ...travelSegment,
+      notificationSummary: getTransportSummary(travelSegment.transportType),
+    };
+  });
 
   return {
     changed: true,
     snapshot: {
       ...snapshot,
       trips: [proofTrip, ...snapshot.trips],
-      packingItems: [proofPackingItem, ...snapshot.packingItems],
-      travelSegments: [proofTravelSegment, ...snapshot.travelSegments],
-      hotelStays: [proofHotelStay, ...snapshot.hotelStays],
-      itineraryEvents: [proofEvent, ...snapshot.itineraryEvents],
+      travelSegments: [...proofTravelSegments, ...snapshot.travelSegments],
       reminderSettings: [
-        buildReminderSetting('trip_countdown_30_days', 30, nowIso),
-        buildReminderSetting('trip_countdown_7_days', 7, nowIso),
-        buildReminderSetting('packing_incomplete', 6, nowIso),
-        buildReminderSetting('trip_countdown_3_days', 3, nowIso),
-        buildReminderSetting('insurance_missing', 7, nowIso),
-        buildReminderSetting('trip_countdown_1_day', 1, nowIso),
-        buildReminderSetting('trip_today', 0, nowIso),
-        buildReminderSetting('flight_check_in', 1, nowIso),
-        buildReminderSetting('hotel_check_in', 0, nowIso),
-        buildReminderSetting('transfer_reminder', 0, nowIso),
-        buildReminderSetting('travel_mode_reminder', 0, nowIso),
-        buildReminderSetting('sos_ready', 0, nowIso),
-        buildReminderSetting('excursion_reminder', 1, nowIso),
+        buildReminderSetting('transport_departure', 0, nowIso),
         ...snapshot.reminderSettings,
       ],
     },

@@ -1,18 +1,59 @@
-import { addDays, differenceInHours, parseISO, setHours, setMinutes, setSeconds, subDays, subHours } from 'date-fns';
+import { addDays, parseISO, setHours, setMinutes, setSeconds, subDays } from 'date-fns';
 
 import { getNotificationProofReminderDate, isNotificationProofTripId } from '@/data/notificationProofBuild';
-import type { AppDataSnapshot, Document, ExpiryReminderLeadTime, ReminderKind, ReminderLeadTime } from '@/types/models';
+import type {
+  AppDataSnapshot,
+  Document,
+  ExpiryReminderLeadTime,
+  ReminderKind,
+  ReminderLeadTime,
+  TravelSegment,
+  TransportType,
+} from '@/types/models';
 import { formatAirportDisplay } from '@/utils/airports';
+import { formatDateTime } from '@/utils/date';
 import { getTripBundle } from '@/utils/selectors';
+import { getTransportDisplay, isAirTransportType } from '@/utils/transport';
 
 export type ReminderInput = {
+  key: string;
+  kind: ReminderKind | 'document_expiry' | 'setup';
   title: string;
   body: string;
   date: Date;
   silent?: boolean;
   href?: string;
   activeTripId?: string | null;
+  channelId?: 'pineapple-reminders' | 'pineapple-transport';
+  transportSegmentId?: string | null;
+  transportType?: TransportType | null;
 };
+
+export type TransportReminderOffset = {
+  key: string;
+  shortLabel: string;
+  phrase: string;
+  millisecondsBefore: number;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+
+const LONG_HAUL_TRANSPORT_OFFSETS: TransportReminderOffset[] = [
+  { key: '7d', shortLabel: '7d', phrase: 'in 7 days', millisecondsBefore: 7 * DAY_MS },
+  { key: '3d', shortLabel: '3d', phrase: 'in 3 days', millisecondsBefore: 3 * DAY_MS },
+  { key: '2d', shortLabel: '2d', phrase: 'in 2 days', millisecondsBefore: 2 * DAY_MS },
+  { key: '1d', shortLabel: '1d', phrase: 'tomorrow', millisecondsBefore: 1 * DAY_MS },
+  { key: '2h', shortLabel: '2h', phrase: 'in 2 hours', millisecondsBefore: 2 * HOUR_MS },
+  { key: '1h', shortLabel: '1h', phrase: 'in 1 hour', millisecondsBefore: 1 * HOUR_MS },
+  { key: '15m', shortLabel: '15m', phrase: 'in 15 minutes', millisecondsBefore: 15 * MINUTE_MS },
+];
+
+const LOCAL_TRANSPORT_OFFSETS: TransportReminderOffset[] = [
+  { key: '1h', shortLabel: '1h', phrase: 'in 1 hour', millisecondsBefore: 1 * HOUR_MS },
+  { key: '15m', shortLabel: '15m', phrase: 'in 15 minutes', millisecondsBefore: 15 * MINUTE_MS },
+];
 
 function getReminderSetting(snapshot: AppDataSnapshot, tripId: string, kind: ReminderKind) {
   return (
@@ -50,6 +91,15 @@ function isReminderEnabledForKinds(snapshot: AppDataSnapshot, tripId: string, ki
   return Boolean(getReminderSettingForKinds(snapshot, tripId, kinds)?.enabled);
 }
 
+function isTransportDepartureReminderEnabled(snapshot: AppDataSnapshot, tripId: string) {
+  if (!snapshot.appPreferences.notificationsEnabled) {
+    return false;
+  }
+
+  const setting = getReminderSettingForKinds(snapshot, tripId, ['transport_departure', 'flight_check_in']);
+  return setting ? Boolean(setting.enabled) : true;
+}
+
 function getLeadTime(snapshot: AppDataSnapshot, tripId: string, kind: ReminderKind, fallback: ReminderLeadTime) {
   return getReminderSetting(snapshot, tripId, kind)?.leadTimeDays ?? fallback;
 }
@@ -67,6 +117,10 @@ function buildReminderDateAtHour(targetIso: string, leadTimeDays: number, hour: 
   return setSeconds(setMinutes(setHours(buildReminderDate(targetIso, leadTimeDays), hour), 0), 0);
 }
 
+function buildTransportReminderDate(targetIso: string, millisecondsBefore: number) {
+  return new Date(parseISO(targetIso).getTime() - millisecondsBefore);
+}
+
 function isFutureDate(date: Date, now: Date) {
   return date.getTime() > now.getTime() + 60_000;
 }
@@ -82,7 +136,7 @@ function formatLeadLabel(leadDays: number) {
   return `${leadDays} days`;
 }
 
-function getDocumentReminderDates(document: Pick<Document, 'expiryDate' | 'expiryReminderSchedule'>) {
+function getDocumentReminderDates(document: Pick<Document, 'expiryDate' | 'expiryReminderSchedule'>, now: Date) {
   if (!document.expiryDate) {
     return [];
   }
@@ -92,7 +146,7 @@ function getDocumentReminderDates(document: Pick<Document, 'expiryDate' | 'expir
       leadDays,
       scheduledDate: buildReminderDate(document.expiryDate as string, leadDays),
     }))
-    .filter((item): item is { leadDays: ExpiryReminderLeadTime; scheduledDate: Date } => isFutureDate(item.scheduledDate, new Date()));
+    .filter((item): item is { leadDays: ExpiryReminderLeadTime; scheduledDate: Date } => isFutureDate(item.scheduledDate, now));
 }
 
 function resolveReminderDate(options: {
@@ -109,6 +163,57 @@ function resolveReminderDate(options: {
   return getNotificationProofReminderDate(options.kind, options.now, options.occurrenceIndex ?? 0) ?? options.defaultDate;
 }
 
+function getTransportDestinationLabel(segment: TravelSegment) {
+  return formatAirportDisplay(
+    segment.arrivalAirport,
+    isAirTransportType(segment.transportType) ? segment.arrivalAirportCode : ''
+  );
+}
+
+function getTransportReminderOffsets(type: TransportType) {
+  if (type === 'flight' || type === 'private_flight' || type === 'ferry' || type === 'eurotunnel') {
+    return LONG_HAUL_TRANSPORT_OFFSETS;
+  }
+
+  if (type === 'train' || type === 'taxi') {
+    return LOCAL_TRANSPORT_OFFSETS;
+  }
+
+  return [];
+}
+
+export function describeTransportReminderMatrix(type: TransportType) {
+  const offsets = getTransportReminderOffsets(type);
+  return offsets.length ? offsets.map((offset) => offset.shortLabel).join(' • ') : 'No automatic alerts';
+}
+
+export function getTransportNotificationSummary(segment: Pick<TravelSegment, 'transportType'>) {
+  const offsets = getTransportReminderOffsets(segment.transportType);
+  return offsets.length ? `Lock screen alerts ${offsets.map((offset) => offset.shortLabel).join(' • ')}` : 'No automatic transport alerts';
+}
+
+function buildTransportReminderTitle(segment: TravelSegment, offset: TransportReminderOffset) {
+  const destinationLabel = getTransportDestinationLabel(segment);
+
+  if (segment.transportType === 'taxi') {
+    return `Taxi to ${destinationLabel} arrives ${offset.phrase}`;
+  }
+
+  if (segment.transportType === 'eurotunnel') {
+    return `Eurotunnel to ${destinationLabel} departs ${offset.phrase}`;
+  }
+
+  return `${getTransportDisplay(segment.transportType).label} to ${destinationLabel} departs ${offset.phrase}`;
+}
+
+function buildTransportReminderBody(segment: TravelSegment) {
+  const display = getTransportDisplay(segment.transportType);
+  const providerLine = [segment.airline, segment.flightNumber].filter(Boolean).join(' ').trim();
+  const summary = providerLine || display.label;
+  const departureLabel = formatDateTime(segment.departureTime);
+  return `${summary} • departs ${departureLabel}${segment.departureTimeZone ? ` • ${segment.departureTimeZone}` : ''}`;
+}
+
 export function createReminderContent(snapshot: AppDataSnapshot, options: { now?: Date } = {}): ReminderInput[] {
   const now = options.now ?? new Date();
   const reminders: ReminderInput[] = [];
@@ -119,10 +224,15 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
     const setupReminderDate = setSeconds(setMinutes(setHours(addDays(now, 1), 18), 0), 0);
     if (isFutureDate(setupReminderDate, now)) {
       reminders.push({
+        key: !hasPassportDocument ? 'setup:passport' : 'setup:profile',
+        kind: 'setup',
         title: 'Finish your Pineapple setup',
-        body: !hasPassportDocument ? 'Add your main travel document so it is ready in Vault.' : 'Add a profile photo so your travel profile is easy to recognise.',
+        body: !hasPassportDocument
+          ? 'Add your main travel document so it is ready in Vault.'
+          : 'Add a profile photo so your travel profile is easy to recognise.',
         date: setupReminderDate,
         href: !hasPassportDocument ? '/vault' : '/account',
+        channelId: 'pineapple-reminders',
       });
     }
   }
@@ -151,11 +261,14 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
       });
       if (isFutureDate(date, now)) {
         reminders.push({
+          key: `trip:${trip.id}:${config.kinds[0]}`,
+          kind: config.kinds[0] as ReminderKind,
           title: `${trip.name} starts soon`,
           body: `${formatLeadLabel(lead)} until ${trip.destination}.`,
           date,
           href: `/trip/${trip.id}`,
           activeTripId: trip.id,
+          channelId: 'pineapple-reminders',
         });
       }
     }
@@ -169,11 +282,14 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
       });
       if (isFutureDate(date, now)) {
         reminders.push({
+          key: `trip:${trip.id}:trip_today`,
+          kind: 'trip_today',
           title: `${trip.name} is today`,
           body: `Safe travels. ${trip.destination} starts today.`,
           date,
           href: `/trip/${trip.id}`,
           activeTripId: trip.id,
+          channelId: 'pineapple-reminders',
         });
       }
     }
@@ -192,11 +308,14 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
       });
       if (isFutureDate(date, now)) {
         reminders.push({
+          key: `trip:${trip.id}:packing_incomplete`,
+          kind: 'packing_incomplete',
           title: `${trip.name} packing still incomplete`,
           body: `${bundle.packingItems.filter((item) => !item.isPacked).length} item(s) still need packing.`,
           date,
           href: '/packing',
           activeTripId: trip.id,
+          channelId: 'pineapple-reminders',
         });
       }
     }
@@ -215,33 +334,45 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
       });
       if (isFutureDate(date, now)) {
         reminders.push({
+          key: `trip:${trip.id}:insurance_missing`,
+          kind: 'insurance_missing',
           title: `${trip.name} needs insurance details`,
           body: 'Add insurance information before departure.',
           date,
           href: '/vault',
           activeTripId: trip.id,
+          channelId: 'pineapple-reminders',
         });
       }
     }
 
-    if (isReminderEnabled(snapshot, trip.id, 'flight_check_in')) {
-      const lead = getLeadTime(snapshot, trip.id, 'flight_check_in', 1);
-      for (const [index, segment] of bundle.travelSegments.entries()) {
-        const date = resolveReminderDate({
-          tripId: trip.id,
-          kind: 'flight_check_in',
-          defaultDate: buildReminderDateAtHour(segment.departureTime, lead, 9),
-          now,
-          occurrenceIndex: index,
-        });
-        if (isFutureDate(date, now)) {
-          reminders.push({
-            title: `${segment.airline} ${segment.flightNumber || ''}`.trim(),
-            body: `Check in for ${formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} to ${formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}.`,
-            date,
-            href: `/trip/${trip.id}?focus=travel`,
-            activeTripId: trip.id,
+    if (isTransportDepartureReminderEnabled(snapshot, trip.id)) {
+      let occurrenceIndex = 0;
+      for (const segment of bundle.travelSegments) {
+        const offsets = getTransportReminderOffsets(segment.transportType);
+        for (const offset of offsets) {
+          const date = resolveReminderDate({
+            tripId: trip.id,
+            kind: 'transport_departure',
+            defaultDate: buildTransportReminderDate(segment.departureTime, offset.millisecondsBefore),
+            now,
+            occurrenceIndex,
           });
+          occurrenceIndex += 1;
+          if (isFutureDate(date, now)) {
+            reminders.push({
+              key: `transport:${segment.id}:${offset.key}`,
+              kind: 'transport_departure',
+              title: buildTransportReminderTitle(segment, offset),
+              body: buildTransportReminderBody(segment),
+              date,
+              href: `/trip/${trip.id}?focus=travel&segmentId=${segment.id}`,
+              activeTripId: trip.id,
+              channelId: 'pineapple-transport',
+              transportSegmentId: segment.id,
+              transportType: segment.transportType,
+            });
+          }
         }
       }
     }
@@ -257,32 +388,36 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
         });
         if (isFutureDate(date, now)) {
           reminders.push({
+            key: `hotel:${hotel.id}:hotel_check_in`,
+            kind: 'hotel_check_in',
             title: `${hotel.hotelName} check-in today`,
             body: `Hotel reminder for ${hotel.city || trip.destination}.`,
             date,
             href: `/trip/${trip.id}?focus=hotel`,
             activeTripId: trip.id,
+            channelId: 'pineapple-reminders',
           });
         }
       }
     }
 
     if (trip.transferTime && isReminderEnabled(snapshot, trip.id, 'transfer_reminder')) {
-      const proofTrip = isNotificationProofTripId(trip.id);
       const date = resolveReminderDate({
         tripId: trip.id,
         kind: 'transfer_reminder',
-        defaultDate: subHours(parseISO(trip.transferTime), 2),
+        defaultDate: new Date(parseISO(trip.transferTime).getTime() - 2 * HOUR_MS),
         now,
       });
       if (isFutureDate(date, now)) {
-        const hoursUntilTransfer = proofTrip ? 2 : Math.max(1, differenceInHours(parseISO(trip.transferTime), date));
         reminders.push({
+          key: `trip:${trip.id}:transfer_reminder`,
+          kind: 'transfer_reminder',
           title: `${trip.name} transfer coming up`,
-          body: `${trip.transferMethod || 'Transfer'} in ${hoursUntilTransfer} hour(s)${trip.transferLocation ? ` from ${trip.transferLocation}` : ''}.`,
+          body: `${trip.transferMethod || 'Transfer'} from ${trip.transferLocation || trip.destination} is coming up.`,
           date,
           href: `/trip/${trip.id}?focus=transfer`,
           activeTripId: trip.id,
+          channelId: 'pineapple-reminders',
         });
       }
     }
@@ -296,11 +431,14 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
       });
       if (isFutureDate(date, now)) {
         reminders.push({
+          key: `trip:${trip.id}:travel_mode_reminder`,
+          kind: 'travel_mode_reminder',
           title: `${trip.name} travel mode is ready`,
           body: 'Open your travel pack before you leave.',
           date,
           href: `/trip/${trip.id}/travel-mode`,
           activeTripId: trip.id,
+          channelId: 'pineapple-reminders',
         });
       }
     }
@@ -314,11 +452,14 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
       });
       if (isFutureDate(date, now)) {
         reminders.push({
+          key: `trip:${trip.id}:sos_ready`,
+          kind: 'sos_ready',
           title: `${trip.name} SOS tools are ready`,
           body: 'Emergency numbers and quick access are available in SOS.',
           date,
           href: '/sos',
           activeTripId: trip.id,
+          channelId: 'pineapple-reminders',
         });
       }
     }
@@ -335,11 +476,14 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
         });
         if (isFutureDate(date, now)) {
           reminders.push({
+            key: `event:${event.id}:excursion_reminder`,
+            kind: 'excursion_reminder',
             title: `${event.title} is coming up`,
             body: `${trip.name} excursion reminder${event.location ? ` at ${event.location}` : ''}.`,
             date,
             href: '/itinerary',
             activeTripId: trip.id,
+            channelId: 'pineapple-reminders',
           });
         }
       }
@@ -352,8 +496,10 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
           item.expiryDate &&
           item.expiryReminderEnabled
       )) {
-        for (const reminder of getDocumentReminderDates(document)) {
+        for (const reminder of getDocumentReminderDates(document, now)) {
           reminders.push({
+            key: `document:${document.id}:${reminder.leadDays}`,
+            kind: 'document_expiry',
             title: reminder.leadDays === 0 ? 'Travel document expired' : 'Travel document reminder',
             body:
               reminder.leadDays === 0
@@ -363,6 +509,7 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
             silent: snapshot.appPreferences.expiryReminderSilent,
             href: `/vault?editDocumentId=${document.id}`,
             activeTripId: document.tripId,
+            channelId: 'pineapple-reminders',
           });
         }
       }

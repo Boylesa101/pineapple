@@ -33,6 +33,7 @@ import { exportEncryptedBackup, restoreEncryptedBackup } from '@/services/backup
 import { protectStoredFilesAtRest } from '@/services/documentProtection';
 import { resolveDestinationImage } from '@/services/destinationImageService';
 import { resolveHotelImage } from '@/services/hotelImageService';
+import { getTransportNotificationSummary } from '@/services/notificationPlanner';
 import { queueNotificationRefresh } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
 import { protectStructuredDataAtRest } from '@/services/structuredDataProtection';
@@ -719,14 +720,22 @@ export const useAppStore = create<StoreState>((set, get) => ({
     await get().refreshData();
   },
   saveTravelSegment: async (draft) => {
+    const transportType = draft.transportType ?? 'flight';
     const id = await upsertTravelSegment({
       ...draft,
-      transportType: draft.transportType ?? 'flight',
+      transportType,
       travelDirection: draft.travelDirection ?? 'other',
       providerCode: draft.providerCode ?? '',
       providerLogoUrl: draft.providerLogoUrl ?? null,
       departureAirportCode: draft.departureAirportCode ?? '',
       arrivalAirportCode: draft.arrivalAirportCode ?? '',
+      departureTimeZone: draft.departureTimeZone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || null),
+      notificationSummary:
+        draft.notificationSummary ??
+        getTransportNotificationSummary({
+          transportType,
+        } as any),
+      scheduledNotificationIds: draft.scheduledNotificationIds ?? [],
     });
     await get().refreshData();
     return id;

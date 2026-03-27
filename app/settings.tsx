@@ -20,9 +20,12 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { legalConfig, privacySummaryBullets } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
 import {
+  getNotificationDiagnostics,
   hasNotificationPermissions,
   isNotificationsRuntimeSupported,
+  openDeviceNotificationSettings,
   requestNotificationPermissions,
+  type NotificationDiagnostics,
 } from '@/services/notifications';
 import {
   MIN_BACKUP_PASSWORD_LENGTH,
@@ -46,6 +49,23 @@ const expiryScheduleOptions: Array<{ label: string; value: ExpiryReminderLeadTim
   { label: 'Day of', value: 0 },
 ];
 
+function notificationImportanceLabel(value: number | null) {
+  if (value === null) return 'Unavailable';
+  if (value >= 5) return 'Max';
+  if (value === 4) return 'High';
+  if (value === 3) return 'Default';
+  if (value === 2) return 'Low';
+  return 'Min';
+}
+
+function notificationVisibilityLabel(value: number | null) {
+  if (value === null) return 'Unavailable';
+  if (value === 1) return 'Public';
+  if (value === 0) return 'Private';
+  if (value === -1) return 'Secret';
+  return 'Unknown';
+}
+
 export default function SettingsScreen() {
   const router = useRouter();
   const {
@@ -65,6 +85,7 @@ export default function SettingsScreen() {
   const [backupSourceLabel, setBackupSourceLabel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notificationAccess, setNotificationAccess] = useState<boolean | null>(null);
+  const [notificationDiagnostics, setNotificationDiagnostics] = useState<NotificationDiagnostics | null>(null);
 
   const openConflicts = useMemo(
     () => data.syncConflicts.filter((conflict) => conflict.status === 'open'),
@@ -79,6 +100,17 @@ export default function SettingsScreen() {
       .then(setNotificationAccess)
       .catch(() => setNotificationAccess(null));
   }, [data.appPreferences.notificationsEnabled]);
+
+  useEffect(() => {
+    getNotificationDiagnostics()
+      .then(setNotificationDiagnostics)
+      .catch(() => setNotificationDiagnostics(null));
+  }, [
+    data.appPreferences.notificationsEnabled,
+    data.reminderSettings,
+    data.travelSegments,
+    data.trips,
+  ]);
 
   function closeBackupModal() {
     setBackupVisible(false);
@@ -331,6 +363,9 @@ export default function SettingsScreen() {
         <Text style={styles.meta}>
           Pineapple does not connect to your inbox or any cloud service for reminders. Email imports should come from files you choose on this device.
         </Text>
+        <Text style={styles.meta}>
+          Transport reminders use the Android lock screen when permission is granted and the installed Pineapple build is allowed to post notifications.
+        </Text>
         {data.appPreferences.notificationsEnabled && notificationAccess === false ? (
           <Text style={styles.meta}>
             Notifications are currently disabled at device level, so Pineapple will keep warning states in-app but cannot deliver local alerts until permission is restored.
@@ -341,6 +376,76 @@ export default function SettingsScreen() {
             This runtime does not support Pineapple reminders. Use the installed Pineapple Android build for notification testing.
           </Text>
         ) : null}
+      </AppCard>
+
+      <AppCard
+        title="Notification diagnostics"
+        subtitle="Proof view for scheduled transport alerts, channel state, and lock-screen readiness."
+      >
+        <View style={styles.chipRow}>
+          <InfoChip
+            label={notificationDiagnostics?.runtimeSupported ? 'Installed runtime' : 'Runtime unsupported'}
+            tone={notificationDiagnostics?.runtimeSupported ? 'blue' : 'coral'}
+          />
+          <InfoChip
+            label={notificationDiagnostics?.permissionGranted ? 'Permission granted' : 'Permission missing'}
+            tone={notificationDiagnostics?.permissionGranted ? 'gold' : 'coral'}
+          />
+          <InfoChip
+            label={`${notificationDiagnostics?.futureScheduledCount ?? 0} future reminder(s)`}
+            tone="default"
+          />
+        </View>
+        <Text style={styles.meta}>
+          Transport channel: {notificationDiagnostics?.transportChannel?.exists ? 'ready' : 'missing'} • importance{' '}
+          {notificationImportanceLabel(notificationDiagnostics?.transportChannel?.importance ?? null)} • lock screen{' '}
+          {notificationVisibilityLabel(notificationDiagnostics?.transportChannel?.lockscreenVisibility ?? null)}
+        </Text>
+        <Text style={styles.meta}>
+          General channel: {notificationDiagnostics?.generalChannel?.exists ? 'ready' : 'missing'} • importance{' '}
+          {notificationImportanceLabel(notificationDiagnostics?.generalChannel?.importance ?? null)} • lock screen{' '}
+          {notificationVisibilityLabel(notificationDiagnostics?.generalChannel?.lockscreenVisibility ?? null)}
+        </Text>
+        {!notificationDiagnostics?.permissionGranted ? (
+          <AppButton
+            label="Open device notification settings"
+            tone="secondary"
+            onPress={() =>
+              openDeviceNotificationSettings().catch(() => {
+                Alert.alert('Settings unavailable', 'Open the Pineapple notification settings from Android system settings.');
+              })
+            }
+          />
+        ) : null}
+        <AppButton
+          label="Refresh diagnostics"
+          tone="ghost"
+          onPress={() =>
+            getNotificationDiagnostics()
+              .then(setNotificationDiagnostics)
+              .catch(() =>
+                Alert.alert('Diagnostics unavailable', 'Pineapple could not refresh the notification diagnostics right now.')
+              )
+          }
+        />
+        {notificationDiagnostics?.scheduledTransportAlerts.length ? (
+          <View style={styles.diagnosticsList}>
+            {notificationDiagnostics.scheduledTransportAlerts.slice(0, 12).map((alertItem) => (
+              <View key={alertItem.id} style={styles.diagnosticCard}>
+                <Text style={styles.diagnosticTitle}>{alertItem.title}</Text>
+                <Text style={styles.meta}>{alertItem.body}</Text>
+                <Text style={styles.meta}>
+                  {alertItem.transportType ? `${alertItem.transportType} • ` : ''}
+                  {alertItem.date ? new Date(alertItem.date).toLocaleString() : 'No trigger date'}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.meta}>
+            No future transport alerts are currently scheduled. Add or edit a transport segment, then return here to confirm the device schedule.
+          </Text>
+        )}
       </AppCard>
       </View>
 
@@ -597,5 +702,22 @@ const styles = StyleSheet.create({
     color: colors.nightNavy,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 16,
+  },
+  diagnosticsList: {
+    gap: spacing.xs,
+  },
+  diagnosticCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    gap: 4,
+    backgroundColor: '#F7FBFF',
+  },
+  diagnosticTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    lineHeight: 18,
   },
 });

@@ -53,6 +53,19 @@ async function encryptField(value: string | null | undefined) {
   return encryptStructuredValue(value);
 }
 
+function parseStringArray(value: unknown) {
+  if (!value || typeof value !== 'string') {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 function parsePassportData(value: unknown) {
   if (!value || typeof value !== 'string') {
     return null;
@@ -357,6 +370,8 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
       transportType:
         segment.transportType === 'private_flight' ||
         segment.transportType === 'train' ||
+        segment.transportType === 'ferry' ||
+        segment.transportType === 'eurotunnel' ||
         segment.transportType === 'car' ||
         segment.transportType === 'taxi'
           ? segment.transportType
@@ -371,9 +386,12 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
       departureAirportCode: (await decryptField(segment.departureAirportCode)) ?? '',
       arrivalAirport: (await decryptField(segment.arrivalAirport)) ?? '',
       arrivalAirportCode: (await decryptField(segment.arrivalAirportCode)) ?? '',
+      departureTimeZone: segment.departureTimeZone ?? null,
       terminal: (await decryptField(segment.terminal)) ?? '',
       gate: (await decryptField(segment.gate)) ?? '',
       bookingRef: (await decryptField(segment.bookingRef)) ?? '',
+      notificationSummary: (await decryptField(segment.notificationSummary)) ?? '',
+      scheduledNotificationIds: parseStringArray(segment.scheduledNotificationIdsJson),
       notes: (await decryptField(segment.notes)) ?? '',
     }))
   );
@@ -841,11 +859,13 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
   const encryptedTerminal = (await encryptField(input.terminal)) ?? '';
   const encryptedGate = (await encryptField(input.gate)) ?? '';
   const encryptedBookingRef = (await encryptField(input.bookingRef)) ?? '';
+  const encryptedNotificationSummary = (await encryptField(input.notificationSummary ?? '')) ?? '';
   const encryptedNotes = (await encryptField(input.notes)) ?? '';
+  const scheduledNotificationIdsJson = JSON.stringify(input.scheduledNotificationIds ?? []);
 
   await db.runAsync(
-    `INSERT INTO travel_segments (id, tripId, transportType, travelDirection, airline, providerCode, providerLogoUrl, flightNumber, departureAirport, departureAirportCode, arrivalAirport, arrivalAirportCode, departureTime, arrivalTime, terminal, gate, bookingRef, notes, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO travel_segments (id, tripId, transportType, travelDirection, airline, providerCode, providerLogoUrl, flightNumber, departureAirport, departureAirportCode, arrivalAirport, arrivalAirportCode, departureTime, departureTimeZone, arrivalTime, terminal, gate, bookingRef, notificationSummary, scheduledNotificationIdsJson, notes, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        transportType = excluded.transportType,
@@ -859,10 +879,13 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
        arrivalAirport = excluded.arrivalAirport,
        arrivalAirportCode = excluded.arrivalAirportCode,
        departureTime = excluded.departureTime,
+       departureTimeZone = excluded.departureTimeZone,
        arrivalTime = excluded.arrivalTime,
        terminal = excluded.terminal,
        gate = excluded.gate,
        bookingRef = excluded.bookingRef,
+       notificationSummary = excluded.notificationSummary,
+       scheduledNotificationIdsJson = excluded.scheduledNotificationIdsJson,
        notes = excluded.notes,
        updatedAt = excluded.updatedAt`,
     id,
@@ -878,16 +901,42 @@ export async function upsertTravelSegment(input: TravelSegmentDraft) {
     encryptedArrivalAirport,
     encryptedArrivalAirportCode,
     input.departureTime,
+    input.departureTimeZone ?? null,
     input.arrivalTime,
     encryptedTerminal,
     encryptedGate,
     encryptedBookingRef,
+    encryptedNotificationSummary,
+    scheduledNotificationIdsJson,
     encryptedNotes,
     timestamp,
     timestamp
   );
 
   return id;
+}
+
+export async function updateTravelSegmentNotificationState(
+  segmentId: string,
+  input: {
+    departureTimeZone?: string | null;
+    notificationSummary?: string;
+    scheduledNotificationIds: string[];
+  }
+) {
+  const db = await getDatabase();
+  const encryptedNotificationSummary = await encryptField(input.notificationSummary ?? '');
+  await db.runAsync(
+    `UPDATE travel_segments
+     SET departureTimeZone = ?,
+         notificationSummary = ?,
+         scheduledNotificationIdsJson = ?
+     WHERE id = ?`,
+    input.departureTimeZone ?? null,
+    encryptedNotificationSummary,
+    JSON.stringify(input.scheduledNotificationIds),
+    segmentId
+  );
 }
 
 export async function upsertHotelStay(input: HotelStayDraft) {

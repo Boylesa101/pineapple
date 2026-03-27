@@ -2,7 +2,7 @@ export type TripStatus = 'upcoming' | 'active' | 'completed';
 export type DestinationType = 'country' | 'place' | 'unknown';
 export type HeroImageStatus = 'idle' | 'loading' | 'ready' | 'failed';
 export type DestinationImageSource = 'curated' | 'pexels' | 'wikimedia' | 'fallback';
-export type TransportType = 'flight' | 'private_flight' | 'train' | 'car' | 'taxi';
+export type TransportType = 'flight' | 'private_flight' | 'train' | 'car' | 'taxi' | 'ferry' | 'eurotunnel';
 export type TravelDirection = 'outbound' | 'return' | 'other';
 export type VibeCategory = 'eat' | 'drink' | 'visit' | 'do';
 export type DocumentType =
@@ -44,6 +44,7 @@ export type ReminderKind =
   | 'trip_starts_tomorrow'
   | 'trip_today'
   | 'insurance_missing'
+  | 'transport_departure'
   | 'flight_check_in'
   | 'hotel_check_in'
   | 'transfer_reminder'
@@ -218,10 +219,13 @@ export interface TravelSegment {
   arrivalAirport: string;
   arrivalAirportCode: string;
   departureTime: string;
+  departureTimeZone: string | null;
   arrivalTime: string;
   terminal: string;
   gate: string;
   bookingRef: string;
+  notificationSummary: string;
+  scheduledNotificationIds: string[];
   notes: string;
   createdAt: string;
   updatedAt: string;

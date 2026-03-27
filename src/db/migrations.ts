@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { createShareCode } from '@/utils/shareCodes';
 
-const DATABASE_VERSION = 21;
+const DATABASE_VERSION = 22;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -115,10 +115,13 @@ CREATE TABLE IF NOT EXISTS travel_segments (
   arrivalAirport TEXT NOT NULL,
   arrivalAirportCode TEXT NOT NULL DEFAULT '',
   departureTime TEXT NOT NULL,
+  departureTimeZone TEXT,
   arrivalTime TEXT NOT NULL,
   terminal TEXT NOT NULL DEFAULT '',
   gate TEXT NOT NULL DEFAULT '',
   bookingRef TEXT NOT NULL DEFAULT '',
+  notificationSummary TEXT NOT NULL DEFAULT '',
+  scheduledNotificationIdsJson TEXT NOT NULL DEFAULT '[]',
   notes TEXT NOT NULL DEFAULT '',
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
@@ -505,6 +508,12 @@ async function runPhaseTwentyMigration(db: SQLiteDatabase) {
   await ensureColumn(db, 'app_preferences', 'vibesIntroSeenAt', 'TEXT');
 }
 
+async function runPhaseTwentyOneMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'travel_segments', 'departureTimeZone', 'TEXT');
+  await ensureColumn(db, 'travel_segments', 'notificationSummary', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'travel_segments', 'scheduledNotificationIdsJson', "TEXT NOT NULL DEFAULT '[]'");
+}
+
 async function runPhaseThreeMigration(db: SQLiteDatabase) {
   await db.execAsync(`
     INSERT OR IGNORE INTO app_preferences (
@@ -647,6 +656,10 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   if (version < 20) {
     await runPhaseTwentyMigration(db);
+  }
+
+  if (version < 22) {
+    await runPhaseTwentyOneMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
