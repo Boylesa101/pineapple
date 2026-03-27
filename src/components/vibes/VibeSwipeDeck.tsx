@@ -144,6 +144,8 @@ function DeckCard({
 
   const card = (
     <Animated.View
+      renderToHardwareTextureAndroid
+      shouldRasterizeIOS
       style={[
         styles.cardLayer,
         {

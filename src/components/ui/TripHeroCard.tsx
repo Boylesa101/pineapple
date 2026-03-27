@@ -7,14 +7,16 @@ import { AppButton } from '@/components/AppButton';
 import { AppModal } from '@/components/AppModal';
 import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
-import type { Trip } from '@/types/models';
+import type { TransportType, Trip } from '@/types/models';
 import { daysUntil } from '@/utils/date';
+import { getTransportDisplay } from '@/utils/transport';
 
 type Props = {
   trip: Trip;
   subtitle: string;
   meta: string;
   badgeLabel?: string | null;
+  transportType?: TransportType | null;
   onPress?: () => void;
   onOpenFlights?: () => void;
   onOpenHotel?: () => void;
@@ -109,6 +111,7 @@ export function TripHeroCard({
   subtitle,
   meta,
   badgeLabel,
+  transportType,
   onPress,
   onOpenFlights,
   onOpenHotel,
@@ -118,11 +121,16 @@ export function TripHeroCard({
   const [attributionVisible, setAttributionVisible] = useState(false);
   const attributionContent = useMemo(() => buildAttributionRows(trip), [trip]);
   const imageUri = trip.destinationImageLocalPath ?? trip.coverImageUri;
+  const transportDisplay = transportType ? getTransportDisplay(transportType) : null;
 
   return (
     <>
-      <Pressable onPress={onPress} disabled={!onPress} style={styles.pressable}>
-        <View style={styles.card}>
+      <Pressable
+        onPress={onPress}
+        disabled={!onPress}
+        style={({ pressed }) => [styles.pressable, pressed ? styles.pressablePressed : null]}
+      >
+        <View style={styles.card} renderToHardwareTextureAndroid shouldRasterizeIOS>
           {imageUri ? <ManagedFileImage uri={imageUri} style={styles.image} /> : null}
           <LinearGradient colors={fallbackGradient(trip.destinationType)} style={styles.fallback} />
           <LinearGradient colors={['rgba(10, 28, 44, 0.08)', 'rgba(10, 28, 44, 0.55)']} style={styles.overlay} />
@@ -134,6 +142,7 @@ export function TripHeroCard({
               <Text style={styles.subtitle}>{subtitle}</Text>
               <Text style={styles.meta}>{meta}</Text>
               <View style={styles.badgeRow}>
+                {transportDisplay ? <Text style={styles.transportBadge}>{transportDisplay.shortLabel}</Text> : null}
                 {badgeLabel ? <Text style={styles.badge}>{badgeLabel}</Text> : null}
                 <Text style={styles.daysLabel}>{daysTillTripLabel(trip)}</Text>
               </View>
@@ -142,7 +151,7 @@ export function TripHeroCard({
 
             <View style={styles.actions}>
               <Pressable onPress={onOpenFlights} disabled={!onOpenFlights} style={styles.iconButton}>
-                <MaterialIcons name="flight" size={24} color={colors.white} />
+                <MaterialIcons name={(transportDisplay?.cardIcon ?? 'flight') as any} size={24} color={colors.white} />
               </Pressable>
               <Pressable onPress={onOpenHotel} disabled={!onOpenHotel} style={styles.iconButton}>
                 <MaterialIcons name="hotel" size={24} color={colors.white} />
@@ -192,6 +201,9 @@ export function TripHeroCard({
 const styles = StyleSheet.create({
   pressable: {
     width: '100%',
+  },
+  pressablePressed: {
+    transform: [{ scale: 0.992 }],
   },
   card: {
     minHeight: 228,
@@ -257,6 +269,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: radii.pill,
   },
+  transportBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(12, 28, 45, 0.32)',
+    color: colors.white,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+  },
   badgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -287,6 +309,8 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   infoButton: {
     position: 'absolute',

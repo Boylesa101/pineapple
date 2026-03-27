@@ -11,14 +11,13 @@ import type { SavedVibe } from '@/types/models';
 
 type Props = {
   item: SavedVibe;
-  fallbackImageUri: string | null;
   onOpen: (url: string) => void;
   onAddToItinerary: () => void;
   onRemove: () => void;
 };
 
-export function MoodSavedCard({ item, fallbackImageUri, onOpen, onAddToItinerary, onRemove }: Props) {
-  const imageUri = item.imageUrl ?? fallbackImageUri;
+export function MoodSavedCard({ item, onOpen, onAddToItinerary, onRemove }: Props) {
+  const imageUri = item.imageUrl;
 
   return (
     <View style={styles.card}>

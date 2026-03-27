@@ -18,6 +18,8 @@ import { packingTemplates, type PackingTemplateId } from '@/data/packingTemplate
 import { useAppStore } from '@/store/useAppStore';
 import type { TripDraft, TripStatus } from '@/types/models';
 import { tripDateRange } from '@/utils/format';
+import { getTripBundle } from '@/utils/selectors';
+import { getPrimaryTransportType } from '@/utils/transport';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
 import { toUserMessage } from '@/utils/userErrors';
 import { validateTrip } from '@/utils/validation';
@@ -104,50 +106,56 @@ export default function TripsScreen() {
           <AppButton label="Create trip" onPress={openNewTrip} />
         </AppCard>
       ) : (
-        sortedTrips.map((trip) => (
-          <View key={trip.id} style={styles.tripBlock}>
-            <TripHeroCard
-              trip={trip}
-              subtitle={tripDateRange(trip.startDate, trip.endDate)}
-              meta={trip.transferSummary || 'Flight, hotel, and pickup shortcuts stay ready on this card.'}
-              badgeLabel={trip.heroImageStatus === 'ready' ? null : trip.heroImageStatus === 'loading' ? 'Loading image' : 'Fallback background'}
-              onPress={() => {
-                setActiveTrip(trip.id);
-                router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id } });
-              }}
-              onOpenFlights={() => {
-                setActiveTrip(trip.id);
-                router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'travel' } });
-              }}
-              onOpenHotel={() => {
-                setActiveTrip(trip.id);
-                router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'hotel' } });
-              }}
-              onOpenTransfers={() => {
-                setActiveTrip(trip.id);
-                router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'transfer' } });
-              }}
-            />
-            <View style={styles.actions}>
-              <AppButton label="Edit" tone="secondary" onPress={() => openEditTrip(trip)} />
-              <Pressable
-                onPress={() =>
-                  Alert.alert('Delete trip?', 'This removes the trip and all related local data.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Delete',
-                      style: 'destructive',
-                      onPress: () => deleteRecord('trips', trip.id),
-                    },
-                  ])
-                }
-                style={styles.deleteButton}
-              >
-                <MaterialIcons name="delete-outline" size={20} color={colors.danger} />
-              </Pressable>
+        sortedTrips.map((trip) => {
+          const bundle = getTripBundle(data, trip.id);
+          const transportType = getPrimaryTransportType(bundle.travelSegments);
+
+          return (
+            <View key={trip.id} style={styles.tripBlock}>
+              <TripHeroCard
+                trip={trip}
+                subtitle={tripDateRange(trip.startDate, trip.endDate)}
+                meta={trip.transferSummary || 'Travel, hotel, and pickup shortcuts stay ready on this card.'}
+                badgeLabel={trip.heroImageStatus === 'ready' ? null : trip.heroImageStatus === 'loading' ? 'Loading image' : 'Fallback background'}
+                transportType={transportType}
+                onPress={() => {
+                  setActiveTrip(trip.id);
+                  router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id } });
+                }}
+                onOpenFlights={() => {
+                  setActiveTrip(trip.id);
+                  router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'travel' } });
+                }}
+                onOpenHotel={() => {
+                  setActiveTrip(trip.id);
+                  router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'hotel' } });
+                }}
+                onOpenTransfers={() => {
+                  setActiveTrip(trip.id);
+                  router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'transfer' } });
+                }}
+              />
+              <View style={styles.actions}>
+                <AppButton label="Edit" tone="secondary" onPress={() => openEditTrip(trip)} />
+                <Pressable
+                  onPress={() =>
+                    Alert.alert('Delete trip?', 'This removes the trip and all related local data.', [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () => deleteRecord('trips', trip.id),
+                      },
+                    ])
+                  }
+                  style={styles.deleteButton}
+                >
+                  <MaterialIcons name="delete-outline" size={20} color={colors.danger} />
+                </Pressable>
+              </View>
             </View>
-          </View>
-        ))
+          );
+        })
       )}
 
       <AppButton label="Add trip" onPress={openNewTrip} />

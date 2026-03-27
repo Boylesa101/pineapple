@@ -96,9 +96,9 @@ export function categoryLabel(category: VibeCategory) {
     case 'drink':
       return 'Bar';
     case 'visit':
-      return 'Attraction';
+      return 'See';
     case 'do':
-      return 'Experience';
+      return 'Do';
     default:
       return 'Place';
   }

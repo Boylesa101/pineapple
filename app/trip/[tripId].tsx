@@ -56,6 +56,7 @@ import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { formatAirportDisplay } from '@/utils/airports';
 import { relationshipLabel, tripDateRange } from '@/utils/format';
 import { getMissingInfoPrompts, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
+import { getPrimaryTransportType, getTransportDisplay, isAirTransportType } from '@/utils/transport';
 import { toUserMessage } from '@/utils/userErrors';
 import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, validateTraveller } from '@/utils/validation';
 
@@ -191,8 +192,9 @@ function createConnectingFlightDraft(tripId: string, primaryDraft: TravelSegment
 }
 
 function segmentDirectionLabel(direction: TravelSegmentDraft['travelDirection'], transportType: TransportType) {
+  const display = getTransportDisplay(transportType);
   if (direction === 'other') {
-    return transportType === 'flight' ? 'connection' : 'other';
+    return display.directionOtherLabel.toLowerCase();
   }
 
   return direction;
@@ -263,6 +265,11 @@ export default function TripDetailScreen() {
         return compareIsoDates(left.departureTime, right.departureTime);
       }),
     [bundle.travelSegments]
+  );
+  const primaryTransportType = useMemo(() => getPrimaryTransportType(bundle.travelSegments), [bundle.travelSegments]);
+  const primaryTransportDisplay = useMemo(
+    () => (primaryTransportType ? getTransportDisplay(primaryTransportType) : null),
+    [primaryTransportType]
   );
 
   useEffect(() => {
@@ -512,8 +519,9 @@ export default function TripDetailScreen() {
     if (modalKind === 'segment' && segmentDraft) {
       const errors = validateTravelSegment(segmentDraft);
       const connectionErrors = connectionSegmentDraft ? validateTravelSegment(connectionSegmentDraft) : [];
+      const transportDisplay = getTransportDisplay(segmentDraft.transportType);
       if (errors.length) {
-        Alert.alert('Flight details need attention', errors.join('\n'));
+        Alert.alert(`${transportDisplay.label} details need attention`, errors.join('\n'));
         return;
       }
       if (connectionErrors.length) {
@@ -527,7 +535,7 @@ export default function TripDetailScreen() {
         }
         closeModal();
       } catch (error) {
-        Alert.alert('Flight could not be saved', toUserMessage(error, 'Unable to save those flight details right now.'));
+        Alert.alert('Travel details could not be saved', toUserMessage(error, 'Unable to save those travel details right now.'));
       }
       return;
     }
@@ -666,6 +674,8 @@ export default function TripDetailScreen() {
     }
   ) {
     const providerBrand = findTransportProvider(draft.providerCode, draft.transportType);
+    const transportDisplay = getTransportDisplay(draft.transportType);
+    const usesAirportFields = isAirTransportType(draft.transportType);
 
     return (
       <>
@@ -694,8 +704,8 @@ export default function TripDetailScreen() {
                   airline: '',
                   providerCode: '',
                   providerLogoUrl: null,
-                  departureAirportCode: value === 'train' ? '' : current.departureAirportCode,
-                  arrivalAirportCode: value === 'train' ? '' : current.arrivalAirportCode,
+                  departureAirportCode: isAirTransportType(value) ? current.departureAirportCode : '',
+                  arrivalAirportCode: isAirTransportType(value) ? current.arrivalAirportCode : '',
                 }));
                 if (value !== 'flight') {
                   setConnectionSegmentDraft(null);
@@ -703,7 +713,10 @@ export default function TripDetailScreen() {
               }}
               options={[
                 { label: 'Flight', value: 'flight' },
+                { label: 'Private flight', value: 'private_flight' },
                 { label: 'Train', value: 'train' },
+                { label: 'Drive', value: 'car' },
+                { label: 'Taxi', value: 'taxi' },
               ]}
             />
           </>
@@ -717,13 +730,13 @@ export default function TripDetailScreen() {
               options={[
                 { label: 'Outbound', value: 'outbound' },
                 { label: 'Return', value: 'return' },
-                { label: draft.transportType === 'flight' ? 'Connection' : 'Other', value: 'other' },
+                { label: transportDisplay.directionOtherLabel, value: 'other' },
               ]}
             />
           </>
         ) : null}
         <TransportProviderSearchField
-          label={draft.transportType === 'train' ? 'Train operator' : 'Airline'}
+          label={transportDisplay.providerLabel}
           transportType={draft.transportType}
           value={draft.airline}
           onChangeText={(value) => updateDraft((current) => ({ ...current, airline: value, providerCode: '', providerLogoUrl: null }))}
@@ -735,17 +748,13 @@ export default function TripDetailScreen() {
               providerLogoUrl: provider.logoUrl,
             }))
           }
-          placeholder={draft.transportType === 'train' ? 'Search train operator' : 'Search airline'}
-          helper={
-            draft.transportType === 'train'
-              ? 'Pick a train operator or type one manually.'
-              : 'Pick an airline to keep the code and logo tidy.'
-          }
+          placeholder={transportDisplay.providerPlaceholder}
+          helper={transportDisplay.providerHelper}
         />
         {draft.providerLogoUrl || draft.providerCode ? (
           <View style={styles.providerPreview}>
             <ProviderLogoBadge
-              name={draft.airline || (draft.transportType === 'train' ? 'Train' : 'Flight')}
+              name={draft.airline || transportDisplay.shortLabel}
               code={draft.providerCode}
               logoXml={providerBrand?.logoXml ?? null}
               logoUrl={draft.providerLogoUrl}
@@ -758,15 +767,15 @@ export default function TripDetailScreen() {
           </View>
         ) : null}
         <AppTextField
-          label={draft.transportType === 'train' ? 'Service number' : 'Flight number'}
+          label={transportDisplay.serviceNumberLabel}
           value={draft.flightNumber}
           onChangeText={(value) => updateDraft((current) => ({ ...current, flightNumber: value }))}
         />
-        {draft.transportType === 'flight' ? (
+        {usesAirportFields ? (
           <>
             <AirportSearchField
-              label="Departure airport"
-              iconName="flight-takeoff"
+              label={transportDisplay.departureLabel}
+              iconName={transportDisplay.departureIcon}
               value={draft.departureAirport}
               airportCode={draft.departureAirportCode}
               onChangeText={(value) =>
@@ -781,8 +790,8 @@ export default function TripDetailScreen() {
               helper="Type a place like London, Newcastle, or JFK."
             />
             <AirportSearchField
-              label="Arrival airport"
-              iconName="flight-land"
+              label={transportDisplay.arrivalLabel}
+              iconName={transportDisplay.arrivalIcon}
               value={draft.arrivalAirport}
               airportCode={draft.arrivalAirportCode}
               onChangeText={(value) =>
@@ -800,12 +809,12 @@ export default function TripDetailScreen() {
         ) : (
           <>
             <AppTextField
-              label="Departure station"
+              label={transportDisplay.departureLabel}
               value={draft.departureAirport}
               onChangeText={(value) => updateDraft((current) => ({ ...current, departureAirport: value }))}
             />
             <AppTextField
-              label="Arrival station"
+              label={transportDisplay.arrivalLabel}
               value={draft.arrivalAirport}
               onChangeText={(value) => updateDraft((current) => ({ ...current, arrivalAirport: value }))}
             />
@@ -813,25 +822,25 @@ export default function TripDetailScreen() {
         )}
         <DateTimeField
           label="Departure time"
-          iconName={draft.transportType === 'flight' ? 'flight-takeoff' : 'schedule'}
+          iconName={transportDisplay.departureIcon}
           mode="datetime"
           value={draft.departureTime}
           onChange={(value) => updateDraft((current) => ({ ...current, departureTime: value }))}
         />
         <DateTimeField
           label="Arrival time"
-          iconName={draft.transportType === 'flight' ? 'flight-land' : 'schedule'}
+          iconName={transportDisplay.arrivalIcon}
           mode="datetime"
           value={draft.arrivalTime}
           onChange={(value) => updateDraft((current) => ({ ...current, arrivalTime: value }))}
         />
         <AppTextField
-          label={draft.transportType === 'train' ? 'Platform / carriage' : 'Terminal'}
+          label={transportDisplay.terminalLabel}
           value={draft.terminal}
           onChangeText={(value) => updateDraft((current) => ({ ...current, terminal: value }))}
         />
         <AppTextField
-          label={draft.transportType === 'train' ? 'Seat / platform note' : 'Gate'}
+          label={transportDisplay.gateLabel}
           value={draft.gate}
           onChangeText={(value) => updateDraft((current) => ({ ...current, gate: value }))}
         />
@@ -893,8 +902,8 @@ export default function TripDetailScreen() {
             }}
             style={[styles.tripFooterButton, activeSection === 'travel' ? styles.tripFooterButtonActive : null]}
           >
-            <MaterialIcons name="flight" size={22} color={colors.white} />
-            <Text style={styles.tripFooterLabel}>Flight</Text>
+            <MaterialIcons name={(primaryTransportDisplay?.cardIcon ?? 'flight') as any} size={22} color={colors.white} />
+            <Text style={styles.tripFooterLabel}>{primaryTransportDisplay?.shortLabel ?? 'Travel'}</Text>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -1191,18 +1200,19 @@ export default function TripDetailScreen() {
 
       <View onLayout={handleSectionLayout('travel')}>
       <AppCard
-        title="Flight and train info"
-        subtitle="Add outbound, return, connection, or rail travel with provider branding and booking details."
+        title="Travel plans"
+        subtitle="Add flights, trains, driving legs, and taxi hops with the right icon, timing, and booking context."
         right={<AppButton label="Add" tone="secondary" onPress={() => openSegmentEditor()} />}
         style={activeSection === 'travel' ? styles.highlightedCard : null}
       >
         {orderedTravelSegments.length ? (
           orderedTravelSegments.map((segment) => {
             const providerBrand = findTransportProvider(segment.providerCode, segment.transportType);
+            const transportDisplay = getTransportDisplay(segment.transportType);
             return (
               <View key={segment.id} style={styles.transportRow}>
                 <ProviderLogoBadge
-                  name={segment.airline || (segment.transportType === 'train' ? 'Train' : 'Flight')}
+                  name={segment.airline || transportDisplay.shortLabel}
                   code={segment.providerCode}
                   logoXml={providerBrand?.logoXml ?? null}
                   logoUrl={segment.providerLogoUrl}
@@ -1211,9 +1221,9 @@ export default function TripDetailScreen() {
                 <View style={styles.transportCopy}>
                   <View style={styles.transportHeader}>
                     <Text style={styles.transportTitle}>
-                      {segment.transportType === 'train' ? 'Train' : 'Flight'} · {segmentDirectionLabel(segment.travelDirection, segment.transportType)}
+                      {transportDisplay.label} · {segmentDirectionLabel(segment.travelDirection, segment.transportType)}
                     </Text>
-                    <InfoChip label={segment.transportType === 'train' ? 'Train' : 'Flight'} tone="blue" />
+                    <InfoChip label={transportDisplay.shortLabel} tone="blue" />
                   </View>
                   <Text style={styles.transportMeta}>
                     {[segment.airline, segment.flightNumber].filter(Boolean).join(' ')}
@@ -1224,7 +1234,7 @@ export default function TripDetailScreen() {
                   </Text>
                   <View style={styles.transportTimingRow}>
                     <MaterialIcons
-                      name={(segment.transportType === 'flight' ? 'flight-takeoff' : 'schedule') as any}
+                      name={transportDisplay.departureIcon as any}
                       size={14}
                       color={colors.primaryBlueDark}
                     />
@@ -1232,7 +1242,7 @@ export default function TripDetailScreen() {
                   </View>
                   <View style={styles.transportTimingRow}>
                     <MaterialIcons
-                      name={(segment.transportType === 'flight' ? 'flight-land' : 'schedule') as any}
+                      name={transportDisplay.arrivalIcon as any}
                       size={14}
                       color={colors.primaryBlueDark}
                     />
@@ -1253,7 +1263,7 @@ export default function TripDetailScreen() {
         ) : (
           <EmptyState
             title="No transport saved"
-            description="Add outbound and return flights, or save train travel with times, stations, booking reference, and notes."
+            description="Add the main way you are travelling so Pineapple can show the right icon, timing, and direction across the trip."
           />
         )}
       </AppCard>
@@ -1576,7 +1586,7 @@ export default function TripDetailScreen() {
 
       <AppModal
         visible={modalKind === 'segment'}
-        title={segmentDraft?.id ? 'Edit flight / travel' : 'Add flight / travel'}
+        title={segmentDraft?.id ? 'Edit travel' : 'Add travel'}
         onClose={closeModal}
       >
         {segmentDraft ? (
@@ -1601,7 +1611,7 @@ export default function TripDetailScreen() {
                 )}
               </View>
             ) : null}
-            <AppButton label={`Save ${segmentDraft.transportType === 'train' ? 'train' : 'flight'}`} onPress={saveCurrentModal} />
+            <AppButton label={`Save ${getTransportDisplay(segmentDraft.transportType).shortLabel.toLowerCase()}`} onPress={saveCurrentModal} />
           </>
         ) : null}
       </AppModal>

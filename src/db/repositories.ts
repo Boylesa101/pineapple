@@ -190,6 +190,7 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
     lastSyncAt: null,
     lastBackupAt: null,
     privacyMaskingMode: 'always',
+    vibesIntroSeenAt: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -343,7 +344,13 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
   const decryptedTravelSegments = await Promise.all(
     travelSegments.map(async (segment) => ({
       ...segment,
-      transportType: segment.transportType === 'train' ? 'train' : 'flight',
+      transportType:
+        segment.transportType === 'private_flight' ||
+        segment.transportType === 'train' ||
+        segment.transportType === 'car' ||
+        segment.transportType === 'taxi'
+          ? segment.transportType
+          : 'flight',
       travelDirection:
         segment.travelDirection === 'outbound' || segment.travelDirection === 'return' ? segment.travelDirection : 'other',
       airline: (await decryptField(segment.airline)) ?? '',
@@ -1140,8 +1147,8 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const normalized = normalizeAppPreferences(input as any);
 
   await db.runAsync(
-    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, structuredDataProtected, profileName, profilePhotoUri, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, structuredDataProtected, profileName, profilePhotoUri, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, vibesIntroSeenAt, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        notificationsEnabled = excluded.notificationsEnabled,
        expiryRemindersEnabled = excluded.expiryRemindersEnabled,
@@ -1156,6 +1163,7 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
        lastSyncAt = excluded.lastSyncAt,
        lastBackupAt = excluded.lastBackupAt,
        privacyMaskingMode = excluded.privacyMaskingMode,
+       vibesIntroSeenAt = excluded.vibesIntroSeenAt,
        updatedAt = excluded.updatedAt`,
     normalized.id,
     normalized.notificationsEnabled ? 1 : 0,
@@ -1171,6 +1179,7 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
     normalized.lastSyncAt,
     normalized.lastBackupAt,
     normalized.privacyMaskingMode,
+    normalized.vibesIntroSeenAt,
     timestamp,
     timestamp
   );

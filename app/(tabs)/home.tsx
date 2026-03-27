@@ -13,6 +13,7 @@ import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { tripDateRange } from '@/utils/format';
 import { getDashboardAlerts, getDocumentExpiryOverview, getTripBundle } from '@/utils/selectors';
+import { getPrimaryTransportType } from '@/utils/transport';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 export default function HomeScreen() {
@@ -32,9 +33,10 @@ export default function HomeScreen() {
         return {
           trip,
           subtitle: tripDateRange(trip.startDate, trip.endDate),
+          transportType: getPrimaryTransportType(bundle.travelSegments),
           meta: `${bundle.travellers.length} traveller${bundle.travellers.length === 1 ? '' : 's'} · ${
             bundle.hotelStays.length ? 'hotel saved' : 'no hotel yet'
-          }${bundle.travelSegments.length ? ' · flights ready' : ''}`,
+          }${bundle.travelSegments.length ? ' · travel saved' : ''}`,
           badgeLabel:
             expiryOverview.expiringCount || expiryOverview.expiredCount
               ? `${expiryOverview.expiredCount + expiryOverview.expiringCount} docs need attention`

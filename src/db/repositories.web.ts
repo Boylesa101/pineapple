@@ -50,6 +50,7 @@ function defaultAppPreferences(timestamp = now()): AppPreferences {
     lastSyncAt: null,
     lastBackupAt: null,
     privacyMaskingMode: 'always',
+    vibesIntroSeenAt: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -138,7 +139,13 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
     travelSegments: await Promise.all(
       (snapshot.travelSegments ?? []).map(async (segment) => ({
         ...segment,
-        transportType: segment.transportType === 'train' ? 'train' : 'flight',
+        transportType:
+          segment.transportType === 'private_flight' ||
+          segment.transportType === 'train' ||
+          segment.transportType === 'car' ||
+          segment.transportType === 'taxi'
+            ? segment.transportType
+            : 'flight',
         travelDirection:
           segment.travelDirection === 'outbound' || segment.travelDirection === 'return' ? segment.travelDirection : 'other',
         airline: (await decryptStructuredValue(segment.airline)) ?? '',

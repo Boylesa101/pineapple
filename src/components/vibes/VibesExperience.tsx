@@ -10,12 +10,13 @@ import { colors, radii, spacing } from '@/constants/theme';
 import {
   buildVibeQueryKey,
   fetchTripVibes,
-  getVibesBaseUrl,
+  interleaveVibeItems,
   parseTripVibes,
   serializeTripVibes,
   type TripVibesResult,
   type VibeItem,
 } from '@/services/tripadvisorVibesService';
+import { cacheVibeImage, cacheVibeItemsImages } from '@/services/vibeImageCache';
 import { buildVibeItineraryDraft } from '@/services/vibesPlanner';
 import { useAppStore } from '@/store/useAppStore';
 import { getTripBundle } from '@/utils/selectors';
@@ -28,6 +29,13 @@ type Props = {
 };
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+const CATEGORY_SUMMARY: Array<{ key: 'eat' | 'drink' | 'visit' | 'do'; label: string; icon: keyof typeof MaterialIcons.glyphMap }> = [
+  { key: 'eat', label: 'Eat', icon: 'restaurant' as const },
+  { key: 'drink', label: 'Drink', icon: 'local-bar' as const },
+  { key: 'visit', label: 'See', icon: 'photo-camera' as const },
+  { key: 'do', label: 'Do', icon: 'explore' as const },
+];
 
 function formatFetchedAt(value: string | null | undefined) {
   if (!value) {
@@ -82,8 +90,26 @@ function toVibeItem(saved: SavedVibe): VibeItem {
   };
 }
 
+async function hydrateTripVibesImages(input: TripVibesResult): Promise<TripVibesResult> {
+  const [eat, drink, visit, doItems] = await Promise.all([
+    cacheVibeItemsImages(input.eat),
+    cacheVibeItemsImages(input.drink),
+    cacheVibeItemsImages(input.visit),
+    cacheVibeItemsImages(input.do),
+  ]);
+
+  return {
+    ...input,
+    eat,
+    drink,
+    visit,
+    do: doItems,
+    items: interleaveVibeItems({ eat, drink, visit, do: doItems }),
+  };
+}
+
 export function VibesExperience({ tripId }: Props) {
-  const { data, saveItineraryEvent, saveSavedVibe, saveVibeCacheEntry, deleteRecord } = useAppStore();
+  const { data, saveAppPreferences, saveItineraryEvent, saveSavedVibe, saveVibeCacheEntry, deleteRecord } = useAppStore();
   const bundle = useMemo(() => getTripBundle(data, tripId), [data, tripId]);
   const trip = bundle.trip;
   const primaryHotel = bundle.hotelStays[0] ?? null;
@@ -94,11 +120,7 @@ export function VibesExperience({ tripId }: Props) {
   const [result, setResult] = useState<TripVibesResult | null>(null);
   const [deckResetKey, setDeckResetKey] = useState('idle');
   const [refreshNonce, setRefreshNonce] = useState(0);
-
-  const fallbackImageUri = useMemo(
-    () => trip?.destinationImageLocalPath ?? trip?.coverImageUri ?? trip?.destinationImageRemoteUrl ?? trip?.heroImageRemoteUrl ?? null,
-    [trip]
-  );
+  const [introDismissed, setIntroDismissed] = useState(false);
 
   const queryInput = useMemo(
     () =>
@@ -136,6 +158,37 @@ export function VibesExperience({ tripId }: Props) {
     () => [...bundle.savedVibes].sort((left, right) => right.savedAt.localeCompare(left.savedAt)),
     [bundle.savedVibes]
   );
+  const shouldShowIntro = Boolean(trip && !data.appPreferences.vibesIntroSeenAt && !introDismissed);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const itemsNeedingLocalImages = savedMoodItems.filter((item) => item.imageUrl?.startsWith('http'));
+    if (!itemsNeedingLocalImages.length) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void Promise.all(
+      itemsNeedingLocalImages.map(async (item) => {
+        const cachedImageUrl = await cacheVibeImage(item.imageUrl);
+        if (!cachedImageUrl || cachedImageUrl === item.imageUrl || cancelled) {
+          return;
+        }
+
+        await saveSavedVibe({
+          ...item,
+          imageUrl: cachedImageUrl,
+          savedAt: item.savedAt,
+        });
+      })
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [saveSavedVibe, savedMoodItems]);
 
   useEffect(() => {
     if (!trip || !queryInput || !cacheKey) {
@@ -156,8 +209,8 @@ export function VibesExperience({ tripId }: Props) {
       setDeckResetKey(`${cacheKey}:${cachedResult.fetchedAt}`);
       setStatusMessage(
         isCachedFresh
-          ? `Ready from saved live picks${formatFetchedAt(cachedResult.fetchedAt) ? ` · ${formatFetchedAt(cachedResult.fetchedAt)}` : ''}`
-          : `Showing an earlier live pass${formatFetchedAt(cachedResult.fetchedAt) ? ` · ${formatFetchedAt(cachedResult.fetchedAt)}` : ''}`
+          ? `Saved picks ready${formatFetchedAt(cachedResult.fetchedAt) ? ` · updated ${formatFetchedAt(cachedResult.fetchedAt)}` : ''}`
+          : `Showing saved picks${formatFetchedAt(cachedResult.fetchedAt) ? ` · last refresh ${formatFetchedAt(cachedResult.fetchedAt)}` : ''}`
       );
     } else {
       setResult(null);
@@ -170,25 +223,30 @@ export function VibesExperience({ tripId }: Props) {
           return;
         }
 
-        setResult(liveResult);
-        setDeckResetKey(`${cacheKey}:${liveResult.fetchedAt}`);
-        setStatusMessage(`Live now via Tripadvisor${formatFetchedAt(liveResult.fetchedAt) ? ` · ${formatFetchedAt(liveResult.fetchedAt)}` : ''}`);
+        const hydratedResult = await hydrateTripVibesImages(liveResult);
+        if (cancelled) {
+          return;
+        }
+
+        setResult(hydratedResult);
+        setDeckResetKey(`${cacheKey}:${hydratedResult.fetchedAt}`);
+        setStatusMessage(`Live now${formatFetchedAt(hydratedResult.fetchedAt) ? ` · refreshed ${formatFetchedAt(hydratedResult.fetchedAt)}` : ''}`);
 
         await saveVibeCacheEntry({
           tripId: trip.id,
           queryKey: cacheKey,
-          areaLabel: liveResult.area,
+          areaLabel: hydratedResult.area,
           source: 'tripadvisor',
           payloadJson: serializeTripVibes({
-            area: liveResult.area,
-            fetchedAt: liveResult.fetchedAt,
-            source: liveResult.source,
-            eat: liveResult.eat,
-            drink: liveResult.drink,
-            visit: liveResult.visit,
-            do: liveResult.do,
+            area: hydratedResult.area,
+            fetchedAt: hydratedResult.fetchedAt,
+            source: hydratedResult.source,
+            eat: hydratedResult.eat,
+            drink: hydratedResult.drink,
+            visit: hydratedResult.visit,
+            do: hydratedResult.do,
           }),
-          fetchedAt: liveResult.fetchedAt,
+          fetchedAt: hydratedResult.fetchedAt,
           expiresAt: new Date(Date.now() + CACHE_TTL_MS).toISOString(),
         });
       })
@@ -198,7 +256,7 @@ export function VibesExperience({ tripId }: Props) {
         }
 
         if (cachedResult) {
-          setStatusMessage('Showing saved live picks while Pineapple cannot reach Tripadvisor right now.');
+          setStatusMessage('Showing saved picks while live suggestions are unavailable.');
           setError(null);
           return;
         }
@@ -250,6 +308,17 @@ export function VibesExperience({ tripId }: Props) {
     await saveSavedVibe(toSavedVibeDraft(trip, item));
   }
 
+  async function dismissIntro() {
+    setIntroDismissed(true);
+    if (data.appPreferences.vibesIntroSeenAt) {
+      return;
+    }
+
+    await saveAppPreferences({
+      vibesIntroSeenAt: new Date().toISOString(),
+    });
+  }
+
   function refreshLivePicks() {
     setStatusMessage('Refreshing live picks...');
     setRefreshNonce((value) => value + 1);
@@ -257,7 +326,7 @@ export function VibesExperience({ tripId }: Props) {
 
   const deckItems = (result?.items ?? []).map((item) => ({
     ...item,
-    imageUri: item.imageUrl ?? fallbackImageUri,
+    imageUri: item.imageUrl ?? null,
   }));
 
   return (
@@ -265,21 +334,50 @@ export function VibesExperience({ tripId }: Props) {
       <AppCard style={styles.heroCard}>
         <View style={styles.heroTop}>
           <View style={styles.heroCopy}>
-            <Text style={styles.heroTitle}>Vibe for {trip?.destination ?? 'your trip'}</Text>
+            <Text style={styles.heroEyebrow}>Vibe</Text>
+            <Text style={styles.heroTitle}>Build the feel of {trip?.destination ?? 'your trip'}</Text>
             <Text style={styles.heroText}>
-              Swipe through live places to eat, drink, and explore. Right-swipes land in Mood so you can shortlist places and add them to the itinerary later.
+              Find popular places, see what people are doing, and save the best ideas into Mood for later.
             </Text>
-          </View>
-          <View style={styles.sourcePill}>
-            <MaterialIcons name="cloud-done" size={16} color={colors.primaryBlue} />
-            <Text style={styles.sourcePillLabel}>Cloudflare + Tripadvisor</Text>
           </View>
         </View>
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>Source endpoint: {getVibesBaseUrl()}/api/vibes</Text>
+          <Text style={styles.metaText}>Swipe right to save. Swipe left to keep moving.</Text>
           {statusMessage ? <Text style={styles.metaText}>{statusMessage}</Text> : null}
         </View>
       </AppCard>
+
+      {shouldShowIntro ? (
+        <AppCard style={styles.introCard}>
+          <View style={styles.introHeader}>
+            <View style={styles.introIcon}>
+              <MaterialIcons name="travel-explore" size={24} color={colors.white} />
+            </View>
+            <View style={styles.introCopy}>
+              <Text style={styles.introTitle}>Start with a few swipes</Text>
+              <Text style={styles.introText}>Vibe helps you explore the trip before you commit anything to the plan.</Text>
+            </View>
+          </View>
+          <View style={styles.introPoints}>
+            <View style={styles.introPoint}>
+              <MaterialIcons name="restaurant" size={16} color={colors.primaryBlue} />
+              <Text style={styles.introPointText}>Find popular places to eat, drink, see, and do.</Text>
+            </View>
+            <View style={styles.introPoint}>
+              <MaterialIcons name="favorite" size={16} color={colors.primaryBlue} />
+              <Text style={styles.introPointText}>Right-swipe anything worth saving into Mood.</Text>
+            </View>
+            <View style={styles.introPoint}>
+              <MaterialIcons name="event-available" size={16} color={colors.primaryBlue} />
+              <Text style={styles.introPointText}>Add saved places to the itinerary when you are ready.</Text>
+            </View>
+          </View>
+          <Pressable accessibilityLabel="Start using Vibe" onPress={() => void dismissIntro()} style={styles.introButton}>
+            <Text style={styles.introButtonLabel}>Start swiping</Text>
+            <MaterialIcons name="arrow-forward" size={18} color={colors.white} />
+          </Pressable>
+        </AppCard>
+      ) : null}
 
       <View style={styles.segmentedWrap}>
         <Pressable onPress={() => setMode('vibe')} style={[styles.segmentButton, mode === 'vibe' ? styles.segmentButtonActive : null]}>
@@ -308,8 +406,24 @@ export function VibesExperience({ tripId }: Props) {
             result.items.length ? (
               <>
               <AppCard style={styles.deckCard}>
-                <Text style={styles.deckTitle}>Swipe right to save, left to pass</Text>
-                <Text style={styles.deckSubtitle}>Cards blend the live eat, drink, visit, and do lanes into one deck for {result.area}.</Text>
+                <View style={styles.deckHeader}>
+                  <View>
+                    <Text style={styles.deckTitle}>Swipe right to save, left to pass</Text>
+                    <Text style={styles.deckSubtitle}>Live picks for {result.area}</Text>
+                  </View>
+                  <View style={styles.deckCountPill}>
+                    <Text style={styles.deckCountLabel}>{result.items.length} places</Text>
+                  </View>
+                </View>
+                <View style={styles.laneGrid}>
+                  {CATEGORY_SUMMARY.map((lane) => (
+                    <View key={lane.key} style={styles.lanePill}>
+                      <MaterialIcons name={lane.icon} size={18} color={colors.primaryBlue} />
+                      <Text style={styles.laneCount}>{result[lane.key].length}</Text>
+                      <Text style={styles.laneLabel}>{lane.label}</Text>
+                    </View>
+                  ))}
+                </View>
                 <VibeSwipeDeck
                   items={deckItems}
                   resetKey={deckResetKey}
@@ -319,34 +433,13 @@ export function VibesExperience({ tripId }: Props) {
                   onRefresh={refreshLivePicks}
                 />
               </AppCard>
-
-              <AppCard title="Live lanes" subtitle="Pineapple keeps the source buckets visible behind the swipe deck.">
-                <View style={styles.laneGrid}>
-                  <View style={styles.lanePill}>
-                    <Text style={styles.laneCount}>{result.eat.length}</Text>
-                    <Text style={styles.laneLabel}>Eat</Text>
-                  </View>
-                  <View style={styles.lanePill}>
-                    <Text style={styles.laneCount}>{result.drink.length}</Text>
-                    <Text style={styles.laneLabel}>Drink</Text>
-                  </View>
-                  <View style={styles.lanePill}>
-                    <Text style={styles.laneCount}>{result.visit.length}</Text>
-                    <Text style={styles.laneLabel}>Visit</Text>
-                  </View>
-                  <View style={styles.lanePill}>
-                    <Text style={styles.laneCount}>{result.do.length}</Text>
-                    <Text style={styles.laneLabel}>Do</Text>
-                  </View>
-                </View>
-              </AppCard>
               </>
             ) : (
               <AppCard>
                 <VibesEmptyState
                   icon="travel-explore"
                   title="No live picks found"
-                  description={`Tripadvisor did not return any clean eat, drink, visit, or do suggestions for ${result.area} right now.`}
+                  description={`We could not find enough clean eat, drink, see, or do picks for ${result.area} right now.`}
                 />
                 <Pressable accessibilityLabel="Refresh live vibe picks" onPress={refreshLivePicks} style={styles.refreshInlineButton}>
                   <MaterialIcons name="refresh" size={18} color={colors.primaryBlue} />
@@ -364,7 +457,6 @@ export function VibesExperience({ tripId }: Props) {
                 <MoodSavedCard
                   key={item.id}
                   item={item}
-                  fallbackImageUri={fallbackImageUri}
                   onOpen={(url) => void openUrl(url)}
                   onAddToItinerary={() => void addMoodToItinerary(item)}
                   onRemove={() => void deleteRecord('saved_vibes', item.id)}
@@ -399,6 +491,13 @@ const styles = StyleSheet.create({
   heroCopy: {
     gap: spacing.xs,
   },
+  heroEyebrow: {
+    color: colors.primaryBlue,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
   heroTitle: {
     color: colors.primaryBlueText,
     fontFamily: 'Poppins_600SemiBold',
@@ -411,20 +510,68 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  sourcePill: {
+  introCard: {
+    gap: spacing.md,
+    backgroundColor: '#F7FBFF',
+  },
+  introHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    gap: spacing.md,
+  },
+  introIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primaryBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  introTitle: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 18,
+  },
+  introText: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  introPoints: {
+    gap: spacing.sm,
+  },
+  introPoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  introPointText: {
+    flex: 1,
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  introButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xs,
     borderRadius: radii.pill,
-    backgroundColor: colors.primaryBlueSurface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    backgroundColor: colors.primaryBlue,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    alignSelf: 'flex-start',
   },
-  sourcePillLabel: {
-    color: colors.primaryBlue,
+  introButtonLabel: {
+    color: colors.white,
     fontFamily: 'Inter_700Bold',
-    fontSize: 12,
+    fontSize: 13,
   },
   metaRow: {
     gap: 4,
@@ -466,6 +613,12 @@ const styles = StyleSheet.create({
   deckCard: {
     gap: spacing.md,
   },
+  deckHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
   deckTitle: {
     color: colors.primaryBlueText,
     fontFamily: 'Poppins_600SemiBold',
@@ -477,14 +630,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  deckCountPill: {
+    borderRadius: radii.pill,
+    backgroundColor: colors.primaryBlueSurface,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  deckCountLabel: {
+    color: colors.primaryBlue,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+  },
   laneGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
   lanePill: {
-    flex: 1,
-    minWidth: '22%',
+    width: '23%',
     borderRadius: radii.md,
     backgroundColor: colors.primaryBlueSurface,
     padding: spacing.md,

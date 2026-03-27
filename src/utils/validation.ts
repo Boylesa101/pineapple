@@ -11,6 +11,7 @@ import type {
   TripDraft,
 } from '@/types/models';
 import { normalizeExpiryReminderSchedule } from './documentExpiry';
+import { getTransportDisplay } from './transport';
 
 export function validateTrip(input: TripDraft) {
   const errors: string[] = [];
@@ -76,10 +77,10 @@ export function validatePackingItem(input: PackingItemDraft) {
 
 export function validateTravelSegment(input: TravelSegmentDraft) {
   const errors: string[] = [];
-  const providerLabel = input.transportType === 'train' ? 'Train operator' : 'Airline';
-  const departureLabel = input.transportType === 'train' ? 'Departure station' : 'Departure airport';
-  const arrivalLabel = input.transportType === 'train' ? 'Arrival station' : 'Arrival airport';
-  if (!input.airline.trim()) errors.push(`${providerLabel} is required.`);
+  const display = getTransportDisplay(input.transportType ?? 'flight');
+  if (!input.airline.trim()) errors.push(`${display.providerLabel} is required.`);
+  const departureLabel = display.departureLabel;
+  const arrivalLabel = display.arrivalLabel;
   if (!input.departureAirport.trim()) errors.push(`${departureLabel} is required.`);
   if (!input.arrivalAirport.trim()) errors.push(`${arrivalLabel} is required.`);
   if (!input.departureTime) errors.push('Departure time is required.');

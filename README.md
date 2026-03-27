@@ -68,24 +68,24 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Home alerts now live behind the bell icon instead of taking over the dashboard, with a red-dot badge only when something needs attention
 - Reusable document expiry status system for passports, visas, GHIC / EHIC, travel insurance, driving licences, ID cards, and custom docs with expiry dates
 - Packing lists grouped by category with multi-traveller assignment, templates, duplicate action, and priority flags
-- Flight / train segment management with outbound/return direction support, searchable airline/operator selection, stored provider codes, and safe airline-logo fallback handling
+- Transport segment management with outbound/return direction support, dynamic flight/private-flight/train/car/taxi modes, searchable operator suggestions where useful, stored provider codes, and safe local logo fallback handling
 - The flight provider picker now bundles 50 common airline brand marks locally so transport selection does not depend on remote logo URLs at runtime
 - Hotel stay management with free OpenStreetMap/Nominatim address search, editable address normalization, automatic free image lookup, and offline cache after the first successful fetch
 - Structured transfer/pickup management with provider, method, location, time, notes, and optional travel-to-airport duration stored directly on the trip
 - Automatic trip-card destination images that resolve from country or place text, cache locally after the first fetch, and fall back cleanly when offline or unresolved
 - Trip detail destination insights with live timezone resolution, real local destination time, GMT/UTC difference versus the device timezone, and graceful fallback when the destination cannot be resolved
 - Trip detail airport set-off timing that calculates `departure - 2 hours - airport travel duration` from the stored outbound flight and airport travel minutes
-- Trip detail 7-day destination weather driven by a dedicated live forecast provider with caching and safe failure fallbacks, selectable day summaries, and a dedicated hourly detail page
+- Trip detail 7-day destination weather driven by a dedicated live forecast provider with caching, cleaner Pineapple-styled summary/detail cards, and safe failure fallbacks
 - Trip-card destination imagery now prefers Pexels when an optional `EXPO_PUBLIC_PEXELS_API_KEY` is supplied at build time, falls back to Wikimedia Commons otherwise, caches the chosen image locally, and exposes source attribution through a small in-card info action
 - Flight entry now includes a built-in searchable airport picker with stored IATA codes, takeoff/landing field icons, and optional connecting-flight capture for cleaner travel records
 - Date-of-birth entry now uses direct typed `DD / MM / YYYY` input in traveller, passport, and driving-licence flows instead of the calendar picker
-- Trip detail now uses a contextual footer for `Packing`, `Vibes`, `Flight`, and `Hotel`, keeping those sections in the trip flow instead of the global footer
+- Trip detail now uses a contextual footer for `Packing`, `Vibes`, `Travel`, and `Hotel`, keeping those sections in the trip flow instead of the global footer
 - Honest limitation: destination time and weather depend on successful live destination geocoding and forecast lookups, so Pineapple intentionally shows calm fallback states instead of guessed values when those requests fail
-- `Vibes` is now a premium swipe deck backed by the same Cloudflare + Tripadvisor proxy, with live image-led cards for places to eat, drink, visit, and do plus a per-trip `Mood` shortlist for saved right-swipes
-- `Mood` persists saved Vibes locally per trip, prevents duplicates, and lets the user review saved places, open reliable source links, or add a place into the itinerary later
+- `Vibes` is now a premium swipe deck backed by the existing Pineapple Tripadvisor proxy, with a first-time intro, clear `Eat`, `Drink`, `See`, and `Do` lanes, live image-led cards, and a per-trip `Mood` shortlist for saved right-swipes
+- `Mood` persists saved Vibes locally per trip, prevents duplicates, caches venue imagery locally where possible, and lets the user review saved places, open reliable source links, or add a place into the itinerary later
 - To enable live Vibes on Cloudflare Pages, add the Pages secret `TRIPADVISOR_API_KEY`, optionally set `TRIPADVISOR_ALLOWED_DOMAIN=pinapple-dev.pages.dev`, and allowlist `pinapple-dev.pages.dev` in Tripadvisor
 - Honest limitation: Tripadvisor does not reliably expose first-party social handles through the current Content API, so Pineapple only shows the official website and Tripadvisor links when the live data includes them and never invents social accounts
-- Honest limitation: Tripadvisor publishes stricter storage/display rules than Pineapple’s normal local-first sources, so the current Vibes implementation keeps only a short-lived local deck cache plus the user’s saved Mood shortlist for continuity
+- Honest limitation: Tripadvisor publishes stricter storage/display rules than Pineapple’s normal local-first sources, so the current Vibes implementation keeps only a short-lived local deck cache plus the user’s saved Mood shortlist for continuity, while the app locally caches venue images it has already fetched for smoother repeat viewing
 - Chronological itinerary timeline
 - Emergency reference storage per trip
 - High-contrast Travel Mode with family overview, traveller tabs/swipe, quick copy actions, and temporary sensitive reveal

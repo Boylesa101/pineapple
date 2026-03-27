@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { createShareCode } from '@/utils/shareCodes';
 
-const DATABASE_VERSION = 19;
+const DATABASE_VERSION = 20;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -232,6 +232,7 @@ CREATE TABLE IF NOT EXISTS app_preferences (
   lastSyncAt TEXT,
   lastBackupAt TEXT,
   privacyMaskingMode TEXT NOT NULL DEFAULT 'always',
+  vibesIntroSeenAt TEXT,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
 );
@@ -498,6 +499,10 @@ async function runPhaseNineteenMigration(db: SQLiteDatabase) {
   `);
 }
 
+async function runPhaseTwentyMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'app_preferences', 'vibesIntroSeenAt', 'TEXT');
+}
+
 async function runPhaseThreeMigration(db: SQLiteDatabase) {
   await db.execAsync(`
     INSERT OR IGNORE INTO app_preferences (
@@ -636,6 +641,10 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   if (version < 19) {
     await runPhaseNineteenMigration(db);
+  }
+
+  if (version < 20) {
+    await runPhaseTwentyMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

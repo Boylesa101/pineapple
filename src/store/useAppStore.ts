@@ -101,6 +101,7 @@ const emptySnapshot: AppDataSnapshot = {
     lastSyncAt: null,
     lastBackupAt: null,
     privacyMaskingMode: 'always',
+    vibesIntroSeenAt: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },

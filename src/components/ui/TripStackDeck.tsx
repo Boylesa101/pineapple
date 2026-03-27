@@ -13,7 +13,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import type { Trip } from '@/types/models';
+import type { TransportType, Trip } from '@/types/models';
 import { radii, shadows, spacing } from '@/constants/theme';
 import { TripHeroCard } from './TripHeroCard';
 
@@ -22,6 +22,7 @@ type TripStackItem = {
   subtitle: string;
   meta: string;
   badgeLabel?: string | null;
+  transportType?: TransportType | null;
 };
 
 type Props = {
@@ -159,6 +160,8 @@ function StackCard({
 
   const card = (
     <Animated.View
+      renderToHardwareTextureAndroid
+      shouldRasterizeIOS
       style={[
         styles.stackCard,
         {
@@ -180,6 +183,7 @@ function StackCard({
         subtitle={item.subtitle}
         meta={item.meta}
         badgeLabel={item.badgeLabel}
+        transportType={item.transportType}
         onPress={() => onOpenTrip(item.trip)}
         onOpenFlights={() => onOpenFlights(item.trip)}
         onOpenHotel={() => onOpenHotel(item.trip)}
@@ -288,6 +292,6 @@ const styles = StyleSheet.create({
     right: spacing.xs,
     fontFamily: 'Inter_500Medium',
     fontSize: 11,
-    color: 'rgba(13,59,102,0.62)',
+    color: 'rgba(13,59,102,0.56)',
   },
 });

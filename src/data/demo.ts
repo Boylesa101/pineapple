@@ -345,6 +345,7 @@ export function createDemoSnapshot(): AppDataSnapshot {
       lastSyncAt: null,
       lastBackupAt: null,
       privacyMaskingMode: 'always',
+      vibesIntroSeenAt: null,
       createdAt: now,
       updatedAt: now,
     },

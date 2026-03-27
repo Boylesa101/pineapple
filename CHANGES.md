@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Vibes refinement pass: added a first-time `Vibe` intro, removed backend terminology from the UI, surfaced clearer `Eat`, `Drink`, `See`, and `Do` lane counts, and kept saved `Mood` cards tied to the trip with locally cached venue imagery where available
+- Tripadvisor worker refinement: the Pineapple proxy now scores destination matches more defensibly, falls back to the Tripadvisor photos endpoint when details do not include a usable venue image, and keeps the same simplified app-facing response without moving secrets into the client
+- Trip-card and transport polish: trip cards now inherit the trip’s primary transport mode for iconography, transport entry supports `flight`, `private_flight`, `train`, `car`, and `taxi`, and the trip footer/travel section now follow that same dynamic transport language
+- Weather redesign: replaced the old illustration-heavy daily detail page with a cleaner Pineapple weather layout while keeping the same live data, hourly outlook, and graceful failure states
+- Architecture confirmation: Vibes remains local-first in the app with on-device trip/Mood/cache storage and a proxy-only Cloudflare worker path for Tripadvisor requests; user trip data and saved Mood items are not stored in Cloudflare buckets or R2
+
 ## 2.2.0 - 2026-03-26
 
 - Stability pass: hardened trip rendering, dashboard selectors, typed date fields, and validation so malformed or missing trip, flight, hotel, and itinerary dates now fall back cleanly instead of crashing screens or downstream calculations

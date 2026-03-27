@@ -271,5 +271,6 @@ export function normalizeAppPreferences(input: Partial<AppPreferences> & Pick<Ap
     structuredDataProtected: input.structuredDataProtected ?? defaults.structuredDataProtected,
     profileName: input.profileName?.trim() ?? '',
     profilePhotoUri: input.profilePhotoUri ?? null,
+    vibesIntroSeenAt: input.vibesIntroSeenAt ?? null,
   };
 }

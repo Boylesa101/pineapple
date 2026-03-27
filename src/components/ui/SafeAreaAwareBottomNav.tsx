@@ -8,7 +8,7 @@ import { colors, radii, spacing } from '@/constants/theme';
 const iconMap = {
   home: 'home',
   vault: 'folder',
-  vibe: 'auto-awesome',
+  vibe: 'travel-explore',
   sos: 'sos',
 } satisfies Record<string, keyof typeof MaterialIcons.glyphMap>;
 

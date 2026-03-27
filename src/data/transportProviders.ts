@@ -33,6 +33,19 @@ function flightProvider(code: string, name: string, searchKey: string, accentCol
   };
 }
 
+function privateFlightProvider(code: string, name: string, searchKey: string, accentColor: string) {
+  return {
+    type: 'private_flight' as const,
+    code,
+    name,
+    logoXml: createMonogramLogoXml(code, accentColor),
+    logoUrl: null,
+    accentColor,
+    label: `${name} (${code})`,
+    searchKey,
+  };
+}
+
 function trainProvider(code: string, name: string, searchKey: string, accentColor: string) {
   return {
     type: 'train' as const,
@@ -97,6 +110,10 @@ const providers: TransportProviderSuggestion[] = [
   flightProvider('HU', 'Hainan Airlines', 'hu hainan airlines china haikou', '#B9975B'),
   flightProvider('OK', 'Czech Airlines', 'ok czech airlines prague csa', '#D7141A'),
   flightProvider('GA', 'Garuda Indonesia', 'ga garuda indonesia jakarta bali', '#0093D0'),
+  privateFlightProvider('VJ', 'VistaJet', 'vj vistajet private jet charter', '#5C6670'),
+  privateFlightProvider('NJ', 'NetJets', 'nj netjets private aviation charter', '#404B5A'),
+  privateFlightProvider('FXA', 'Flexjet', 'fxa flexjet private aviation charter', '#8F2432'),
+  privateFlightProvider('VTF', 'Victor', 'vtf fly victor private aviation charter', '#3E5D8F'),
   trainProvider('NR', 'National Rail', 'nr national rail uk train london', '#003B5C'),
   trainProvider('LNER', 'LNER', 'lner london north eastern railway train', '#C8102E'),
   trainProvider('EURO', 'Eurostar', 'euro eurostar train london paris brussels', '#1F2A44'),
@@ -106,13 +123,14 @@ const providers: TransportProviderSuggestion[] = [
 ];
 
 export function searchTransportProviders(query: string, type: TransportType) {
+  const normalizedType = type === 'private_flight' ? 'private_flight' : type;
   const normalized = query.trim().toLowerCase();
   if (!normalized) {
-    return providers.filter((provider) => provider.type === type).slice(0, 8);
+    return providers.filter((provider) => provider.type === normalizedType).slice(0, 8);
   }
 
   return providers
-    .filter((provider) => provider.type === type)
+    .filter((provider) => provider.type === normalizedType)
     .filter(
       (provider) =>
         provider.searchKey.includes(normalized) ||

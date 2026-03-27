@@ -1,5 +1,6 @@
 import type { TravelSegment } from '@/types/models';
 import { compareIsoDates, formatDateTime, parseIsoDate } from '@/utils/date';
+import { isAirTransportType } from '@/utils/transport';
 import { normalizeDestinationLabel } from '@/utils/trips';
 
 type OpenMeteoGeocodeResult = {
@@ -820,7 +821,7 @@ export function getAirportSetOffInfo(
   airportTravelDurationMinutes: number | null | undefined
 ): AirportSetOffInfo {
   const outboundFlight = [...travelSegments]
-    .filter((segment) => segment.transportType === 'flight' && segment.travelDirection === 'outbound')
+    .filter((segment) => isAirTransportType(segment.transportType) && segment.travelDirection === 'outbound')
     .sort((left, right) => compareIsoDates(left.departureTime, right.departureTime))[0];
 
   if (!outboundFlight) {

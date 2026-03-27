@@ -25,6 +25,28 @@ function buildAreaQuery(destination, city, country) {
   return [city, destination, country].filter(Boolean).join(', ');
 }
 
+function buildAreaContext(destination, city, country) {
+  const area = buildAreaQuery(destination, city, country);
+  const primaryLabel = cleanText(destination)?.split(',')[0]?.trim().toLowerCase() ?? '';
+  const tokens = Array.from(
+    new Set(
+      [destination, city, country]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/i)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 3),
+    ),
+  );
+
+  return {
+    area,
+    primaryLabel,
+    tokens,
+  };
+}
+
 function sanitizeAllowedDomain(value) {
   return (value || 'pinapple-dev.pages.dev').replace(/^https?:\/\//, '').replace(/\/+$/, '');
 }
@@ -136,7 +158,70 @@ async function fetchLocationDetails(locationId, apiKey, allowedDomain) {
   }
 }
 
-function mapTripadvisorItem(searchItem, detail, vibeCategory, area) {
+async function fetchLocationPhotos(locationId, apiKey, allowedDomain) {
+  try {
+    return await tripadvisorRequest(`/location/${locationId}/photos`, { limit: '5' }, apiKey, allowedDomain);
+  } catch {
+    return null;
+  }
+}
+
+function buildCandidateTexts(searchItem, detail) {
+  return {
+    nameText: [searchItem?.name, detail?.name]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase(),
+    addressText: [
+      searchItem?.address_obj?.address_string,
+      detail?.address_obj?.address_string,
+      searchItem?.address_string,
+      detail?.address_string,
+      detail?.location_string,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase(),
+  };
+}
+
+function scoreTripadvisorCandidate(searchItem, detail, areaContext) {
+  const { nameText, addressText } = buildCandidateTexts(searchItem, detail);
+  let score = 0;
+  let addressMatches = 0;
+
+  if (areaContext.primaryLabel && addressText.includes(areaContext.primaryLabel)) {
+    score += 90;
+    addressMatches += 1;
+  } else if (areaContext.primaryLabel && nameText.includes(areaContext.primaryLabel)) {
+    score += 12;
+  }
+
+  for (const token of areaContext.tokens) {
+    if (addressText.includes(token)) {
+      score += token === areaContext.primaryLabel ? 30 : 18;
+      addressMatches += 1;
+    } else if (nameText.includes(token)) {
+      score += token === areaContext.primaryLabel ? 4 : 2;
+    }
+  }
+
+  if (searchItem?.address_obj?.address_string || detail?.address_obj?.address_string) {
+    score += 12;
+  }
+
+  if (searchItem?.rating || detail?.rating) {
+    score += 8;
+  }
+
+  if (addressText && addressMatches === 0 && areaContext.tokens.length) {
+    score -= 40;
+  }
+
+  return score;
+}
+
+function mapTripadvisorItem(searchItem, detail, photosPayload, vibeCategory, area) {
   const rawCategoryLabel = getRawCategoryLabel(detail, searchItem);
   const ranking =
     pickFirstString(detail?.ranking_data?.ranking_string, detail?.ranking, searchItem?.ranking) ?? null;
@@ -158,16 +243,16 @@ function mapTripadvisorItem(searchItem, detail, vibeCategory, area) {
     ranking,
     tripadvisorUrl: pickFirstString(detail?.web_url, searchItem?.web_url),
     websiteUrl: pickFirstString(detail?.website),
-    imageUrl: pickImageUrl(detail) ?? pickImageUrl(searchItem),
+    imageUrl: pickImageUrl(detail) ?? pickImageUrl(searchItem) ?? pickImageUrl(photosPayload?.data?.[0]) ?? pickImageUrl(photosPayload),
   };
 }
 
-async function fetchTripadvisorCategory(area, vibeCategory, apiKey, allowedDomain) {
+async function fetchTripadvisorCategory(areaContext, vibeCategory, apiKey, allowedDomain) {
   const config = vibeSearchMap[vibeCategory];
   const payload = await tripadvisorRequest(
     '/location/search',
     {
-      searchQuery: `${area} ${config.searchSuffix}`,
+      searchQuery: `${areaContext.area} ${config.searchSuffix}`,
       category: config.category,
     },
     apiKey,
@@ -175,12 +260,35 @@ async function fetchTripadvisorCategory(area, vibeCategory, apiKey, allowedDomai
   );
 
   const items = Array.isArray(payload?.data) ? payload.data : [];
-  const trimmed = items.filter((item) => item?.location_id && item?.name).slice(0, RESULTS_PER_BUCKET + 2);
+  const scoredItems = items
+    .filter((item) => item?.location_id && item?.name)
+    .map((item) => ({
+      item,
+      score: scoreTripadvisorCandidate(item, null, areaContext),
+    }))
+    .sort((left, right) => right.score - left.score);
+  const primaryCandidates = scoredItems.filter((entry) => entry.score > 0);
+  const trimmed = (primaryCandidates.length ? primaryCandidates : scoredItems)
+    .slice(0, RESULTS_PER_BUCKET + 4)
+    .map((entry) => entry.item);
   const details = await Promise.all(trimmed.map((item) => fetchLocationDetails(item.location_id, apiKey, allowedDomain)));
+  const photos = await Promise.all(
+    trimmed.map((item, index) =>
+      pickImageUrl(details[index]) || pickImageUrl(item)
+        ? Promise.resolve(null)
+        : fetchLocationPhotos(item.location_id, apiKey, allowedDomain),
+    ),
+  );
   const seen = new Set();
 
   return trimmed
-    .map((item, index) => mapTripadvisorItem(item, details[index], vibeCategory, area))
+    .map((item, index) => ({
+      score: scoreTripadvisorCandidate(item, details[index], areaContext),
+      item: mapTripadvisorItem(item, details[index], photos[index], vibeCategory, areaContext.area),
+    }))
+    .sort((left, right) => right.score - left.score)
+    .filter((entry, index) => entry.score >= 30 || index < RESULTS_PER_BUCKET)
+    .map((entry) => entry.item)
     .filter((item) => item?.id && item?.name)
     .filter((item) => {
       if (seen.has(item.id)) {
@@ -199,8 +307,7 @@ async function handleVibes(request, env) {
   if (!apiKey) {
     return json(
       {
-        error:
-          'Tripadvisor is not configured on the Pineapple Cloudflare site yet. Add the TRIPADVISOR_API_KEY Pages secret to enable Vibes.',
+        error: 'Vibes is not configured for live suggestions yet.',
       },
       503,
     );
@@ -215,18 +322,18 @@ async function handleVibes(request, env) {
     return json({ error: 'Destination is required for live Vibes suggestions.' }, 400);
   }
 
-  const area = buildAreaQuery(destination, hotelCity, hotelCountry);
+  const areaContext = buildAreaContext(destination, hotelCity, hotelCountry);
 
   try {
     const [eat, drink, visit, doItems] = await Promise.all([
-      fetchTripadvisorCategory(area, 'eat', apiKey, allowedDomain),
-      fetchTripadvisorCategory(area, 'drink', apiKey, allowedDomain),
-      fetchTripadvisorCategory(area, 'visit', apiKey, allowedDomain),
-      fetchTripadvisorCategory(area, 'do', apiKey, allowedDomain),
+      fetchTripadvisorCategory(areaContext, 'eat', apiKey, allowedDomain),
+      fetchTripadvisorCategory(areaContext, 'drink', apiKey, allowedDomain),
+      fetchTripadvisorCategory(areaContext, 'visit', apiKey, allowedDomain),
+      fetchTripadvisorCategory(areaContext, 'do', apiKey, allowedDomain),
     ]);
 
     return json({
-      area,
+      area: areaContext.area,
       fetchedAt: new Date().toISOString(),
       eat,
       drink,
@@ -239,7 +346,7 @@ async function handleVibes(request, env) {
       const status = Number.parseInt(error.message.split(':')[1] || '502', 10);
       return json(
         {
-          error: `Tripadvisor request failed (${status}). Check the Cloudflare domain allowlist and API key configuration.`,
+          error: 'Live suggestions are temporarily unavailable.',
         },
         status >= 400 && status < 600 ? status : 502,
       );

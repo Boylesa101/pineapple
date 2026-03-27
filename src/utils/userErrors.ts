@@ -41,8 +41,11 @@ export function toUserMessage(error: unknown, fallback: string) {
       return 'Pineapple could not generate a secure local key on this device build. Reinstall or update the app if this keeps happening.';
     case 'Destination is required for live Vibes suggestions.':
       return 'Add a destination to the trip before opening Vibes.';
+    case 'Vibes is not configured for live suggestions yet.':
     case 'Tripadvisor is not configured on the Pineapple Cloudflare site yet. Add the TRIPADVISOR_API_KEY Pages secret to enable Vibes.':
-      return 'Vibes is not live yet. Add the TripAdvisor key to the Pineapple Cloudflare Pages project to enable it.';
+      return 'Vibes is not configured for live suggestions yet.';
+    case 'Live suggestions are temporarily unavailable.':
+      return 'Live suggestions are temporarily unavailable.';
     default:
       return message.length > 160 ? fallback : message;
   }

@@ -2,7 +2,7 @@ export type TripStatus = 'upcoming' | 'active' | 'completed';
 export type DestinationType = 'country' | 'place' | 'unknown';
 export type HeroImageStatus = 'idle' | 'loading' | 'ready' | 'failed';
 export type DestinationImageSource = 'curated' | 'pexels' | 'wikimedia' | 'fallback';
-export type TransportType = 'flight' | 'train';
+export type TransportType = 'flight' | 'private_flight' | 'train' | 'car' | 'taxi';
 export type TravelDirection = 'outbound' | 'return' | 'other';
 export type VibeCategory = 'eat' | 'drink' | 'visit' | 'do';
 export type DocumentType =
@@ -330,6 +330,7 @@ export interface AppPreferences {
   lastSyncAt: string | null;
   lastBackupAt: string | null;
   privacyMaskingMode: PrivacyMaskingMode;
+  vibesIntroSeenAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
