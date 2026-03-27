@@ -66,7 +66,26 @@ function pickFirstString(...values) {
 }
 
 function pickImageUrl(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const nestedEntries = Array.isArray(payload?.data)
+    ? payload.data
+    : Array.isArray(payload?.photos)
+      ? payload.photos
+      : [];
   const candidates = [
+    payload?.images?.large?.url,
+    payload?.images?.original?.url,
+    payload?.images?.medium?.url,
+    payload?.images?.small?.url,
+    payload?.images?.thumbnail?.url,
+    payload?.images?.large?.url_template,
+    payload?.images?.original?.url_template,
+    payload?.images?.medium?.url_template,
+    payload?.images?.small?.url_template,
+    payload?.images?.thumbnail?.url_template,
     payload?.photo?.images?.large?.url,
     payload?.photo?.images?.original?.url,
     payload?.photo?.images?.medium?.url,
@@ -78,6 +97,23 @@ function pickImageUrl(payload) {
     payload?.hero?.images?.small?.url,
     payload?.image?.url,
   ];
+
+  for (const entry of nestedEntries.slice(0, 5)) {
+    candidates.push(
+      entry?.images?.large?.url,
+      entry?.images?.original?.url,
+      entry?.images?.medium?.url,
+      entry?.images?.small?.url,
+      entry?.images?.thumbnail?.url,
+      entry?.photo?.images?.large?.url,
+      entry?.photo?.images?.original?.url,
+      entry?.photo?.images?.medium?.url,
+      entry?.photo?.images?.small?.url,
+      entry?.photo?.images?.thumbnail?.url,
+      entry?.image?.url,
+      entry?.url,
+    );
+  }
 
   return candidates.find((candidate) => cleanText(candidate)) ?? null;
 }

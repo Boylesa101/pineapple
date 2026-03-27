@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
+import Constants, { AppOwnership, ExecutionEnvironment } from 'expo-constants';
 import type { AppDataSnapshot } from '@/types/models';
 import { createReminderContent } from '@/services/notificationPlanner';
 
@@ -26,7 +26,12 @@ export function isNotificationsRuntimeSupported() {
 
   // Expo Go on Android no longer supports the native notifications runtime that
   // expo-notifications expects, so importing the module there can crash boot.
-  if (Platform.OS === 'android' && Boolean(Constants.expoGoConfig)) {
+  // Development and standalone APK builds are both valid here.
+  if (
+    Platform.OS === 'android' &&
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient &&
+    (Constants.appOwnership === AppOwnership.Expo || Boolean(Constants.expoGoConfig))
+  ) {
     return false;
   }
 
