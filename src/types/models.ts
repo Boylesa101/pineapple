@@ -37,6 +37,10 @@ export type ReminderKind =
   | 'passport_expiry'
   | 'ghic_expiry'
   | 'packing_incomplete'
+  | 'trip_countdown_30_days'
+  | 'trip_countdown_7_days'
+  | 'trip_countdown_3_days'
+  | 'trip_countdown_1_day'
   | 'trip_starts_tomorrow'
   | 'trip_today'
   | 'insurance_missing'
@@ -46,7 +50,7 @@ export type ReminderKind =
   | 'travel_mode_reminder'
   | 'sos_ready'
   | 'excursion_reminder';
-export type ReminderLeadTime = 30 | 7 | 1 | 0;
+export type ReminderLeadTime = 30 | 7 | 6 | 3 | 1 | 0;
 export type ParticipantRole = 'owner' | 'editor' | 'viewer';
 export type InviteStatus = 'pending' | 'accepted' | 'revoked';
 export type SyncMode = 'manual_share';

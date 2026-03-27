@@ -1,9 +1,11 @@
 import { AppStateStatus } from 'react-native';
 
+import Constants from 'expo-constants';
 import { create } from 'zustand';
 
 import { buildPackingTemplateItems, type PackingTemplateId } from '@/data/packingTemplates';
 import { createDemoSnapshot } from '@/data/demo';
+import { isNotificationProofBuildVersion, withNotificationProofTrip } from '@/data/notificationProofBuild';
 import { PERSONAL_DOCUMENTS_LABEL, PERSONAL_DOCUMENTS_TRIP_ID, isPersonalDocumentsTripId } from '@/constants/vault';
 import {
   clearAllData,
@@ -189,6 +191,18 @@ function logStoreError(context: string, error: unknown) {
   }
 }
 
+function runtimeAppVersion() {
+  return Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? null;
+}
+
+function prepareSnapshotForCurrentBuild(snapshot: AppDataSnapshot) {
+  if (!isNotificationProofBuildVersion(runtimeAppVersion())) {
+    return { snapshot, changed: false };
+  }
+
+  return withNotificationProofTrip(snapshot, new Date());
+}
+
 function destinationNeedsHeroRefresh(
   current: TripDraft,
   previous?:
@@ -305,6 +319,11 @@ export const useAppStore = create<StoreState>((set, get) => ({
       const shareCodeRotationResult = rotateLegacyShareCodes(data);
       if (shareCodeRotationResult.changed) {
         data = shareCodeRotationResult.snapshot;
+        await replaceAllData(data);
+      }
+      const proofBuildResult = prepareSnapshotForCurrentBuild(data);
+      if (proofBuildResult.changed) {
+        data = proofBuildResult.snapshot;
         await replaceAllData(data);
       }
 
@@ -872,7 +891,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
   },
   resetWithDemoData: async () => {
     await clearAllData();
-    await persistSnapshot(createDemoSnapshot());
+    const demoSnapshot = prepareSnapshotForCurrentBuild(createDemoSnapshot()).snapshot;
+    await persistSnapshot(demoSnapshot);
     await get().refreshData();
   },
 }));

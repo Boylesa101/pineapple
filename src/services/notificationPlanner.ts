@@ -1,5 +1,6 @@
-import { addDays, differenceInCalendarDays, differenceInHours, parseISO, setHours, setMinutes, setSeconds, subDays, subHours } from 'date-fns';
+import { addDays, differenceInHours, parseISO, setHours, setMinutes, setSeconds, subDays, subHours } from 'date-fns';
 
+import { getNotificationProofReminderDate, isNotificationProofTripId } from '@/data/notificationProofBuild';
 import type { AppDataSnapshot, Document, ExpiryReminderLeadTime, ReminderKind, ReminderLeadTime } from '@/types/models';
 import { formatAirportDisplay } from '@/utils/airports';
 import { getTripBundle } from '@/utils/selectors';
@@ -21,6 +22,17 @@ function getReminderSetting(snapshot: AppDataSnapshot, tripId: string, kind: Rem
   );
 }
 
+function getReminderSettingForKinds(snapshot: AppDataSnapshot, tripId: string, kinds: ReminderKind[]) {
+  for (const kind of kinds) {
+    const setting = getReminderSetting(snapshot, tripId, kind);
+    if (setting) {
+      return setting;
+    }
+  }
+
+  return null;
+}
+
 function isReminderEnabled(snapshot: AppDataSnapshot, tripId: string, kind: ReminderKind) {
   if (!snapshot.appPreferences.notificationsEnabled) {
     return false;
@@ -30,8 +42,20 @@ function isReminderEnabled(snapshot: AppDataSnapshot, tripId: string, kind: Remi
   return Boolean(setting?.enabled);
 }
 
+function isReminderEnabledForKinds(snapshot: AppDataSnapshot, tripId: string, kinds: ReminderKind[]) {
+  if (!snapshot.appPreferences.notificationsEnabled) {
+    return false;
+  }
+
+  return Boolean(getReminderSettingForKinds(snapshot, tripId, kinds)?.enabled);
+}
+
 function getLeadTime(snapshot: AppDataSnapshot, tripId: string, kind: ReminderKind, fallback: ReminderLeadTime) {
   return getReminderSetting(snapshot, tripId, kind)?.leadTimeDays ?? fallback;
+}
+
+function getLeadTimeForKinds(snapshot: AppDataSnapshot, tripId: string, kinds: ReminderKind[], fallback: ReminderLeadTime) {
+  return getReminderSettingForKinds(snapshot, tripId, kinds)?.leadTimeDays ?? fallback;
 }
 
 function buildReminderDate(targetIso: string, leadTimeDays: number) {
@@ -43,8 +67,8 @@ function buildReminderDateAtHour(targetIso: string, leadTimeDays: number, hour: 
   return setSeconds(setMinutes(setHours(buildReminderDate(targetIso, leadTimeDays), hour), 0), 0);
 }
 
-function isFutureDate(date: Date) {
-  return date.getTime() > Date.now() + 60_000;
+function isFutureDate(date: Date, now: Date) {
+  return date.getTime() > now.getTime() + 60_000;
 }
 
 function formatLeadLabel(leadDays: number) {
@@ -68,17 +92,32 @@ function getDocumentReminderDates(document: Pick<Document, 'expiryDate' | 'expir
       leadDays,
       scheduledDate: buildReminderDate(document.expiryDate as string, leadDays),
     }))
-    .filter((item): item is { leadDays: ExpiryReminderLeadTime; scheduledDate: Date } => isFutureDate(item.scheduledDate));
+    .filter((item): item is { leadDays: ExpiryReminderLeadTime; scheduledDate: Date } => isFutureDate(item.scheduledDate, new Date()));
 }
 
-export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[] {
+function resolveReminderDate(options: {
+  tripId: string;
+  kind: ReminderKind;
+  defaultDate: Date;
+  now: Date;
+  occurrenceIndex?: number;
+}) {
+  if (!isNotificationProofTripId(options.tripId)) {
+    return options.defaultDate;
+  }
+
+  return getNotificationProofReminderDate(options.kind, options.now, options.occurrenceIndex ?? 0) ?? options.defaultDate;
+}
+
+export function createReminderContent(snapshot: AppDataSnapshot, options: { now?: Date } = {}): ReminderInput[] {
+  const now = options.now ?? new Date();
   const reminders: ReminderInput[] = [];
   const hasProfilePhoto = Boolean(snapshot.appPreferences.profilePhotoUri);
   const hasPassportDocument = snapshot.documents.some((document) => document.documentType === 'passport');
 
   if (!hasProfilePhoto || !hasPassportDocument) {
-    const setupReminderDate = setSeconds(setMinutes(setHours(addDays(new Date(), 1), 18), 0), 0);
-    if (isFutureDate(setupReminderDate)) {
+    const setupReminderDate = setSeconds(setMinutes(setHours(addDays(now, 1), 18), 0), 0);
+    if (isFutureDate(setupReminderDate, now)) {
       reminders.push({
         title: 'Finish your Pineapple setup',
         body: !hasPassportDocument ? 'Add your main travel document so it is ready in Vault.' : 'Add a profile photo so your travel profile is easy to recognise.',
@@ -91,13 +130,29 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
   for (const trip of snapshot.trips) {
     const bundle = getTripBundle(snapshot, trip.id);
 
-    if (trip.status !== 'completed' && isReminderEnabled(snapshot, trip.id, 'trip_starts_tomorrow')) {
-      const lead = getLeadTime(snapshot, trip.id, 'trip_starts_tomorrow', 1);
-      const date = buildReminderDateAtHour(trip.startDate, lead, 9);
-      if (isFutureDate(date)) {
+    const countdownConfigs: Array<{ kinds: ReminderKind[]; fallbackLead: ReminderLeadTime }> = [
+      { kinds: ['trip_countdown_30_days'], fallbackLead: 30 },
+      { kinds: ['trip_countdown_7_days'], fallbackLead: 7 },
+      { kinds: ['trip_countdown_3_days'], fallbackLead: 3 },
+      { kinds: ['trip_countdown_1_day', 'trip_starts_tomorrow'], fallbackLead: 1 },
+    ];
+
+    for (const config of countdownConfigs) {
+      if (trip.status === 'completed' || !isReminderEnabledForKinds(snapshot, trip.id, config.kinds)) {
+        continue;
+      }
+
+      const lead = getLeadTimeForKinds(snapshot, trip.id, config.kinds, config.fallbackLead);
+      const date = resolveReminderDate({
+        tripId: trip.id,
+        kind: config.kinds[0] as ReminderKind,
+        defaultDate: buildReminderDateAtHour(trip.startDate, lead, 9),
+        now,
+      });
+      if (isFutureDate(date, now)) {
         reminders.push({
           title: `${trip.name} starts soon`,
-          body: `${trip.destination} begins in ${differenceInCalendarDays(parseISO(trip.startDate), date)} day(s).`,
+          body: `${formatLeadLabel(lead)} until ${trip.destination}.`,
           date,
           href: `/trip/${trip.id}`,
           activeTripId: trip.id,
@@ -106,8 +161,13 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
     }
 
     if (trip.status !== 'completed' && isReminderEnabled(snapshot, trip.id, 'trip_today')) {
-      const date = buildReminderDateAtHour(trip.startDate, 0, 7);
-      if (isFutureDate(date)) {
+      const date = resolveReminderDate({
+        tripId: trip.id,
+        kind: 'trip_today',
+        defaultDate: buildReminderDateAtHour(trip.startDate, 0, 7),
+        now,
+      });
+      if (isFutureDate(date, now)) {
         reminders.push({
           title: `${trip.name} is today`,
           body: `Safe travels. ${trip.destination} starts today.`,
@@ -123,9 +183,14 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
       bundle.packingItems.some((item) => !item.isPacked) &&
       isReminderEnabled(snapshot, trip.id, 'packing_incomplete')
     ) {
-      const lead = getLeadTime(snapshot, trip.id, 'packing_incomplete', 1);
-      const date = buildReminderDateAtHour(trip.startDate, lead, 18);
-      if (isFutureDate(date)) {
+      const lead = getLeadTime(snapshot, trip.id, 'packing_incomplete', 6);
+      const date = resolveReminderDate({
+        tripId: trip.id,
+        kind: 'packing_incomplete',
+        defaultDate: buildReminderDateAtHour(trip.startDate, lead, 18),
+        now,
+      });
+      if (isFutureDate(date, now)) {
         reminders.push({
           title: `${trip.name} packing still incomplete`,
           body: `${bundle.packingItems.filter((item) => !item.isPacked).length} item(s) still need packing.`,
@@ -142,8 +207,13 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
       isReminderEnabled(snapshot, trip.id, 'insurance_missing')
     ) {
       const lead = getLeadTime(snapshot, trip.id, 'insurance_missing', 7);
-      const date = buildReminderDateAtHour(trip.startDate, lead, 10);
-      if (isFutureDate(date)) {
+      const date = resolveReminderDate({
+        tripId: trip.id,
+        kind: 'insurance_missing',
+        defaultDate: buildReminderDateAtHour(trip.startDate, lead, 10),
+        now,
+      });
+      if (isFutureDate(date, now)) {
         reminders.push({
           title: `${trip.name} needs insurance details`,
           body: 'Add insurance information before departure.',
@@ -156,9 +226,15 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
 
     if (isReminderEnabled(snapshot, trip.id, 'flight_check_in')) {
       const lead = getLeadTime(snapshot, trip.id, 'flight_check_in', 1);
-      for (const segment of bundle.travelSegments) {
-        const date = buildReminderDateAtHour(segment.departureTime, lead, 9);
-        if (isFutureDate(date)) {
+      for (const [index, segment] of bundle.travelSegments.entries()) {
+        const date = resolveReminderDate({
+          tripId: trip.id,
+          kind: 'flight_check_in',
+          defaultDate: buildReminderDateAtHour(segment.departureTime, lead, 9),
+          now,
+          occurrenceIndex: index,
+        });
+        if (isFutureDate(date, now)) {
           reminders.push({
             title: `${segment.airline} ${segment.flightNumber || ''}`.trim(),
             body: `Check in for ${formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} to ${formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}.`,
@@ -171,9 +247,15 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
     }
 
     if (isReminderEnabled(snapshot, trip.id, 'hotel_check_in')) {
-      for (const hotel of bundle.hotelStays) {
-        const date = buildReminderDateAtHour(hotel.checkIn, 0, 9);
-        if (isFutureDate(date)) {
+      for (const [index, hotel] of bundle.hotelStays.entries()) {
+        const date = resolveReminderDate({
+          tripId: trip.id,
+          kind: 'hotel_check_in',
+          defaultDate: buildReminderDateAtHour(hotel.checkIn, 0, 9),
+          now,
+          occurrenceIndex: index,
+        });
+        if (isFutureDate(date, now)) {
           reminders.push({
             title: `${hotel.hotelName} check-in today`,
             body: `Hotel reminder for ${hotel.city || trip.destination}.`,
@@ -186,9 +268,15 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
     }
 
     if (trip.transferTime && isReminderEnabled(snapshot, trip.id, 'transfer_reminder')) {
-      const date = subHours(parseISO(trip.transferTime), 2);
-      if (isFutureDate(date)) {
-        const hoursUntilTransfer = Math.max(1, differenceInHours(parseISO(trip.transferTime), date));
+      const proofTrip = isNotificationProofTripId(trip.id);
+      const date = resolveReminderDate({
+        tripId: trip.id,
+        kind: 'transfer_reminder',
+        defaultDate: subHours(parseISO(trip.transferTime), 2),
+        now,
+      });
+      if (isFutureDate(date, now)) {
+        const hoursUntilTransfer = proofTrip ? 2 : Math.max(1, differenceInHours(parseISO(trip.transferTime), date));
         reminders.push({
           title: `${trip.name} transfer coming up`,
           body: `${trip.transferMethod || 'Transfer'} in ${hoursUntilTransfer} hour(s)${trip.transferLocation ? ` from ${trip.transferLocation}` : ''}.`,
@@ -200,8 +288,13 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
     }
 
     if (isReminderEnabled(snapshot, trip.id, 'travel_mode_reminder')) {
-      const date = buildReminderDateAtHour(trip.startDate, 0, 6);
-      if (isFutureDate(date)) {
+      const date = resolveReminderDate({
+        tripId: trip.id,
+        kind: 'travel_mode_reminder',
+        defaultDate: buildReminderDateAtHour(trip.startDate, 0, 6),
+        now,
+      });
+      if (isFutureDate(date, now)) {
         reminders.push({
           title: `${trip.name} travel mode is ready`,
           body: 'Open your travel pack before you leave.',
@@ -213,8 +306,13 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
     }
 
     if (isReminderEnabled(snapshot, trip.id, 'sos_ready')) {
-      const date = buildReminderDateAtHour(trip.startDate, 0, 8);
-      if (isFutureDate(date)) {
+      const date = resolveReminderDate({
+        tripId: trip.id,
+        kind: 'sos_ready',
+        defaultDate: buildReminderDateAtHour(trip.startDate, 0, 8),
+        now,
+      });
+      if (isFutureDate(date, now)) {
         reminders.push({
           title: `${trip.name} SOS tools are ready`,
           body: 'Emergency numbers and quick access are available in SOS.',
@@ -227,9 +325,15 @@ export function createReminderContent(snapshot: AppDataSnapshot): ReminderInput[
 
     if (isReminderEnabled(snapshot, trip.id, 'excursion_reminder')) {
       const lead = getLeadTime(snapshot, trip.id, 'excursion_reminder', 1);
-      for (const event of bundle.itineraryEvents.filter((item) => item.type === 'excursion')) {
-        const date = buildReminderDateAtHour(event.dateTime, lead, 8);
-        if (isFutureDate(date)) {
+      for (const [index, event] of bundle.itineraryEvents.filter((item) => item.type === 'excursion').entries()) {
+        const date = resolveReminderDate({
+          tripId: trip.id,
+          kind: 'excursion_reminder',
+          defaultDate: buildReminderDateAtHour(event.dateTime, lead, 8),
+          now,
+          occurrenceIndex: index,
+        });
+        if (isFutureDate(date, now)) {
           reminders.push({
             title: `${event.title} is coming up`,
             body: `${trip.name} excursion reminder${event.location ? ` at ${event.location}` : ''}.`,

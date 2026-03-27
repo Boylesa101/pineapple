@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pineapple",
     "slug": "pineapple",
-    "version": "2.2.0",
+    "version": "2.2.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,10 +15,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pineapple.travel",
-      "buildNumber": "40"
+      "buildNumber": "41"
     },
     "android": {
-      "versionCode": 47,
+      "versionCode": 48,
       "package": "com.pineapple.travel",
       "adaptiveIcon": {
         "backgroundColor": "#F7E7CE",

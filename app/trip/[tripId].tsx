@@ -24,6 +24,7 @@ import { ProviderLogoBadge } from '@/components/ProviderLogoBadge';
 import { TransportProviderSearchField } from '@/components/TransportProviderSearchField';
 import { TypedDateField } from '@/components/TypedDateField';
 import { colors, spacing } from '@/constants/theme';
+import { NOTIFICATION_PROOF_BUILD_VERSION, NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES, isNotificationProofTripId } from '@/data/notificationProofBuild';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import {
   getAirportSetOffInfo,
@@ -71,9 +72,17 @@ type TransferDraft = {
   notes: string;
 };
 
-const reminderMeta: Record<Exclude<ReminderKind, 'passport_expiry' | 'ghic_expiry'>, { label: string; leadTimeDays: ReminderLeadTime }> = {
-  packing_incomplete: { label: 'Packing incomplete warning', leadTimeDays: 1 },
-  trip_starts_tomorrow: { label: 'Trip starts tomorrow warning', leadTimeDays: 1 },
+type VisibleTripReminderKind = Exclude<ReminderKind, 'passport_expiry' | 'ghic_expiry' | 'trip_starts_tomorrow'>;
+
+const reminderMeta: Record<
+  VisibleTripReminderKind,
+  { label: string; leadTimeDays: ReminderLeadTime; legacyKinds?: ReminderKind[] }
+> = {
+  trip_countdown_30_days: { label: '30 days to trip', leadTimeDays: 30 },
+  trip_countdown_7_days: { label: '7 days to trip', leadTimeDays: 7 },
+  packing_incomplete: { label: 'Packing reminder', leadTimeDays: 6 },
+  trip_countdown_3_days: { label: '3 days to trip', leadTimeDays: 3 },
+  trip_countdown_1_day: { label: '1 day to trip', leadTimeDays: 1, legacyKinds: ['trip_starts_tomorrow'] },
   trip_today: { label: 'Trip day reminder', leadTimeDays: 0 },
   insurance_missing: { label: 'Missing insurance warning', leadTimeDays: 7 },
   flight_check_in: { label: 'Flight check-in reminder', leadTimeDays: 1 },
@@ -240,6 +249,29 @@ export default function TripDetailScreen() {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const tripScrollRef = useRef<ScrollView | null>(null);
   const sectionOffsets = useRef<Partial<Record<TripSection, number>>>({});
+  const isNotificationProofTrip = isNotificationProofTripId(tripId);
+  const notificationProofSchedule = useMemo(
+    () =>
+      [
+        ['trip_countdown_30_days', '30 days to trip'],
+        ['trip_countdown_7_days', '7 days to trip'],
+        ['packing_incomplete', 'Packing reminder'],
+        ['trip_countdown_3_days', '3 days to trip'],
+        ['insurance_missing', 'Insurance reminder'],
+        ['trip_countdown_1_day', '1 day to trip'],
+        ['trip_today', 'Trip day reminder'],
+        ['flight_check_in', 'Flight check-in'],
+        ['hotel_check_in', 'Hotel check-in'],
+        ['transfer_reminder', 'Transfer reminder'],
+        ['travel_mode_reminder', 'Travel mode reminder'],
+        ['sos_ready', 'SOS reminder'],
+        ['excursion_reminder', 'Excursion reminder'],
+      ].map(([kind, label]) => ({
+        label,
+        offsetMinutes: NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES[kind as keyof typeof NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES],
+      })),
+    []
+  );
 
   const summary = useMemo(
     () => ({
@@ -603,22 +635,42 @@ export default function TripDetailScreen() {
     }
   }
 
-  async function toggleReminder(kind: ReminderKind) {
+  async function toggleReminder(kind: VisibleTripReminderKind) {
     if (!(kind in reminderMeta)) {
       return;
     }
-    const existing = bundle.reminderSettings.find((setting) => setting.kind === kind && setting.tripId === tripId);
-    const base = reminderMeta[kind as keyof typeof reminderMeta];
+
+    const base = reminderMeta[kind];
+    const targetKinds = [kind, ...(base.legacyKinds ?? [])];
+    const existing = bundle.reminderSettings.find((setting) => targetKinds.includes(setting.kind) && setting.tripId === tripId);
+    const exactSetting = bundle.reminderSettings.find((setting) => setting.kind === kind && setting.tripId === tripId);
+    const nextEnabled = !(existing?.enabled ?? false);
+
     await saveReminderSetting(
-      existing
-        ? { ...existing, enabled: !existing.enabled }
+      exactSetting
+        ? { ...exactSetting, enabled: nextEnabled }
         : {
             tripId,
             kind,
-            enabled: true,
+            enabled: nextEnabled,
             leadTimeDays: base.leadTimeDays,
           }
     );
+
+    if (base.legacyKinds?.length) {
+      await Promise.all(
+        base.legacyKinds.map((legacyKind) =>
+          saveReminderSetting(
+            bundle.reminderSettings.find((setting) => setting.kind === legacyKind && setting.tripId === tripId) ?? {
+              tripId,
+              kind: legacyKind,
+              enabled: false,
+              leadTimeDays: base.leadTimeDays,
+            }
+          )
+        )
+      );
+    }
   }
 
   async function handleExportPdf() {
@@ -1407,15 +1459,40 @@ export default function TripDetailScreen() {
         <AppButton label="Export trip PDF" onPress={() => setModalKind('export')} />
       </AppCard>
 
-      <AppCard title="Trip reminders" subtitle="Trip-level local reminders for departures, packing, flights, and excursions.">
+      {isNotificationProofTrip ? (
+        <AppCard
+          title="Notification proof build"
+          subtitle={`Temporary seeded trip for real Android lock-screen verification in Pineapple ${NOTIFICATION_PROOF_BUILD_VERSION}.`}
+        >
+          <Text style={styles.notes}>
+            Turn on `Enable local reminders`, keep this trip’s reminders enabled, then lock the phone. Pineapple compresses the normal reminder windows
+            into a short local test run so you can verify multiple notifications in minutes on the installed APK.
+          </Text>
+          <Text style={styles.notes}>
+            Expected cadence: {notificationProofSchedule.map((entry) => `${entry.label} in ${entry.offsetMinutes} min`).join(' • ')}.
+          </Text>
+          <Text style={styles.notes}>This seeded trip is temporary and should be removed again after notification proofing is complete.</Text>
+        </AppCard>
+      ) : null}
+
+      <AppCard title="Trip reminders" subtitle="Trip-level local reminders for countdowns, packing, flights, hotels, transfers, and excursions.">
         {Object.entries(reminderMeta).map(([kind, meta]) => {
-          const enabled = bundle.reminderSettings.find((setting) => setting.kind === kind && setting.tripId === tripId)?.enabled ?? false;
+          const enabled =
+            bundle.reminderSettings.find(
+              (setting) => setting.tripId === tripId && [kind, ...(meta.legacyKinds ?? [])].includes(setting.kind)
+            )?.enabled ?? false;
           return (
             <ListRow
               key={kind}
               title={meta.label}
               subtitle={`Lead time ${meta.leadTimeDays} day(s)`}
-              right={<AppButton label={enabled ? 'On' : 'Off'} tone={enabled ? 'primary' : 'secondary'} onPress={() => toggleReminder(kind as ReminderKind)} />}
+              right={
+                <AppButton
+                  label={enabled ? 'On' : 'Off'}
+                  tone={enabled ? 'primary' : 'secondary'}
+                  onPress={() => toggleReminder(kind as VisibleTripReminderKind)}
+                />
+              }
             />
           );
         })}

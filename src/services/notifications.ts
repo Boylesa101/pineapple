@@ -62,7 +62,7 @@ async function loadNotificationsModule() {
             importance: Notifications.AndroidImportance.HIGH,
             vibrationPattern: [0, 200, 150, 200],
             lightColor: '#0D6EFD',
-            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
           });
         }
 

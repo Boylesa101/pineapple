@@ -2,11 +2,21 @@
 
 ## Unreleased
 
+- Notification verification build: expanded trip reminder coverage to real `30 day`, `7 day`, `3 day`, `1 day`, and `day-of` trip countdowns, moved the old `trip starts tomorrow` path into legacy compatibility, and kept scheduling local-first
+- Proof-trip scaffolding: version `2.2.2` now seeds a temporary `Notification Proof Trip` on device only for this build, with compressed reminder timing so multiple reminder types can be checked on a real lock screen in minutes rather than days
+- Android notification visibility: the `pineapple-reminders` channel now uses high importance with public lock-screen visibility so standard trip notifications surface more like a normal installed Android app notification
+- Trip-card visual correction: the main stacked trip cards now use a lighter overlay again so destination imagery reads brighter without losing text contrast
 - Vibes refinement pass: added a first-time `Vibe` intro, removed backend terminology from the UI, surfaced clearer `Eat`, `Drink`, `See`, and `Do` lane counts, and kept saved `Mood` cards tied to the trip with locally cached venue imagery where available
 - Tripadvisor worker refinement: the Pineapple proxy now scores destination matches more defensibly, falls back to the Tripadvisor photos endpoint when details do not include a usable venue image, and keeps the same simplified app-facing response without moving secrets into the client
 - Trip-card and transport polish: trip cards now inherit the trip’s primary transport mode for iconography, transport entry supports `flight`, `private_flight`, `train`, `car`, and `taxi`, and the trip footer/travel section now follow that same dynamic transport language
 - Weather redesign: replaced the old illustration-heavy daily detail page with a cleaner Pineapple weather layout while keeping the same live data, hourly outlook, and graceful failure states
 - Architecture confirmation: Vibes remains local-first in the app with on-device trip/Mood/cache storage and a proxy-only Cloudflare worker path for Tripadvisor requests; user trip data and saved Mood items are not stored in Cloudflare buckets or R2
+
+## 2.2.2 - 2026-03-27
+
+- Notification proof pass: audited the existing Expo local notification path, confirmed real scheduling and tap-routing were already implemented, filled the missing countdown reminder coverage, and prepared a dedicated `2.2.2` APK for on-device lock-screen verification
+- Temporary proof trip: seeded a removable local `Notification Proof Trip` for this build only so testers can verify countdown, trip-day, flight, hotel, transfer, travel-mode, SOS, and excursion reminders quickly on a real device
+- Build metadata: bumped Expo, Android, and APK artifact metadata to `2.2.2` for a clean notification verification handoff
 
 ## 2.2.0 - 2026-03-26
 
