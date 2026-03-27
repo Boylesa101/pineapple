@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Account polish: fixed the oversized Account tools container, made the main blue profile circle open the real photo-picker flow, and kept the selected profile image stored locally and rendered immediately
+- Traveller photos: traveller add/edit now supports optional profile images with safe replace and cleanup behavior, and traveller avatars render those stored photos across trip and account surfaces
+- Trip transfer QR fix: Pineapple now generates Pineapple-owned deep-link QR payloads for shared trips, imports them through a dedicated `trip-transfer` route, and keeps QR handoff inside Pineapple instead of bouncing raw text into unrelated scanner apps
+- Privacy wording cleanup: removed stale web/PWA wording from the in-app legal/settings surfaces and aligned the repo docs with the current installable-mobile-app flow
+- Airport timing fallback: trip departure set-off timing now falls back to the earliest saved air segment if legacy trip data is missing an explicit outbound flag, so valid outbound flights no longer disappear from airport-leave calculations
+- Weather scenic card refinement: the trip weather detail header now follows the supplied sunset-hills reference more closely with the layered sky, ocean, hills, reflections, and tree silhouettes in native React Native views
 - Notification verification build: expanded trip reminder coverage to real `30 day`, `7 day`, `3 day`, `1 day`, and `day-of` trip countdowns, moved the old `trip starts tomorrow` path into legacy compatibility, and kept scheduling local-first
 - Proof-trip scaffolding: version `2.2.2` now seeds a temporary `Notification Proof Trip` on device only for this build, with compressed reminder timing so multiple reminder types can be checked on a real lock screen in minutes rather than days
 - Android notification visibility: the `pineapple-reminders` channel now uses high importance with public lock-screen visibility so standard trip notifications surface more like a normal installed Android app notification

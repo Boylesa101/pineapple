@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -12,6 +12,7 @@ import { MiniActionCard } from '@/components/ui/MiniActionCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { colors, radii, spacing } from '@/constants/theme';
 import { useAppStore } from '@/store/useAppStore';
+import { chooseProfilePhoto, removeProfilePhoto } from '@/utils/profilePhotos';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 function initialsForName(value: string) {
@@ -25,13 +26,48 @@ function initialsForName(value: string) {
 
 export default function AccountScreen() {
   const router = useRouter();
-  const { data } = useAppStore();
+  const { data, saveAppPreferences } = useAppStore();
   const visibleTrips = useMemo(() => filterVisibleTrips(data.trips), [data.trips]);
   const travellers = data.travellers;
   const primaryTraveller = travellers[0] ?? null;
   const fullName = primaryTraveller?.fullName || data.appPreferences.profileName || 'Pineapple traveller';
   const profilePhotoUri = data.appPreferences.profilePhotoUri;
   const initials = useMemo(() => initialsForName(fullName) || 'P', [fullName]);
+
+  async function handleProfilePhotoPress() {
+    if (profilePhotoUri) {
+      Alert.alert('Profile photo', 'Update or remove your account photo.', [
+        {
+          text: 'Change photo',
+          onPress: () => {
+            void (async () => {
+              const nextUri = await chooseProfilePhoto(profilePhotoUri);
+              if (nextUri) {
+                await saveAppPreferences({ profilePhotoUri: nextUri });
+              }
+            })();
+          },
+        },
+        {
+          text: 'Remove photo',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              await removeProfilePhoto(profilePhotoUri);
+              await saveAppPreferences({ profilePhotoUri: null });
+            })();
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+
+    const nextUri = await chooseProfilePhoto(null);
+    if (nextUri) {
+      await saveAppPreferences({ profilePhotoUri: nextUri });
+    }
+  }
 
   return (
     <AppScreen scroll contentStyle={styles.screen}>
@@ -44,11 +80,15 @@ export default function AccountScreen() {
       />
 
       <View style={styles.profileTop}>
-        <View style={styles.avatar}>
+        <Pressable onPress={() => void handleProfilePhotoPress()} style={styles.avatar} accessibilityLabel="Add or change profile photo">
           {profilePhotoUri ? <ManagedFileImage uri={profilePhotoUri} style={styles.avatarImage} /> : <Text style={styles.avatarText}>{initials}</Text>}
-        </View>
+          <View style={styles.avatarEditBadge}>
+            <MaterialIcons name="photo-camera" size={16} color={colors.white} />
+          </View>
+        </Pressable>
         <Text style={styles.profileName}>{fullName}</Text>
         <Text style={styles.profileSubtitle}>Primary traveller · Offline-first profile</Text>
+        <Text style={styles.profileHint}>{profilePhotoUri ? 'Tap photo to change it' : 'Tap blue circle to add a photo'}</Text>
       </View>
 
       <View style={styles.statRow}>
@@ -73,7 +113,7 @@ export default function AccountScreen() {
             travellers.map((traveller, index) => (
               <Pressable key={traveller.id} onPress={() => router.push('/trips')} style={[styles.listItem, index === travellers.length - 1 ? styles.listItemLast : null]}>
                 <View style={styles.rowLeft}>
-                  <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} size={34} />
+                  <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} imageUri={traveller.photoUri} size={34} />
                   <View style={styles.rowCopy}>
                     <Text style={styles.rowTitle}>{traveller.fullName}</Text>
                     <Text style={styles.rowDescription}>
@@ -100,30 +140,35 @@ export default function AccountScreen() {
         <SectionHeader title="Account tools" />
         <View style={styles.grid}>
           <MiniActionCard
+            style={styles.gridItem}
             icon={<MaterialIcons name="lock" size={28} color={colors.primaryBlue} />}
             title="Security"
             description="PIN, biometric lock, and privacy settings."
             onPress={() => router.push('/settings')}
           />
           <MiniActionCard
+            style={styles.gridItem}
             icon={<MaterialIcons name="backup" size={28} color={colors.primaryBlue} />}
             title="Backups"
             description="Create local encrypted backups and restore packs."
             onPress={() => router.push('/settings')}
           />
           <MiniActionCard
+            style={styles.gridItem}
             icon={<MaterialIcons name="upload-file" size={28} color={colors.primaryBlue} />}
             title="Imports"
             description="Add scans, files, and travel documents from your device."
             onPress={() => router.push('/vault')}
           />
           <MiniActionCard
+            style={styles.gridItem}
             icon={<MaterialIcons name="notifications" size={28} color={colors.primaryBlue} />}
             title="Reminders"
             description="Manage expiry and trip reminder preferences."
             onPress={() => router.push('/settings')}
           />
           <MiniActionCard
+            style={styles.gridItem}
             icon={<MaterialIcons name="policy" size={28} color={colors.primaryBlue} />}
             title="About"
             description="Privacy summary, support details, and legal pages."
@@ -153,6 +198,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  avatarEditBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryBlueDark,
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
   avatarImage: {
     width: '100%',
     height: '100%',
@@ -171,6 +229,11 @@ const styles = StyleSheet.create({
     color: '#6D8194',
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
+  },
+  profileHint: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
   },
   statRow: {
     flexDirection: 'row',
@@ -203,6 +266,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  gridItem: {
+    width: '48%',
+    alignSelf: 'flex-start',
   },
   listItem: {
     flexDirection: 'row',

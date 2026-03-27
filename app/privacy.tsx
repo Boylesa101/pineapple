@@ -1,23 +1,14 @@
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
-import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { LegalSectionCards } from '@/components/legal/LegalSectionCards';
 import { AppHeader } from '@/components/ui/AppHeader';
-import { legalConfig, privacySections, privacySummaryBullets } from '@/content/legal';
+import { privacySections, privacySummaryBullets } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
-import { openExternalOrFallback } from '@/utils/openExternal';
 
 export default function PrivacyScreen() {
-  async function openWebsitePolicy() {
-    await openExternalOrFallback(
-      legalConfig.privacyPolicyUrl,
-      'The public privacy policy could not be opened right now. The in-app version is shown here instead.'
-    );
-  }
-
   return (
     <AppScreen scroll contentStyle={styles.screen}>
       <AppHeader
@@ -39,7 +30,6 @@ export default function PrivacyScreen() {
             </View>
           ))}
         </View>
-        <AppButton label="Open website policy" tone="secondary" onPress={() => void openWebsitePolicy()} />
       </AppCard>
 
       <LegalSectionCards sections={privacySections} />

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AppState, Platform, StyleSheet, Text, View } from 'react-native';
+import { AppState, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack, usePathname, useRootNavigationState, useRouter, useSegments } from 'expo-router';
@@ -22,6 +22,7 @@ import { PineappleMark } from '@/brand/PineappleMark';
 import { AppButton } from '@/components/AppButton';
 import { colors, spacing } from '@/constants/theme';
 import { addNotificationResponseListener, consumePendingNotificationTarget, getInitialNotificationTarget, type NotificationTarget } from '@/services/notifications';
+import { addTripTransferUrlListener, getInitialTripTransferTarget } from '@/services/tripTransfer';
 import { useAppStore } from '@/store/useAppStore';
 import { resolveAuthRoute } from '@/utils/authRoutes';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
@@ -161,23 +162,21 @@ export default function RootLayout() {
   }, [bootError, fontsLoaded, isBootstrapped]);
 
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
-      return;
-    }
-
-    navigator.serviceWorker.register('/sw.js').catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
     if (!isBootstrapped) {
       return;
     }
 
     let cancelled = false;
     let unsubscribe: (() => void) | null = null;
+    let removeTripTransferListener: (() => void) | null = null;
 
-    void getInitialNotificationTarget().then((target) => {
-      if (!cancelled && target) {
+    void Promise.all([getInitialNotificationTarget(), getInitialTripTransferTarget()]).then(([notificationTarget]) => {
+      if (cancelled) {
+        return;
+      }
+
+      if (notificationTarget) {
+        const target = notificationTarget;
         applyNotificationTarget(target, {
           isUnlocked,
           pinConfigured,
@@ -208,9 +207,12 @@ export default function RootLayout() {
       unsubscribe = remove;
     });
 
+    removeTripTransferListener = addTripTransferUrlListener(() => undefined);
+
     return () => {
       cancelled = true;
       unsubscribe?.();
+      removeTripTransferListener?.();
     };
   }, [isBootstrapped, isUnlocked, pathname, pinConfigured, router, setActiveTrip]);
 
@@ -237,6 +239,7 @@ export default function RootLayout() {
           <Stack.Screen name="terms" />
           <Stack.Screen name="support" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="trip-transfer" />
           <Stack.Screen name="warnings" />
           <Stack.Screen name="trip/[tripId]" />
           <Stack.Screen name="trip/[tripId]/travel-mode" />

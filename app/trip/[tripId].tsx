@@ -23,6 +23,7 @@ import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { ProviderLogoBadge } from '@/components/ProviderLogoBadge';
 import { TransportProviderSearchField } from '@/components/TransportProviderSearchField';
 import { TypedDateField } from '@/components/TypedDateField';
+import { QRCodeImage } from '@/components/ui/QRCodeImage';
 import { colors, spacing } from '@/constants/theme';
 import { NOTIFICATION_PROOF_BUILD_VERSION, NOTIFICATION_PROOF_REMINDER_OFFSETS_MINUTES, isNotificationProofTripId } from '@/data/notificationProofBuild';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
@@ -35,6 +36,8 @@ import {
   type DestinationQuickFacts,
   type DestinationWeatherForecast,
 } from '@/services/tripInsightsService';
+import { createSharedTripPacket } from '@/services/sync';
+import { buildTripTransferQrPayload } from '@/services/tripTransfer';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
 import { findTransportProvider } from '@/data/transportProviders';
 import { useAppStore } from '@/store/useAppStore';
@@ -60,6 +63,8 @@ import { getMissingInfoPrompts, getTripBundle, getUpcomingTimeline } from '@/uti
 import { getPrimaryTransportType, getTransportDisplay, isAirTransportType } from '@/utils/transport';
 import { toUserMessage } from '@/utils/userErrors';
 import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, validateTraveller } from '@/utils/validation';
+import { chooseProfilePhoto } from '@/utils/profilePhotos';
+import { deleteLocalFile } from '@/utils/fileStorage';
 
 type ModalKind = 'traveller' | 'segment' | 'hotel' | 'transfer' | 'emergency' | 'export' | 'invite' | null;
 type TripSection = 'overview' | 'travel' | 'hotel' | 'transfer' | 'packing' | 'itinerary' | 'vibes';
@@ -241,6 +246,8 @@ export default function TripDetailScreen() {
   const [exportOptions, setExportOptions] = useState<PdfExportOptions>(defaultExportOptions);
   const [inviteDraft, setInviteDraft] = useState<TripInviteDraft | null>(null);
   const [connectionSegmentDraft, setConnectionSegmentDraft] = useState<TravelSegmentDraft | null>(null);
+  const [transferQrVisible, setTransferQrVisible] = useState(false);
+  const [travellerPhotoBaselineUri, setTravellerPhotoBaselineUri] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<TripSection>('overview');
   const [destinationTimeInfo, setDestinationTimeInfo] = useState<DestinationLocalTimeInfo | null>(null);
   const [destinationWeather, setDestinationWeather] = useState<DestinationWeatherForecast | null>(null);
@@ -324,6 +331,18 @@ export default function TripDetailScreen() {
           },
     [bundle.travelSegments, trip]
   );
+  const tripTransferQr = useMemo(() => {
+    if (!trip) {
+      return null;
+    }
+
+    try {
+      const packet = createSharedTripPacket(data, tripId);
+      return buildTripTransferQrPayload(JSON.stringify(packet));
+    } catch {
+      return null;
+    }
+  }, [data, trip, tripId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -430,10 +449,12 @@ export default function TripDetailScreen() {
   }, [activeSection]);
 
   function openTravellerEditor(current?: TravellerDraft) {
+    setTravellerPhotoBaselineUri(current?.photoUri ?? null);
     setTravellerDraft(
       current ?? {
         tripId,
         fullName: '',
+        photoUri: null,
         dateOfBirth: null,
         passportNationality: '',
         passportNumber: '',
@@ -447,13 +468,41 @@ export default function TripDetailScreen() {
     setModalKind('traveller');
   }
 
+  async function handleTravellerPhotoSelection() {
+    if (!travellerDraft) {
+      return;
+    }
+
+    const nextUri = await chooseProfilePhoto(travellerDraft.photoUri, {
+      replaceExisting: Boolean(travellerDraft.photoUri && travellerDraft.photoUri !== travellerPhotoBaselineUri),
+    });
+    if (nextUri) {
+      setTravellerDraft((current) => (current ? { ...current, photoUri: nextUri } : current));
+    }
+  }
+
+  async function handleTravellerPhotoRemoval() {
+    const draftPhotoUri = travellerDraft?.photoUri ?? null;
+    if (draftPhotoUri && draftPhotoUri !== travellerPhotoBaselineUri) {
+      await deleteLocalFile(draftPhotoUri);
+    }
+    setTravellerDraft((current) => (current ? { ...current, photoUri: null } : current));
+  }
+
   function openSegmentEditor(current?: TravelSegmentDraft) {
     setSegmentDraft(current ?? createTravelSegmentDraft(tripId, bundle.travelSegments.length));
     setConnectionSegmentDraft(null);
     setModalKind('segment');
   }
 
-  function closeModal() {
+  function closeModal(options?: { preserveTravellerPhoto?: boolean }) {
+    if (modalKind === 'traveller' && !options?.preserveTravellerPhoto) {
+      const draftPhotoUri = travellerDraft?.photoUri ?? null;
+      if (draftPhotoUri && draftPhotoUri !== travellerPhotoBaselineUri) {
+        void deleteLocalFile(draftPhotoUri);
+      }
+      setTravellerPhotoBaselineUri(null);
+    }
     setModalKind(null);
     setConnectionSegmentDraft(null);
   }
@@ -544,7 +593,8 @@ export default function TripDetailScreen() {
         return;
       }
       await saveTraveller(travellerDraft);
-      closeModal();
+      setTravellerPhotoBaselineUri(travellerDraft.photoUri ?? null);
+      closeModal({ preserveTravellerPhoto: true });
       return;
     }
 
@@ -689,6 +739,15 @@ export default function TripDetailScreen() {
     } catch (error) {
       Alert.alert('Share export failed', toUserMessage(error, 'Unable to export that shared trip right now.'));
     }
+  }
+
+  function openTransferQr() {
+    if (!tripTransferQr) {
+      Alert.alert('Transfer QR unavailable', 'Pineapple could not prepare a transfer QR for this trip right now.');
+      return;
+    }
+
+    setTransferQrVisible(true);
   }
 
   async function handleImportShare() {
@@ -1179,7 +1238,7 @@ export default function TripDetailScreen() {
             <View key={traveller.id} style={styles.travellerCard}>
               <View style={styles.travellerHeader}>
                 <View style={styles.travellerIdentity}>
-                  <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} size={42} />
+                  <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} imageUri={traveller.photoUri} size={42} />
                   <View style={styles.travellerCopy}>
                     <Text style={styles.travellerName}>{traveller.fullName}</Text>
                     <Text style={styles.notes}>
@@ -1498,7 +1557,7 @@ export default function TripDetailScreen() {
         })}
       </AppCard>
 
-      <AppCard title="Sharing and participants" subtitle="Optional manual-share sync with participant roles and conflict review.">
+      <AppCard title="Sharing and participants" subtitle="Optional manual-share sync with participant roles, QR handoff, and conflict review.">
         <View style={styles.chipRow}>
           <InfoChip label={`Share code ${bundle.sharedTripState?.shareCode ?? 'Pending'}`} tone="blue" />
           <InfoChip
@@ -1542,9 +1601,13 @@ export default function TripDetailScreen() {
         </View>
         <View style={styles.buttonWrap}>
           <AppButton label="Invite by email / code" tone="secondary" onPress={openInviteEditor} />
+          <AppButton label="Show transfer QR" tone="secondary" onPress={openTransferQr} />
           <AppButton label="Export shared trip" onPress={handleExportShare} />
           <AppButton label="Import update" tone="secondary" onPress={handleImportShare} />
         </View>
+        <Text style={styles.helperText}>
+          Scan the transfer QR with Pineapple installed. If the trip is too large for QR, use the shared-trip file export instead.
+        </Text>
         {bundle.conflicts.length ? (
           <View style={styles.conflictList}>
             {bundle.conflicts
@@ -1574,10 +1637,28 @@ export default function TripDetailScreen() {
       <AppModal
         visible={modalKind === 'traveller'}
         title={travellerDraft?.id ? 'Edit traveller' : 'Add traveller'}
-        onClose={() => setModalKind(null)}
+        onClose={closeModal}
       >
         {travellerDraft ? (
           <>
+            <View style={styles.travellerPhotoEditor}>
+              <AvatarBadge
+                label={travellerDraft.fullName || 'Traveller'}
+                color={travellerDraft.avatarColor}
+                imageUri={travellerDraft.photoUri}
+                size={78}
+              />
+              <View style={styles.buttonWrap}>
+                <AppButton
+                  label={travellerDraft.photoUri ? 'Change photo' : 'Choose photo'}
+                  tone="secondary"
+                  onPress={() => void handleTravellerPhotoSelection()}
+                />
+                {travellerDraft.photoUri ? (
+                  <AppButton label="Remove photo" tone="ghost" onPress={() => void handleTravellerPhotoRemoval()} />
+                ) : null}
+              </View>
+            </View>
             <AppTextField
               label="Full name"
               value={travellerDraft.fullName}
@@ -1943,6 +2024,23 @@ export default function TripDetailScreen() {
           />
         </View>
         <AppButton label="Generate PDF" onPress={handleExportPdf} />
+      </AppModal>
+
+      <AppModal visible={transferQrVisible} title="Trip transfer QR" onClose={() => setTransferQrVisible(false)}>
+        {tripTransferQr?.fitsQr ? (
+          <>
+            <Text style={styles.notes}>Scan this with Pineapple installed on the other device to import the trip directly.</Text>
+            <View style={styles.transferQrCard}>
+              <QRCodeImage value={tripTransferQr.externalUrl} size={232} />
+            </View>
+            <Text style={styles.helperText}>If the other phone is locked, unlock Pineapple first and scan again if needed.</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.notes}>This trip is too detailed to fit safely inside a QR code.</Text>
+            <Text style={styles.helperText}>Use Export shared trip instead, then import the shared file on the receiving phone.</Text>
+          </>
+        )}
       </AppModal>
     </AppScreen>
   );
@@ -2494,6 +2592,10 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     gap: spacing.sm,
   },
+  travellerPhotoEditor: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   inlineFields: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -2519,5 +2621,10 @@ const styles = StyleSheet.create({
   colorSelected: {
     borderWidth: 3,
     borderColor: colors.nightNavy,
+  },
+  transferQrCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
   },
 });

@@ -2,25 +2,16 @@ import Constants from 'expo-constants';
 import { StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
-import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { LegalSectionCards } from '@/components/legal/LegalSectionCards';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { legalConfig, supportFaqs, supportIntroSections } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
-import { openExternalOrFallback } from '@/utils/openExternal';
 
 const versionLabel = Constants.expoConfig?.version ?? legalConfig.versionPlaceholder;
 
 export default function SupportScreen() {
-  async function openWebsiteSupport() {
-    await openExternalOrFallback(
-      legalConfig.supportUrl,
-      'The public support page could not be opened right now. The in-app support content is shown here instead.'
-    );
-  }
-
   return (
     <AppScreen scroll contentStyle={styles.screen}>
       <AppHeader badgeLabel="H" title="Support" subtitle="Help and release contact details" />
@@ -33,7 +24,6 @@ export default function SupportScreen() {
         <Text style={styles.meta}>Support email: {legalConfig.supportEmail}</Text>
         <Text style={styles.meta}>App version: {versionLabel}</Text>
         <Text style={styles.meta}>Release support label: {legalConfig.releaseLabel}</Text>
-        <AppButton label="Open website support" tone="secondary" onPress={() => void openWebsiteSupport()} />
       </AppCard>
 
       <LegalSectionCards sections={supportIntroSections} />

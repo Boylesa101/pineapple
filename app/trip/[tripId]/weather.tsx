@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Svg, { Path } from 'react-native-svg';
 
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
@@ -44,14 +45,21 @@ function formatLocationLabel(value: string) {
   return value.split(',')[0]?.trim() || value;
 }
 
-function LandscapeTree({ style, color }: { style: object; color: string }) {
+function ScenicTree({ style, color, width, height }: { style: object; color: string; width: number; height: number }) {
   return (
-    <View style={[styles.treeWrap, style]}>
-      <View style={[styles.treeCanopyOuter, { backgroundColor: color }]} />
-      <View style={[styles.treeCanopyInner, { backgroundColor: `${color}CC` }]} />
-      <View style={styles.treeTrunk} />
+    <View style={style}>
+      <Svg width={width} height={height} viewBox="0 0 64 64">
+        <Path
+          d="M32,0C18.148,0,12,23.188,12,32c0,9.656,6.883,17.734,16,19.594V60c0,2.211,1.789,4,4,4s4-1.789,4-4v-8.406 C45.117,49.734,52,41.656,52,32C52,22.891,46.051,0,32,0z"
+          fill={color}
+        />
+      </Svg>
     </View>
   );
+}
+
+function ScenicReflection({ style }: { style: object }) {
+  return <View style={[styles.reflection, style]} />;
 }
 
 export default function TripWeatherScreen() {
@@ -136,9 +144,14 @@ export default function TripWeatherScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
           <View style={styles.scenicCard}>
             <View style={styles.landscapeSection}>
-              <LinearGradient colors={['#E96594', '#F7E157']} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} />
-              <View style={styles.sunGlowOuter} />
-              <View style={styles.sunGlowInner} />
+              <LinearGradient
+                colors={['#E96594', '#F7E157']}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={styles.sky}
+              />
+              <View style={styles.sunHaloFar} />
+              <View style={styles.sunHaloNear} />
               <View style={styles.sunCore} />
 
               <View style={styles.hillOne} />
@@ -146,25 +159,27 @@ export default function TripWeatherScreen() {
 
               <View style={styles.ocean}>
                 <LinearGradient colors={['#F7DA96', '#F1C07D']} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} />
-                <View style={[styles.reflection, styles.reflectionOne]} />
-                <View style={[styles.reflection, styles.reflectionTwo]} />
-                <View style={[styles.reflection, styles.reflectionThree]} />
-                <View style={[styles.reflection, styles.reflectionFour]} />
-                <View style={[styles.reflection, styles.reflectionFive]} />
+                <ScenicReflection style={styles.reflectionOne} />
+                <ScenicReflection style={styles.reflectionTwo} />
+                <ScenicReflection style={styles.reflectionThree} />
+                <ScenicReflection style={styles.reflectionFour} />
+                <ScenicReflection style={styles.reflectionFive} />
                 <View style={styles.shadowHillOne} />
                 <View style={styles.shadowHillTwo} />
               </View>
 
               <View style={styles.hillThree} />
               <View style={styles.hillFour} />
-              <LandscapeTree style={styles.treeOne} color="#B77873" />
-              <LandscapeTree style={styles.treeTwo} color="#B77873" />
-              <LandscapeTree style={styles.treeThree} color="#A16773" />
+              <ScenicTree style={styles.treeOne} color="#B77873" width={50} height={70} />
+              <ScenicTree style={styles.treeTwo} color="#B77873" width={50} height={70} />
+              <ScenicTree style={styles.treeThree} color="#A16773" width={65} height={80} />
 
               <LinearGradient
-                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.28)']}
-                locations={[0, 0.45, 1]}
-                style={StyleSheet.absoluteFillObject}
+                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,1)']}
+                locations={[0, 0.44, 1]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={styles.landscapeFilter}
               />
 
               <View style={styles.weatherInfo}>
@@ -288,7 +303,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   scenicCard: {
-    height: 410,
+    height: 392,
     borderRadius: 28,
     overflow: 'hidden',
     backgroundColor: colors.white,
@@ -302,31 +317,34 @@ const styles = StyleSheet.create({
     height: '70%',
     overflow: 'hidden',
   },
-  sunGlowOuter: {
+  sky: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sunHaloFar: {
     position: 'absolute',
-    bottom: '39%',
-    left: '19%',
+    bottom: '38.5%',
+    left: '21.4%',
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  sunGlowInner: {
+  sunHaloNear: {
     position: 'absolute',
-    bottom: '40%',
-    left: '21%',
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.48)',
+    bottom: '39.7%',
+    left: '20.7%',
+    width: 53,
+    height: 53,
+    borderRadius: 26.5,
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
   sunCore: {
     position: 'absolute',
-    bottom: '41%',
-    left: '23%',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    bottom: '40.4%',
+    left: '22.7%',
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
     backgroundColor: colors.white,
   },
   ocean: {
@@ -345,32 +363,35 @@ const styles = StyleSheet.create({
     height: 10,
     top: '5%',
     left: '32%',
-    transform: [{ skewX: '-30deg' }],
+    transform: [{ skewX: '-30deg' }, { scaleY: 0.8 }],
   },
   reflectionTwo: {
-    width: 76,
-    height: 14,
+    width: 80,
+    height: 15,
     top: '15%',
     left: '39%',
-    transform: [{ skewX: '-25deg' }],
+    transform: [{ skewX: '-20deg' }, { scaleY: 0.78 }],
   },
   reflectionThree: {
     width: 60,
-    height: 3,
+    height: 2,
     top: '28%',
     right: '15%',
+    borderRadius: 999,
   },
   reflectionFour: {
     width: 70,
-    height: 3,
+    height: 2,
     top: '38%',
     right: '28%',
+    borderRadius: 999,
   },
   reflectionFive: {
     width: 70,
-    height: 4,
+    height: 3,
     top: '47%',
     right: '8%',
+    borderRadius: 999,
   },
   hillOne: {
     position: 'absolute',
@@ -426,41 +447,23 @@ const styles = StyleSheet.create({
     borderRadius: 175,
     backgroundColor: '#A16773',
   },
-  treeWrap: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  treeCanopyOuter: {
-    width: 28,
-    height: 48,
-    borderRadius: 20,
-  },
-  treeCanopyInner: {
-    position: 'absolute',
-    top: 8,
-    width: 20,
-    height: 30,
-    borderRadius: 16,
-  },
-  treeTrunk: {
-    width: 6,
-    height: 26,
-    marginTop: -4,
-    borderRadius: 3,
-    backgroundColor: 'rgba(69,40,45,0.28)',
-  },
   treeOne: {
+    position: 'absolute',
     bottom: '20%',
-    left: '4%',
+    left: '3%',
   },
   treeTwo: {
-    bottom: '15%',
-    left: '24%',
+    position: 'absolute',
+    bottom: '14%',
+    left: '25%',
   },
   treeThree: {
+    position: 'absolute',
     bottom: '10%',
-    right: '3%',
+    right: '1%',
+  },
+  landscapeFilter: {
+    ...StyleSheet.absoluteFillObject,
   },
   weatherInfo: {
     position: 'absolute',
@@ -470,33 +473,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 15,
     gap: spacing.md,
     zIndex: 2,
   },
   weatherInfoLeft: {
-    width: '28%',
-    gap: 6,
+    width: '22%',
+    gap: 4,
   },
   weatherIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
   },
   weatherInfoLabel: {
     color: colors.white,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
     lineHeight: 18,
   },
   weatherInfoRight: {
     flex: 1,
     alignItems: 'flex-end',
-    gap: 2,
+    gap: 0,
   },
   locationRow: {
     flexDirection: 'row',
@@ -519,13 +521,13 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontFamily: 'Poppins_700Bold',
     fontSize: 30,
-    lineHeight: 34,
+    lineHeight: 36,
   },
   contentSection: {
     flex: 1,
     backgroundColor: colors.white,
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 14,
     justifyContent: 'space-between',
   },
   contentMetaRow: {

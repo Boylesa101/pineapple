@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { createShareCode } from '@/utils/shareCodes';
 
-const DATABASE_VERSION = 20;
+const DATABASE_VERSION = 21;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS travellers (
   id TEXT PRIMARY KEY NOT NULL,
   tripId TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   fullName TEXT NOT NULL,
+  photoUri TEXT,
   dateOfBirth TEXT,
   passportNationality TEXT NOT NULL DEFAULT '',
   passportNumber TEXT NOT NULL DEFAULT '',
@@ -318,6 +319,7 @@ async function ensureColumn(db: SQLiteDatabase, table: string, column: string, d
 
 async function runPhaseTwoMigration(db: SQLiteDatabase) {
   await ensureColumn(db, 'travellers', 'dateOfBirth', 'TEXT');
+  await ensureColumn(db, 'travellers', 'photoUri', 'TEXT');
   await ensureColumn(db, 'travellers', 'passportNationality', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn(db, 'travellers', 'notes', "TEXT NOT NULL DEFAULT ''");
   await ensureColumn(db, 'travellers', 'avatarColor', "TEXT NOT NULL DEFAULT '#F4B400'");

@@ -100,7 +100,8 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Dedicated expiry warnings screen with filters for all, expiring soon, expired, and notifications off
 - Optional manual-share trip sync with participant roles, invite records, conflict review, and trip-share export/import
 - Expanded settings surface for security, reminders, sync, backup/restore, and privacy masking
-- Expo web/PWA companion mode for trip overview, packing, itinerary, emergency info, and printable summaries
+- Trip sharing now supports Pineapple-owned shared files plus a trip-level Pineapple QR handoff route for smaller transfers
+- Account and traveller profiles can each keep an optional local profile photo stored in Pineapple-managed device storage
 - Five-screen first-launch onboarding with PIN setup, first-trip creation, and a setup checklist
 - Blue first-run welcome/auth flow with setup-aware greeting copy and centered PIN pad layout
 - Retryable startup recovery if local bootstrap fails unexpectedly
@@ -276,7 +277,7 @@ npx expo export --platform web
 - Backup export/import uses password-protected AES encryption in the local backup layer
 - Shared trip sync is optional and manual-share only in phase 3
 - Conflict review is explicit; Pineapple does not silently overwrite local trip changes
-- Web/PWA is supported as a companion surface, but the Android app remains the most secure home for sensitive vault images
+- Pineapple is currently shipped and tested as an installable mobile app, with the Android build remaining the main secure home for sensitive vault images
 - Notification text stays privacy-aware and does not include document numbers, images, or full document contents
 - Expiry reminder notifications also avoid traveller names and specific document types so lock-screen reminder text stays more generic
 - Android screenshots are blocked and Android OS backup is disabled
@@ -310,7 +311,7 @@ npx expo export --platform web
 - Photo library access is requested only when the user chooses to import a local image for a trip or document
 - File picker access is used only for user-selected local files such as PDFs, images, shared-trip packets, and encrypted backups
 - Pineapple does not connect to a live inbox; any “email import” workflow is limited to local files the user chooses on-device
-- The web companion uses browser-safe local storage fallbacks for onboarding and security state instead of relying on native secure storage APIs
+- Pineapple relies on device-local secure storage and local files in the native app build for onboarding, security state, and encrypted attachments
 
 ### Brand direction
 
@@ -330,7 +331,7 @@ npx expo export --platform web
 - Participant avatars, invite records, and conflict review UI
 - Settings hub for security, reminders, sync, backup, and privacy preferences
 - Improved Travel Mode with a next-action card and today timeline
-- Web/PWA companion scaffolding and companion-mode guidance
+- Mobile-app release and deployment guidance
 
 ### Roadmap
 
@@ -345,9 +346,9 @@ npx expo export --platform web
 - Internal release-readiness notes: [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md)
 - Legal and compliance release checklist:
   - Replace placeholder support and privacy emails in `src/content/legal.ts`
-  - Confirm final website URLs in `src/content/legal.ts`
+  - Confirm final support and policy URLs in `src/content/legal.ts`
   - Verify whether analytics or crash reporting are enabled before Play submission
   - Recheck what data leaves the device for third-party lookups and keep legal wording aligned
   - Confirm Google Play Data safety answers against the shipped build
-  - Confirm the public privacy policy link is live and visible in both the app and website
+  - Confirm the in-app privacy and terms pages still match the shipped behavior
   - Review SOS and location wording before release if nearby SOS features are added

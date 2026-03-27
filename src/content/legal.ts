@@ -1,5 +1,5 @@
 // Replace these placeholder emails and URLs before production release.
-// This file is the single source of truth for Pineapple's app and website legal wording.
+// This file is the single source of truth for Pineapple's in-app legal wording.
 // Keep this aligned with the actual shipped app behavior. Do not overstate security,
 // location usage, analytics, or cloud capabilities if the code does not support them.
 
@@ -19,11 +19,6 @@ export const legalConfig = {
   tagline: 'Your travel essentials in one secure place — even offline.',
   supportEmail: 'studiopixel101@gmail.com',
   privacyEmail: 'studiopixel101@gmail.com',
-  websiteUrl: 'https://get-pineapple.pages.dev',
-  privacyPolicyUrl: 'https://get-pineapple.pages.dev/privacy',
-  termsUrl: 'https://get-pineapple.pages.dev/terms',
-  supportUrl: 'https://get-pineapple.pages.dev/support',
-  futurePlayStoreUrl: '#',
   versionPlaceholder: 'Use the current app version here before release.',
   releaseLabel: 'First public release candidate',
   developerName: 'Pineapple App',
@@ -211,7 +206,7 @@ export const privacySections: ContentSection[] = [
   {
     heading: 'Updates to this policy',
     paragraphs: [
-      'We may update this Privacy Policy as Pineapple changes. When we do, we will update the wording in the app and on the public website.',
+      'We may update this Privacy Policy as Pineapple changes. When we do, we will update the wording shown inside the app.',
       `Questions about this policy can be sent to ${legalConfig.privacyEmail}.`,
     ],
   },
@@ -255,14 +250,14 @@ export const termsSections: ContentSection[] = [
   {
     heading: 'Limitation of liability',
     paragraphs: [
-      'To the fullest extent allowed by law, Pineapple App is not liable for indirect, incidental, special, consequential, or similar losses that arise from use of the app or website.',
+      'To the fullest extent allowed by law, Pineapple App is not liable for indirect, incidental, special, consequential, or similar losses that arise from use of the app.',
       'That includes missed travel, expired documents, booking errors, emergency issues, or reliance on information that is incomplete, delayed, or no longer current.',
     ],
   },
   {
     heading: 'Changes',
     paragraphs: [
-      'We may update the app, website, and these terms over time. Continued use after an update means you accept the updated version.',
+      'We may update the app and these terms over time. Continued use after an update means you accept the updated version.',
     ],
   },
   {
@@ -323,11 +318,11 @@ export const supportFaqs: FAQItem[] = [
 
 export const releaseChecklist = [
   'Replace placeholder support and privacy email addresses.',
-  'Confirm the final pages.dev or custom domain URLs in legalConfig.',
-  'Update the Google Play link on the website when the listing is live.',
+  'Confirm any linked support or policy URLs before release.',
+  'Update the Google Play listing link when the store page is live.',
   'Verify whether analytics, crash reporting, or any new SDKs have been added since this draft.',
   'Recheck what data leaves the device for third-party lookups and keep the policy wording aligned.',
-  'Confirm the privacy policy link is live and visible in both the app and the website.',
+  'Confirm the in-app privacy and terms pages still match the shipped app behavior.',
   'Confirm Google Play Data safety answers against the actual shipped build.',
   'Review SOS wording and any location-related copy before release if nearby help features are added.',
 ] as const;

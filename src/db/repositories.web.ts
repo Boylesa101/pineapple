@@ -108,6 +108,7 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
       (snapshot.travellers ?? []).map(async (traveller) => ({
         ...traveller,
         fullName: (await decryptStructuredValue(traveller.fullName)) ?? '',
+        photoUri: traveller.photoUri ?? null,
         dateOfBirth: await decryptStructuredValue(traveller.dateOfBirth),
         passportNationality: (await decryptStructuredValue(traveller.passportNationality)) ?? '',
         passportNumber: (await decryptStructuredValue(traveller.passportNumber)) ?? '',

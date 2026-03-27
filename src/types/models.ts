@@ -104,6 +104,7 @@ export interface Traveller {
   id: string;
   tripId: string;
   fullName: string;
+  photoUri?: string | null;
   dateOfBirth: string | null;
   passportNationality: string;
   passportNumber: string;

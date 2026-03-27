@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
@@ -368,15 +368,12 @@ export default function SettingsScreen() {
           Last sync: {data.appPreferences.lastSyncAt ? new Date(data.appPreferences.lastSyncAt).toLocaleString() : 'Never'}
         </Text>
         <AppButton label="Import shared trip / sync file" tone="secondary" onPress={handleImportSharedTrip} />
-        <View style={styles.qrBox}>
-          <View style={styles.qrCopy}>
-            <Text style={styles.qrTitle}>Trip transfer</Text>
-            <Text style={styles.meta}>
-              Use local share packages to move trip data between devices. QR handoff can be layered on top of this safe local transfer flow later.
-            </Text>
-          </View>
-          <View style={styles.qrVisual} />
-        </View>
+        <Text style={styles.meta}>
+          Trip transfer uses Pineapple-owned shared files and trip-level transfer QR codes. Open a trip and use Sharing and participants to show a Pineapple QR for that trip.
+        </Text>
+        <Text style={styles.meta}>
+          Very detailed trips may still need the shared-trip file export because QR codes have limited capacity.
+        </Text>
       </AppCard>
 
       <AppCard title="Privacy">
@@ -390,7 +387,7 @@ export default function SettingsScreen() {
           ]}
         />
         <Text style={styles.meta}>
-          Document images remain most secure on Android. Web/PWA is intended for overview, packing, itinerary, emergency info, and printable summaries.
+          Document images, trips, reminders, and emergency notes are designed to stay on this device unless you explicitly export or share them.
         </Text>
       </AppCard>
       </View>
@@ -450,20 +447,9 @@ export default function SettingsScreen() {
       </AppCard>
       </View>
 
-      {Platform.OS === 'web' ? (
-        <View style={styles.section}>
-          <SectionHeader title="Web companion" />
-          <AppCard title="Web companion">
-            <Text style={styles.meta}>
-              This web build is intended for overview, packing, itinerary, emergency details, and printable summaries. Keep sensitive document images in the Android app whenever possible.
-            </Text>
-          </AppCard>
-        </View>
-      ) : null}
-
       <View style={styles.section}>
         <SectionHeader title="Privacy and legal" />
-        <AppCard title="Privacy summary" subtitle="Keep the legal wording visible inside the app, not just on the website.">
+        <AppCard title="Privacy summary" subtitle="Keep the legal wording visible inside the app where travellers actually use it.">
           {privacySummaryBullets.map((item) => (
             <View key={item} style={styles.privacyRow}>
               <Text style={styles.privacyBullet}>•</Text>
@@ -472,7 +458,7 @@ export default function SettingsScreen() {
           ))}
         </AppCard>
 
-        <AppCard title="Legal links" subtitle="Open the in-app policy pages or the matching public Pages site.">
+        <AppCard title="Legal links" subtitle="Open Pineapple's in-app policy and support pages.">
           <ListRow
             title="About Pineapple"
             subtitle={legalConfig.tagline}
@@ -481,7 +467,7 @@ export default function SettingsScreen() {
           />
           <ListRow
             title="Privacy Policy"
-            subtitle="In-app policy aligned with the public website wording."
+            subtitle="How Pineapple handles local-first travel data on your device."
             onPress={() => router.push('/privacy')}
             right={<Text style={styles.linkText}>Open</Text>}
           />
@@ -595,34 +581,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-  },
-  qrBox: {
-    marginTop: spacing.sm,
-    borderWidth: 1,
-    borderColor: '#B7D1F4',
-    borderStyle: 'dashed',
-    borderRadius: 18,
-    backgroundColor: '#F7FBFF',
-    padding: spacing.md,
-    flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'center',
-  },
-  qrCopy: {
-    flex: 1,
-    gap: 6,
-  },
-  qrTitle: {
-    color: colors.primaryBlueText,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-  },
-  qrVisual: {
-    width: 78,
-    height: 78,
-    borderRadius: 12,
-    backgroundColor: colors.primaryBlue,
-    opacity: 0.12,
   },
   conflictList: {
     gap: spacing.sm,

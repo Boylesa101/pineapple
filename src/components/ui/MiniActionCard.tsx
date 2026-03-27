@@ -26,7 +26,7 @@ export function MiniActionCard({ icon, title, description, onPress, style }: Pro
 
 const styles = StyleSheet.create({
   card: {
-    height: '100%',
+    minHeight: 0,
   },
   iconWrap: {
     marginBottom: spacing.xs,

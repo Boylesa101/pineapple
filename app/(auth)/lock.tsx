@@ -8,6 +8,7 @@ import { PinPad } from '@/components/PinPad';
 import { colors, spacing } from '@/constants/theme';
 import { unlockCultureFacts, unlockGreetings } from '@/data/unlockCulture';
 import { consumePendingNotificationTarget } from '@/services/notifications';
+import { consumePendingTripTransferTarget } from '@/services/tripTransfer';
 import { useAppStore } from '@/store/useAppStore';
 import { getPostUnlockRoute } from '@/utils/authRoutes';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
@@ -34,7 +35,7 @@ export default function LockScreen() {
   const nextRoute = getPostUnlockRoute(tripCount);
 
   function resolvePostUnlockRoute() {
-    return consumePendingNotificationTarget()?.href ?? nextRoute;
+    return consumePendingTripTransferTarget()?.href ?? consumePendingNotificationTarget()?.href ?? nextRoute;
   }
 
   useEffect(() => {

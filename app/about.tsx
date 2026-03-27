@@ -10,7 +10,6 @@ import { ListRow } from '@/components/ListRow';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { aboutSections, legalConfig, privacySummaryBullets } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
-import { openExternalOrFallback } from '@/utils/openExternal';
 
 const versionLabel = Constants.expoConfig?.version ?? legalConfig.versionPlaceholder;
 
@@ -42,7 +41,7 @@ export default function AboutScreen() {
       <AppCard title="Legal and support links">
         <ListRow
           title="Privacy Policy"
-          subtitle="Read the in-app policy or open the public website version."
+          subtitle="Read Pineapple's in-app privacy policy."
           onPress={() => router.push('/privacy')}
           right={<MaterialIcons name="chevron-right" size={20} color={colors.primaryBlue} />}
         />
@@ -57,17 +56,6 @@ export default function AboutScreen() {
           subtitle="Open help content, FAQs, and support details."
           onPress={() => router.push('/support')}
           right={<MaterialIcons name="chevron-right" size={20} color={colors.primaryBlue} />}
-        />
-        <ListRow
-          title="Website"
-          subtitle={legalConfig.websiteUrl}
-          onPress={() =>
-            void openExternalOrFallback(
-              legalConfig.websiteUrl,
-              'The Pineapple website could not be opened right now. You can still use the in-app legal pages.'
-            )
-          }
-          right={<MaterialIcons name="open-in-new" size={18} color={colors.primaryBlue} />}
         />
       </AppCard>
     </AppScreen>

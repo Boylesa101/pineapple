@@ -148,6 +148,10 @@ async function cleanupTripFiles(tripId: string) {
     'SELECT hotelImageLocalPath FROM hotel_stays WHERE tripId = ?',
     tripId
   );
+  const travellers = await db.getAllAsync<{ photoUri: string | null }>(
+    'SELECT photoUri FROM travellers WHERE tripId = ?',
+    tripId
+  );
   const documents = await db.getAllAsync<{
     localFileUri: string;
     previewUri: string | null;
@@ -165,6 +169,11 @@ async function cleanupTripFiles(tripId: string) {
 
   const hotelImageUris = new Set(hotels.map((hotel) => hotel.hotelImageLocalPath).filter((value): value is string => Boolean(value)));
   for (const uri of hotelImageUris) {
+    await deleteLocalFile(uri);
+  }
+
+  const travellerPhotoUris = new Set(travellers.map((traveller) => traveller.photoUri).filter((value): value is string => Boolean(value)));
+  for (const uri of travellerPhotoUris) {
     await deleteLocalFile(uri);
   }
 
@@ -300,6 +309,7 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     travellers.map(async (traveller) => ({
       ...traveller,
       fullName: (await decryptField(traveller.fullName)) ?? '',
+      photoUri: traveller.photoUri ?? null,
       dateOfBirth: await decryptField(traveller.dateOfBirth),
       passportNationality: (await decryptField(traveller.passportNationality)) ?? '',
       passportNumber: (await decryptField(traveller.passportNumber)) ?? '',
@@ -613,6 +623,9 @@ export async function upsertTraveller(input: TravellerDraft) {
   const db = await getDatabase();
   const timestamp = now();
   const id = input.id ?? createId('traveller');
+  const existing = input.id
+    ? await db.getFirstAsync<{ photoUri: string | null }>('SELECT photoUri FROM travellers WHERE id = ?', input.id)
+    : null;
   const encryptedFullName = (await encryptField(input.fullName)) ?? '';
   const encryptedDateOfBirth = await encryptField(input.dateOfBirth);
   const encryptedPassportNationality = (await encryptField(input.passportNationality)) ?? '';
@@ -622,11 +635,12 @@ export async function upsertTraveller(input: TravellerDraft) {
   const encryptedNotes = (await encryptField(input.notes)) ?? '';
 
   await db.runAsync(
-    `INSERT INTO travellers (id, tripId, fullName, dateOfBirth, passportNationality, passportNumber, ghicNumber, medicalNote, notes, avatarColor, relationshipType, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO travellers (id, tripId, fullName, photoUri, dateOfBirth, passportNationality, passportNumber, ghicNumber, medicalNote, notes, avatarColor, relationshipType, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        tripId = excluded.tripId,
        fullName = excluded.fullName,
+       photoUri = excluded.photoUri,
        dateOfBirth = excluded.dateOfBirth,
        passportNationality = excluded.passportNationality,
        passportNumber = excluded.passportNumber,
@@ -639,6 +653,7 @@ export async function upsertTraveller(input: TravellerDraft) {
     id,
     input.tripId,
     encryptedFullName,
+    input.photoUri ?? null,
     encryptedDateOfBirth,
     encryptedPassportNationality,
     encryptedPassportNumber,
@@ -650,6 +665,10 @@ export async function upsertTraveller(input: TravellerDraft) {
     timestamp,
     timestamp
   );
+
+  if (existing?.photoUri && existing.photoUri !== input.photoUri) {
+    await deleteLocalFile(existing.photoUri);
+  }
 
   return id;
 }
@@ -1350,15 +1369,26 @@ export async function deleteById(table: string, id: string) {
     }
   }
 
+  if (table === 'travellers') {
+    const traveller = await db.getFirstAsync<{ photoUri: string | null }>(
+      'SELECT photoUri FROM travellers WHERE id = ?',
+      id
+    );
+    if (traveller?.photoUri) {
+      await deleteLocalFile(traveller.photoUri);
+    }
+  }
+
   await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, id);
 }
 
 export async function clearAllData() {
   const db = await getDatabase();
-  const [trips, documents] = await Promise.all([
+  const [trips, travellers, documents] = await Promise.all([
     db.getAllAsync<{ coverImageUri: string | null; destinationImageLocalPath: string | null }>(
       'SELECT coverImageUri, destinationImageLocalPath FROM trips'
     ),
+    db.getAllAsync<{ photoUri: string | null }>('SELECT photoUri FROM travellers'),
     db.getAllAsync<{
       localFileUri: string;
       previewUri: string | null;
@@ -1371,6 +1401,12 @@ export async function clearAllData() {
     const tripImageUris = new Set([trip.coverImageUri, trip.destinationImageLocalPath].filter((value): value is string => Boolean(value)));
     for (const uri of tripImageUris) {
       await deleteLocalFile(uri);
+    }
+  }
+
+  for (const traveller of travellers) {
+    if (traveller.photoUri) {
+      await deleteLocalFile(traveller.photoUri);
     }
   }
 

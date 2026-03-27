@@ -50,6 +50,8 @@
     "expo-status-bar": "~55.0.4",
     "expo-system-ui": "~55.0.10",
     "idb-keyval": "^6.2.2",
+    "lz-string": "^1.5.0",
+    "qrcode": "^1.5.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.2",
@@ -66,6 +68,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@types/qrcode": "^1.5.6",
     "@types/react": "~19.2.10",
     "tsx": "^4.21.0",
     "typescript": "~5.9.2"

@@ -820,9 +820,11 @@ export function getAirportSetOffInfo(
   travelSegments: TravelSegment[],
   airportTravelDurationMinutes: number | null | undefined
 ): AirportSetOffInfo {
-  const outboundFlight = [...travelSegments]
-    .filter((segment) => isAirTransportType(segment.transportType) && segment.travelDirection === 'outbound')
-    .sort((left, right) => compareIsoDates(left.departureTime, right.departureTime))[0];
+  const airSegments = [...travelSegments]
+    .filter((segment) => isAirTransportType(segment.transportType))
+    .sort((left, right) => compareIsoDates(left.departureTime, right.departureTime));
+  const outboundFlight = airSegments.find((segment) => segment.travelDirection === 'outbound') ?? airSegments[0];
+  const usedDirectionFallback = Boolean(outboundFlight && outboundFlight.travelDirection !== 'outbound');
 
   if (!outboundFlight) {
     return {
@@ -858,7 +860,9 @@ export function getAirportSetOffInfo(
       minute: '2-digit',
       hour12: false,
     }).format(setOffTime),
-    helperLabel: `Leave ${airportTravelDurationMinutes} min before a 2h pre-flight arrival window.`,
+    helperLabel: usedDirectionFallback
+      ? `Using the earliest saved air departure. Leave ${airportTravelDurationMinutes} min before a 2h pre-flight arrival window.`
+      : `Leave ${airportTravelDurationMinutes} min before a 2h pre-flight arrival window.`,
     departureLabel: `Departure ${formatDateTime(outboundFlight.departureTime)}`,
   };
 }

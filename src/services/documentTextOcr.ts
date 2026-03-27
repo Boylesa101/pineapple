@@ -52,7 +52,7 @@ async function resolveOcrSource(localFileUri: string, mimeType?: string | null):
 
 export async function recognizeDocumentText(localFileUri: string, mimeType: string | null | undefined, label: string) {
   if (Platform.OS === 'web') {
-    throw createUnavailableError(`${label} OCR is available in the Android app, not the web companion.`);
+    throw createUnavailableError(`${label} OCR is available in the installed Pineapple Android app.`);
   }
 
   let generatedImageUris: string[] = [];
