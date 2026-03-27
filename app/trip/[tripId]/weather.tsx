@@ -134,7 +134,7 @@ export default function TripWeatherScreen() {
   }
 
   return (
-    <AppScreen backgroundColor="#F7FBFF" hideBackgroundDecor>
+    <AppScreen backgroundColor="#FFF4ED" hideBackgroundDecor>
       <Pressable onPress={() => router.back()} style={styles.backButton}>
         <MaterialIcons name="arrow-back" size={20} color={colors.nightNavy} />
         <Text style={styles.backLabel}>Back to trip</Text>
@@ -256,15 +256,18 @@ export default function TripWeatherScreen() {
           </AppCard>
 
           <AppCard title="Hourly outlook" subtitle="Real forecast for the selected trip day.">
-            <View style={styles.hourList}>
+            <View style={styles.hourlyList}>
               {weatherDetail.hours.map((hour, index) => (
-                <View key={hour.time} style={[styles.hourRow, index < weatherDetail.hours.length - 1 ? styles.hourRowBorder : null]}>
-                  <Text style={styles.hourTime}>{hour.timeLabel}</Text>
-                  <View style={styles.hourCondition}>
-                    <MaterialIcons name={weatherIconName(hour.weatherCode) as any} size={18} color={colors.primaryBlue} />
-                    <Text style={styles.hourConditionText}>{hour.conditionLabel}</Text>
+                <View key={hour.time}>
+                  <View style={styles.hourlyRow}>
+                    <Text style={styles.hourlyTime}>{hour.timeLabel}</Text>
+                    <View style={styles.hourlyValue}>
+                      <MaterialIcons name={weatherIconName(hour.weatherCode) as any} size={18} color={colors.textMuted} />
+                      <Text style={styles.hourlyCondition}>{hour.conditionLabel}</Text>
+                    </View>
+                    <Text style={styles.hourlyTemp}>{formatTemperature(hour.temperatureC)}</Text>
                   </View>
-                  <Text style={styles.hourTemp}>{formatTemperature(hour.temperatureC)}</Text>
+                  {index < weatherDetail.hours.length - 1 ? <View style={styles.separator} /> : null}
                 </View>
               ))}
             </View>
@@ -647,45 +650,47 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 13,
   },
-  hourList: {
+  hourlyList: {
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
   },
-  hourRow: {
+  hourlyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    gap: spacing.md,
     backgroundColor: colors.white,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
-  hourRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEF3F8',
-  },
-  hourTime: {
+  hourlyTime: {
     width: 58,
     color: colors.primaryBlueText,
     fontFamily: 'Inter_700Bold',
     fontSize: 14,
   },
-  hourCondition: {
+  hourlyValue: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
-  hourConditionText: {
+  hourlyCondition: {
     flex: 1,
     color: colors.textMuted,
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
   },
-  hourTemp: {
+  hourlyTemp: {
     color: colors.primaryBlueDark,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 16,
+  },
+  separator: {
+    height: 1,
+    marginHorizontal: spacing.md,
+    backgroundColor: '#EEF3F8',
   },
 });

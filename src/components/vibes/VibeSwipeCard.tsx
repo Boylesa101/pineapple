@@ -22,7 +22,13 @@ export function VibeSwipeCard({ item, imageUri, onOpen }: Props) {
         {imageUri ? (
           <ManagedFileImage uri={imageUri} style={styles.image} />
         ) : (
-          <LinearGradient colors={['#0D6EFD', '#2BA6CB', '#F4B400']} style={StyleSheet.absoluteFillObject} />
+          <>
+            <LinearGradient colors={['#0D6EFD', '#2BA6CB', '#F4B400']} style={StyleSheet.absoluteFillObject} />
+            <View style={styles.imageFallbackBadge}>
+              <MaterialIcons name="photo-camera" size={20} color="rgba(255,255,255,0.92)" />
+              <Text style={styles.imageFallbackLabel}>Venue photo loading</Text>
+            </View>
+          </>
         )}
         <LinearGradient
           colors={['rgba(10, 18, 30, 0.06)', 'rgba(12, 27, 45, 0.16)', 'rgba(12, 27, 45, 0.84)']}
@@ -76,6 +82,23 @@ const styles = StyleSheet.create({
   },
   image: {
     ...StyleSheet.absoluteFillObject,
+  },
+  imageFallbackBadge: {
+    position: 'absolute',
+    top: spacing.lg,
+    right: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    backgroundColor: 'rgba(10, 18, 30, 0.18)',
+  },
+  imageFallbackLabel: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
   },
   topRow: {
     position: 'absolute',

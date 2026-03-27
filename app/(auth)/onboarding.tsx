@@ -57,7 +57,7 @@ const slides = [
     icon: 'warning-amber' as const,
     heading: 'Catch expiry dates early',
     body:
-      'Surface passport and GHIC expiry warnings before departure, plus local reminders for packing, flights, and missing insurance so nothing slips through.',
+      'Keep passport and GHIC expiry dates easy to spot before departure, alongside packing, flight, and insurance checks so nothing slips through.',
   },
 ];
 

@@ -65,6 +65,27 @@ function pickFirstString(...values) {
   return null;
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeAbsoluteHttpUrl(value, baseUrl = null) {
+  const normalized = cleanText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    const resolved = baseUrl ? new URL(normalized, baseUrl) : new URL(normalized);
+    if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') {
+      return null;
+    }
+    return resolved.toString();
+  } catch {
+    return null;
+  }
+}
+
 function pickImageUrl(payload) {
   if (!payload || typeof payload !== 'object') {
     return null;
@@ -116,6 +137,111 @@ function pickImageUrl(payload) {
   }
 
   return candidates.find((candidate) => cleanText(candidate)) ?? null;
+}
+
+function extractMetaTagContent(html, attribute, key) {
+  const escapedAttribute = escapeRegex(attribute);
+  const escapedKey = escapeRegex(key);
+  const patterns = [
+    new RegExp(
+      `<meta[^>]+${escapedAttribute}=["']${escapedKey}["'][^>]+content=["']([^"']+)["'][^>]*>`,
+      'i',
+    ),
+    new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+${escapedAttribute}=["']${escapedKey}["'][^>]*>`,
+      'i',
+    ),
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
+function extractWebsitePreviewImage(html, responseUrl) {
+  const metaCandidates = [
+    extractMetaTagContent(html, 'property', 'og:image:secure_url'),
+    extractMetaTagContent(html, 'property', 'og:image:url'),
+    extractMetaTagContent(html, 'property', 'og:image'),
+    extractMetaTagContent(html, 'name', 'twitter:image'),
+    extractMetaTagContent(html, 'name', 'twitter:image:src'),
+  ];
+
+  for (const candidate of metaCandidates) {
+    const normalized = normalizeAbsoluteHttpUrl(candidate, responseUrl);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  const imageTagPattern = /<img[^>]+(?:data-lazy-src|data-src|src)=["']([^"']+)["'][^>]*>/gi;
+  let imageMatch = imageTagPattern.exec(html);
+  while (imageMatch) {
+    const normalized = normalizeAbsoluteHttpUrl(imageMatch[1], responseUrl);
+    const lowered = normalized?.toLowerCase() ?? '';
+    if (
+      normalized &&
+      !lowered.startsWith('data:') &&
+      !lowered.endsWith('.svg') &&
+      !lowered.includes('/logo') &&
+      !lowered.includes('logo-') &&
+      !lowered.includes('/icon') &&
+      !lowered.includes('placeholder')
+    ) {
+      return normalized;
+    }
+    imageMatch = imageTagPattern.exec(html);
+  }
+
+  return null;
+}
+
+const previewImageCache = new Map();
+
+async function fetchPreviewImageFromPage(url) {
+  const normalizedUrl = normalizeAbsoluteHttpUrl(url);
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  const existing = previewImageCache.get(normalizedUrl);
+  if (existing) {
+    return existing;
+  }
+
+  const task = (async () => {
+    try {
+      const response = await fetch(normalizedUrl, {
+        redirect: 'follow',
+        headers: {
+          accept: 'text/html,application/xhtml+xml',
+          'user-agent': 'Pineapple/1.0 (+https://pinapple-dev.pages.dev)',
+        },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.toLowerCase().includes('html')) {
+        return null;
+      }
+
+      const html = await response.text();
+      return extractWebsitePreviewImage(html, response.url || normalizedUrl);
+    } catch {
+      return null;
+    }
+  })();
+
+  previewImageCache.set(normalizedUrl, task);
+  return task;
 }
 
 function getRawCategoryLabel(detail, searchItem) {
@@ -317,7 +443,7 @@ async function fetchTripadvisorCategory(areaContext, vibeCategory, apiKey, allow
   );
   const seen = new Set();
 
-  return trimmed
+  const rankedItems = trimmed
     .map((item, index) => ({
       score: scoreTripadvisorCandidate(item, details[index], areaContext),
       item: mapTripadvisorItem(item, details[index], photos[index], vibeCategory, areaContext.area),
@@ -334,6 +460,22 @@ async function fetchTripadvisorCategory(areaContext, vibeCategory, apiKey, allow
       return true;
     })
     .slice(0, RESULTS_PER_BUCKET);
+
+  const websiteFallbackTargets = rankedItems
+    .filter((item) => !item.imageUrl && (item.websiteUrl || item.tripadvisorUrl))
+    .slice(0, 8);
+  await Promise.all(
+    websiteFallbackTargets.map(async (item) => {
+      const previewImage =
+        (item.websiteUrl ? await fetchPreviewImageFromPage(item.websiteUrl) : null) ||
+        (item.tripadvisorUrl ? await fetchPreviewImageFromPage(item.tripadvisorUrl) : null);
+      if (previewImage) {
+        item.imageUrl = previewImage;
+      }
+    }),
+  );
+
+  return rankedItems;
 }
 
 async function handleVibes(request, env) {
