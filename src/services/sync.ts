@@ -12,6 +12,8 @@ import { writeUtf8File } from '@/utils/fileStorage';
 import { createShareCode } from '@/utils/shareCodes';
 import { getTripBundle, getTripById } from '@/utils/selectors';
 
+const MAX_SHARED_TRIP_PACKET_LENGTH = 1_000_000;
+
 function cloneSnapshot<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -84,11 +86,25 @@ export async function exportSharedTripPacket(snapshot: AppDataSnapshot, tripId: 
 }
 
 export function parseSharedTripPacket(contents: string) {
+  if (!contents || contents.length > MAX_SHARED_TRIP_PACKET_LENGTH) {
+    throw new Error('This shared trip file is too large to import safely.');
+  }
+
   const packet = JSON.parse(contents) as SharedTripPacket;
   if (packet.format !== 'pineapple-shared-trip' || packet.version !== 1) {
     throw new Error('This shared trip file is not recognised.');
   }
-  if (!packet.data?.trip?.id) {
+  if (
+    !packet.data?.trip?.id ||
+    !Array.isArray(packet.data.travellers) ||
+    !Array.isArray(packet.data.packingItems) ||
+    !Array.isArray(packet.data.travelSegments) ||
+    !Array.isArray(packet.data.hotelStays) ||
+    !Array.isArray(packet.data.itineraryEvents) ||
+    !Array.isArray(packet.data.reminderSettings) ||
+    !Array.isArray(packet.data.participants) ||
+    !Array.isArray(packet.data.invites)
+  ) {
     throw new Error('This shared trip file is incomplete.');
   }
   return packet;

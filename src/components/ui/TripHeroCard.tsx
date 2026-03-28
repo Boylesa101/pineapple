@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -9,6 +9,7 @@ import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { colors, radii, shadows, spacing } from '@/constants/theme';
 import type { TransportType, Trip } from '@/types/models';
 import { daysUntil } from '@/utils/date';
+import { openExternalOrFallback } from '@/utils/openExternal';
 import { getTransportDisplay } from '@/utils/transport';
 
 type Props = {
@@ -213,7 +214,10 @@ export function TripHeroCard({
             label={attributionContent.linkLabel}
             tone="outline"
             onPress={() => {
-              void Linking.openURL(attributionContent.linkUrl as string).catch(() => undefined);
+              void openExternalOrFallback(
+                attributionContent.linkUrl as string,
+                'Pineapple could not open that image source right now.'
+              );
             }}
           />
         ) : null}

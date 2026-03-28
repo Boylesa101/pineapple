@@ -3,6 +3,8 @@ import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from
 
 const TRIP_TRANSFER_PATH = 'trip-transfer';
 const MAX_QR_HREF_LENGTH = 2600;
+const MAX_TRANSFER_PAYLOAD_LENGTH = 4096;
+const MAX_TRANSFER_CONTENT_LENGTH = 1_000_000;
 
 export type TripTransferTarget = {
   href: `/${string}`;
@@ -31,6 +33,10 @@ function parsePayload(value: string | string[] | undefined) {
 }
 
 export function buildTripTransferQrPayload(contents: string) {
+  if (contents.length > MAX_TRANSFER_CONTENT_LENGTH) {
+    throw new Error('This trip transfer is too large to package into a QR link.');
+  }
+
   const payload = compressToEncodedURIComponent(contents);
   const externalUrl = ExpoLinking.createURL(`/${TRIP_TRANSFER_PATH}`, {
     queryParams: { payload },
@@ -45,10 +51,19 @@ export function buildTripTransferQrPayload(contents: string) {
 }
 
 export function decodeTripTransferPayload(payload: string) {
+  if (!payload || payload.length > MAX_TRANSFER_PAYLOAD_LENGTH) {
+    throw new Error('That trip transfer QR code is too large to import safely.');
+  }
+
   const decoded = decompressFromEncodedURIComponent(payload);
   if (!decoded) {
     throw new Error('That trip transfer QR code is invalid or incomplete.');
   }
+
+  if (decoded.length > MAX_TRANSFER_CONTENT_LENGTH) {
+    throw new Error('That trip transfer payload is too large to import safely.');
+  }
+
   return decoded;
 }
 

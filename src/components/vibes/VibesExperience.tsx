@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { AppCard } from '@/components/AppCard';
@@ -19,8 +19,9 @@ import {
 import { cacheVibeImage, cacheVibeItemsImages } from '@/services/vibeImageCache';
 import { buildVibeItineraryDraft } from '@/services/vibesPlanner';
 import { useAppStore } from '@/store/useAppStore';
-import { getTripBundle } from '@/utils/selectors';
 import { createId } from '@/utils/ids';
+import { openExternalOrFallback } from '@/utils/openExternal';
+import { getTripBundle } from '@/utils/selectors';
 import { toUserMessage } from '@/utils/userErrors';
 import type { SavedVibe, Trip } from '@/types/models';
 
@@ -288,11 +289,7 @@ export function VibesExperience({ tripId, mode: modeProp, onModeChange }: Props)
   ]);
 
   async function openUrl(url: string) {
-    try {
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert('Link unavailable', 'Pineapple could not open that link on this device.');
-    }
+    await openExternalOrFallback(url, 'Pineapple could not open that link on this device.');
   }
 
   async function addMoodToItinerary(item: SavedVibe) {
