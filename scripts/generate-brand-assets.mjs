@@ -21,6 +21,91 @@ const splashLogoTargets = [
   ['drawable-xxxhdpi', 1152],
 ];
 
+const monochromeSize = 432;
+const backgroundThreshold = 18;
+
+function isNearBlack(red, green, blue) {
+  return red <= backgroundThreshold && green <= backgroundThreshold && blue <= backgroundThreshold;
+}
+
+async function buildMonochromeIcon() {
+  const { data, info } = await sharp(markSource)
+    .resize(monochromeSize, monochromeSize)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const pixelCount = info.width * info.height;
+  const background = new Uint8Array(pixelCount);
+  const queue = [];
+
+  function maybeQueue(x, y) {
+    if (x < 0 || y < 0 || x >= info.width || y >= info.height) {
+      return;
+    }
+
+    const offset = (y * info.width + x) * info.channels;
+    const index = y * info.width + x;
+    if (background[index]) {
+      return;
+    }
+
+    const red = data[offset];
+    const green = data[offset + 1];
+    const blue = data[offset + 2];
+
+    if (!isNearBlack(red, green, blue)) {
+      return;
+    }
+
+    background[index] = 1;
+    queue.push(index);
+  }
+
+  for (let x = 0; x < info.width; x += 1) {
+    maybeQueue(x, 0);
+    maybeQueue(x, info.height - 1);
+  }
+
+  for (let y = 0; y < info.height; y += 1) {
+    maybeQueue(0, y);
+    maybeQueue(info.width - 1, y);
+  }
+
+  while (queue.length) {
+    const index = queue.shift();
+    const x = index % info.width;
+    const y = Math.floor(index / info.width);
+    maybeQueue(x + 1, y);
+    maybeQueue(x - 1, y);
+    maybeQueue(x, y + 1);
+    maybeQueue(x, y - 1);
+  }
+
+  const output = Buffer.alloc(pixelCount * 4);
+
+  for (let index = 0; index < pixelCount; index += 1) {
+    const offset = index * info.channels;
+    const outputOffset = index * 4;
+    const alpha = data[offset + 3];
+    const isForeground = alpha > 0 && !background[index];
+    output[outputOffset] = 255;
+    output[outputOffset + 1] = 255;
+    output[outputOffset + 2] = 255;
+    output[outputOffset + 3] = isForeground ? 255 : 0;
+  }
+
+  return sharp(output, {
+    raw: {
+      width: info.width,
+      height: info.height,
+      channels: 4,
+    },
+  })
+    .png()
+    .toFile(join(assetsDir, 'android-icon-monochrome.png'));
+}
+
 async function render() {
   await mkdir(brandDir, { recursive: true });
 
@@ -54,13 +139,7 @@ async function render() {
     .png()
     .toFile(join(assetsDir, 'android-icon-background.png'));
 
-  await sharp(markSource)
-    .ensureAlpha()
-    .extractChannel('alpha')
-    .threshold()
-    .resize(432, 432)
-    .png()
-    .toFile(join(assetsDir, 'android-icon-monochrome.png'));
+  await buildMonochromeIcon();
 
   await sharp(roundSource).resize(192, 192).png().toFile(join(assetsDir, 'icons', 'pineapple-round-preview.png'));
 

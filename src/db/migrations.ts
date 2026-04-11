@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { createShareCode } from '@/utils/shareCodes';
 
-const DATABASE_VERSION = 23;
+const DATABASE_VERSION = 24;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -223,6 +223,7 @@ CREATE TABLE IF NOT EXISTS vibe_cache_entries (
 
 CREATE TABLE IF NOT EXISTS app_preferences (
   id TEXT PRIMARY KEY NOT NULL,
+  appLanguage TEXT NOT NULL DEFAULT 'en-GB',
   notificationsEnabled INTEGER NOT NULL DEFAULT 0,
   expiryRemindersEnabled INTEGER NOT NULL DEFAULT 1,
   expiryReminderSchedule TEXT NOT NULL DEFAULT '[90,30,7,1,0]',
@@ -515,6 +516,10 @@ async function runPhaseTwentyOneMigration(db: SQLiteDatabase) {
   await ensureColumn(db, 'travel_segments', 'scheduledNotificationIdsJson', "TEXT NOT NULL DEFAULT '[]'");
 }
 
+async function runPhaseTwentyTwoMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'app_preferences', 'appLanguage', "TEXT NOT NULL DEFAULT 'en-GB'");
+}
+
 async function runPhaseThreeMigration(db: SQLiteDatabase) {
   await db.execAsync(`
     INSERT OR IGNORE INTO app_preferences (
@@ -662,6 +667,10 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   if (version < 22) {
     await runPhaseTwentyOneMigration(db);
+  }
+
+  if (version < 24) {
+    await runPhaseTwentyTwoMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

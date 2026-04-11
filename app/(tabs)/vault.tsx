@@ -80,24 +80,16 @@ import {
 import { buildPassportCopyPayload, ensurePassportDraftData, getPassportVerificationStatus } from '@/utils/passport';
 import { applyPassportOcrToDraft, hasPassportImageForOcr } from '@/utils/passportOcr';
 import { getDocumentSourceCtaLabel, isDocumentPdfSource } from '@/utils/documentViewer';
+import {
+  airlineLoyaltyPresets,
+  documentLabels,
+  getFormalDocumentDateLabels,
+  manualTravelDocumentTypes,
+} from '@/utils/documentTypes';
 import { getDocumentVaultSetupState } from '@/utils/documentVaultSetup';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
 import { toUserMessage } from '@/utils/userErrors';
 import { validateDocument } from '@/utils/validation';
-
-const documentLabels: Record<DocumentType, string> = {
-  passport: 'Passport',
-  ghic: 'GHIC / EHIC',
-  insurance: 'Travel insurance',
-  visa: 'Visa',
-  driving_licence: 'Driving licence',
-  payment_card: 'Payment card',
-  id_card: 'ID card',
-  boarding_pass: 'Boarding pass',
-  hotel_booking: 'Hotel booking',
-  excursion_ticket: 'Excursion ticket',
-  custom: 'Custom',
-};
 
 const scheduleOptions: Array<{ label: string; value: ExpiryReminderLeadTime }> = [
   { label: '180d', value: 180 },
@@ -135,7 +127,7 @@ type GuidedScanState = {
   warningText?: string | null;
 };
 
-const guidedFormalTypeOptions: DocumentType[] = ['insurance', 'visa', 'boarding_pass', 'hotel_booking', 'excursion_ticket', 'custom'];
+const guidedFormalTypeOptions: DocumentType[] = [...manualTravelDocumentTypes];
 const guidedImportTypeOptions: DocumentType[] = ['passport', 'driving_licence', 'ghic', 'insurance'];
 
 function wait(ms: number) {
@@ -407,6 +399,7 @@ export default function VaultScreen() {
       }))
       .filter((group) => group.documents.length);
   }, [bundle.travellers, filteredDocuments, groupMode]);
+  const draftDateLabels = draft ? getFormalDocumentDateLabels(draft.documentType) : null;
 
   const orderedVaultSections = useMemo(() => {
     const documentGroups = [
@@ -2087,6 +2080,35 @@ export default function VaultScreen() {
                     : null
                 }
               >
+                {draft.documentType === 'loyalty_card' ? (
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Airline program</Text>
+                    <ChoiceChips<string>
+                      value={airlineLoyaltyPresets.find((preset) => preset.title === (draft.formalDocumentData?.title ?? ''))?.id ?? ''}
+                      onChange={(value) => {
+                        const preset = airlineLoyaltyPresets.find((item) => item.id === value);
+                        if (!preset) {
+                          return;
+                        }
+
+                        setDraft((current) =>
+                          current?.formalDocumentData
+                            ? {
+                                ...current,
+                                formalDocumentData: {
+                                  ...current.formalDocumentData,
+                                  title: preset.title,
+                                  issuer: preset.issuer,
+                                  status: current.formalDocumentData.status || 'Member',
+                                },
+                              }
+                            : current
+                        );
+                      }}
+                      options={airlineLoyaltyPresets.map((preset) => ({ label: preset.title, value: preset.id }))}
+                    />
+                  </View>
+                ) : null}
                 <AppTextField
                   label="Document title"
                   value={draft.formalDocumentData.title}
@@ -2212,14 +2234,14 @@ export default function VaultScreen() {
               </ExtractedFieldEditor>
             ) : null}
             <DateTimeField
-              label="Issue date"
-              mode="date"
+              label={draftDateLabels?.startLabel ?? 'Issue date'}
+              mode={draft.documentType === 'hire_car_booking' || draft.documentType === 'airport_lounge_pass' || draft.documentType === 'rail_ticket' ? 'datetime' : 'date'}
               value={draft.issueDate}
               onChange={(value) => setDraft((current) => (current ? { ...current, issueDate: value } : current))}
             />
             <DateTimeField
-              label="Expiry date"
-              mode="date"
+              label={draftDateLabels?.endLabel ?? 'Expiry date'}
+              mode={draft.documentType === 'hire_car_booking' || draft.documentType === 'airport_lounge_pass' || draft.documentType === 'rail_ticket' ? 'datetime' : 'date'}
               value={draft.expiryDate}
               onChange={(value) => setDraft((current) => (current ? { ...current, expiryDate: value } : current))}
             />

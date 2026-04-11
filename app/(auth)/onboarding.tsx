@@ -8,17 +8,19 @@ import { useRouter } from 'expo-router';
 import { PineappleMark } from '@/brand/PineappleMark';
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
+import { LanguagePicker } from '@/components/LanguagePicker';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
 import { TypedDateField } from '@/components/TypedDateField';
 import { DocumentScanFlowModal, type DocumentScanStage } from '@/components/document-support/DocumentScanFlowModal';
 import { OnboardingIllustration } from '@/components/OnboardingIllustration';
 import { colors, radii, spacing } from '@/constants/theme';
+import { translate } from '@/i18n/strings';
 import { PERSONAL_DOCUMENTS_TRIP_ID } from '@/constants/vault';
 import { recognizeDocumentText } from '@/services/documentTextOcr';
 import { isLiveDocumentScannerAvailable, scanDocumentWithLiveEdges } from '@/services/documentScanner';
 import { useAppStore } from '@/store/useAppStore';
-import type { TravelStyle } from '@/types/models';
+import type { AppLanguage, TravelStyle } from '@/types/models';
 import { createEmptyPassportData, ensurePassportDraftData } from '@/utils/passport';
 import { applyPassportOcrToDraft, parsePassportOcrText } from '@/utils/passportOcr';
 import { validateDocument } from '@/utils/validation';
@@ -64,7 +66,7 @@ const slides = [
   },
 ];
 
-type SetupStep = 'name' | 'preferences' | 'photo' | 'document';
+type SetupStep = 'language' | 'name' | 'preferences' | 'photo' | 'document';
 type DocumentSetupChoice = 'skip' | 'passport_manual' | 'passport_photo';
 type CompanionDraft = {
   id: string;
@@ -133,8 +135,9 @@ export default function OnboardingScreen() {
   const saveDocument = useAppStore((state) => state.saveDocument);
   const appPreferences = useAppStore((state) => state.data.appPreferences);
   const [slideIndex, setSlideIndex] = useState(0);
-  const [setupStep, setSetupStep] = useState<SetupStep>('name');
+  const [setupStep, setSetupStep] = useState<SetupStep>('language');
   const [submitting, setSubmitting] = useState(false);
+  const [appLanguage, setAppLanguage] = useState<AppLanguage>(appPreferences.appLanguage);
   const [profileName, setProfileName] = useState('');
   const [profilePhotoUri, setProfilePhotoUri] = useState<string | null>(null);
   const [travelStyle, setTravelStyle] = useState<TravelStyle>(appPreferences.travelStyle ?? 'mixed');
@@ -173,6 +176,7 @@ export default function OnboardingScreen() {
           : null;
 
       await saveAppPreferences({
+        appLanguage,
         profileName: displayName,
         profilePhotoUri,
         travelStyle,
@@ -538,11 +542,15 @@ export default function OnboardingScreen() {
   }
 
   const footer = useMemo(() => {
+    const continueLabel = translate(appLanguage, 'common.continue');
+    const backLabel = translate(appLanguage, 'common.back');
+    const skipForNowLabel = translate(appLanguage, 'common.skipForNow');
+
     if (inSlides) {
       return (
         <View style={styles.footer}>
           <AppButton
-            label={isLastSlide ? 'Continue' : 'Next'}
+            label={isLastSlide ? continueLabel : 'Next'}
             tone="secondary"
             size="large"
             style={styles.footerButton}
@@ -550,7 +558,7 @@ export default function OnboardingScreen() {
             onPress={() => {
               if (isLastSlide) {
                 setSlideIndex(slides.length);
-                setSetupStep('name');
+                setSetupStep('language');
                 return;
               }
 
@@ -566,7 +574,7 @@ export default function OnboardingScreen() {
             labelStyle={styles.footerButtonLabel}
             onPress={() => {
               setSlideIndex(slides.length);
-              setSetupStep('name');
+              setSetupStep('language');
             }}
             disabled={submitting}
           />
@@ -574,20 +582,20 @@ export default function OnboardingScreen() {
       );
     }
 
-    if (setupStep === 'name') {
+    if (setupStep === 'language') {
       return (
         <View style={styles.footer}>
           <AppButton
-            label="Continue"
+            label={continueLabel}
             tone="secondary"
             size="large"
             style={styles.footerButton}
             labelStyle={styles.footerButtonLabel}
-            onPress={() => setSetupStep('preferences')}
-            disabled={!displayName || submitting}
+            onPress={() => setSetupStep('name')}
+            disabled={submitting}
           />
           <AppButton
-            label="Back"
+            label={backLabel}
             tone="secondary"
             size="large"
             style={styles.footerButton}
@@ -601,11 +609,38 @@ export default function OnboardingScreen() {
       );
     }
 
+    if (setupStep === 'name') {
+      return (
+        <View style={styles.footer}>
+          <AppButton
+            label={continueLabel}
+            tone="secondary"
+            size="large"
+            style={styles.footerButton}
+            labelStyle={styles.footerButtonLabel}
+            onPress={() => setSetupStep('preferences')}
+            disabled={!displayName || submitting}
+          />
+          <AppButton
+            label={backLabel}
+            tone="secondary"
+            size="large"
+            style={styles.footerButton}
+            labelStyle={styles.footerButtonLabel}
+            onPress={() => {
+              setSetupStep('language');
+            }}
+            disabled={submitting}
+          />
+        </View>
+      );
+    }
+
     if (setupStep === 'preferences') {
       return (
         <View style={styles.footer}>
           <AppButton
-            label="Continue"
+            label={continueLabel}
             tone="secondary"
             size="large"
             style={styles.footerButton}
@@ -614,7 +649,7 @@ export default function OnboardingScreen() {
             disabled={submitting}
           />
           <AppButton
-            label="Back"
+            label={backLabel}
             tone="secondary"
             size="large"
             style={styles.footerButton}
@@ -630,7 +665,7 @@ export default function OnboardingScreen() {
       return (
         <View style={styles.footer}>
           <AppButton
-            label="Continue"
+            label={continueLabel}
             tone="secondary"
             size="large"
             style={styles.footerButton}
@@ -684,7 +719,7 @@ export default function OnboardingScreen() {
           disabled={!readyToFinish}
         />
         <AppButton
-          label="Skip for now"
+          label={skipForNowLabel}
           tone="secondary"
           size="large"
           style={styles.footerButton}
@@ -698,6 +733,7 @@ export default function OnboardingScreen() {
     );
   }, [
     appPreferences.expiryReminderSchedule,
+    appLanguage,
     companions,
     displayName,
     documentChoice,
@@ -730,6 +766,17 @@ export default function OnboardingScreen() {
           <OnboardingIllustration icon={currentSlide.icon} accent={slideIndex % 2 === 0 ? colors.pineappleGold : colors.oceanBlue} />
           <Text style={styles.heading}>{currentSlide.heading}</Text>
           <Text style={styles.body}>{currentSlide.body}</Text>
+        </AppCard>
+      ) : null}
+
+      {!inSlides && setupStep === 'language' ? (
+        <AppCard>
+          <LanguagePicker
+            title={translate(appLanguage, 'onboarding.languageTitle')}
+            description={translate(appLanguage, 'onboarding.languageBody')}
+            value={appLanguage}
+            onChange={setAppLanguage}
+          />
         </AppCard>
       ) : null}
 

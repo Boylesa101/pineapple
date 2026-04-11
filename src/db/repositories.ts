@@ -1,5 +1,6 @@
 import { getDatabase } from './client';
 
+import { detectAppLanguage, resolveAppLanguage } from '@/i18n/config';
 import { createId } from '@/utils/ids';
 import { createShareCode } from '@/utils/shareCodes';
 import {
@@ -202,6 +203,7 @@ function toBool(value: number | boolean | null | undefined) {
 function defaultAppPreferences(timestamp = now()): AppPreferences {
   return {
     id: 'app',
+    appLanguage: detectAppLanguage(),
     notificationsEnabled: false,
     ...defaultAppExpiryPreferences(),
     profileName: '',
@@ -282,6 +284,7 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
   const appPreferences = appPreferencesRaw
     ? normalizeAppPreferences({
         ...appPreferencesRaw,
+        appLanguage: resolveAppLanguage(appPreferencesRaw.appLanguage),
         notificationsEnabled: toBool(appPreferencesRaw.notificationsEnabled),
         expiryRemindersEnabled: toBool(appPreferencesRaw.expiryRemindersEnabled ?? 1),
         expiryReminderSilent: toBool(appPreferencesRaw.expiryReminderSilent ?? 0),
@@ -1217,9 +1220,10 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
   const normalized = normalizeAppPreferences(input as any);
 
   await db.runAsync(
-    `INSERT INTO app_preferences (id, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, structuredDataProtected, profileName, profilePhotoUri, travelStyle, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, vibesIntroSeenAt, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO app_preferences (id, appLanguage, notificationsEnabled, expiryRemindersEnabled, expiryReminderSchedule, expiryReminderSilent, structuredDataProtected, profileName, profilePhotoUri, travelStyle, syncEnabled, syncMode, syncStatus, lastSyncAt, lastBackupAt, privacyMaskingMode, vibesIntroSeenAt, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
+       appLanguage = excluded.appLanguage,
        notificationsEnabled = excluded.notificationsEnabled,
        expiryRemindersEnabled = excluded.expiryRemindersEnabled,
        expiryReminderSchedule = excluded.expiryReminderSchedule,
@@ -1237,6 +1241,7 @@ export async function upsertAppPreferences(input: AppPreferencesDraft) {
        vibesIntroSeenAt = excluded.vibesIntroSeenAt,
        updatedAt = excluded.updatedAt`,
     normalized.id,
+    normalized.appLanguage,
     normalized.notificationsEnabled ? 1 : 0,
     normalized.expiryRemindersEnabled ? 1 : 0,
     serializeExpiryReminderSchedule(normalized.expiryReminderSchedule),

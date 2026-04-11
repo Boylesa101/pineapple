@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
+import { LanguagePicker } from '@/components/LanguagePicker';
 import { AppModal } from '@/components/AppModal';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
@@ -19,6 +20,7 @@ import { HeroCard } from '@/components/ui/HeroCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { legalConfig, privacySummaryBullets } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   getNotificationDiagnostics,
   hasNotificationPermissions,
@@ -68,6 +70,7 @@ function notificationVisibilityLabel(value: number | null) {
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const {
     data,
     security,
@@ -292,14 +295,26 @@ export default function SettingsScreen() {
     <AppScreen scroll contentStyle={styles.screen}>
       <AppHeader
         badgeLabel="S"
-        title="Settings"
-        subtitle="App preferences and controls"
+        title={t('settings.title')}
+        subtitle={t('settings.subtitle')}
       />
 
       <HeroCard
         title="Settings that travel with you"
         description="Manage security, reminders, local backups, privacy masking, and manual-share sync without leaving your device."
       />
+
+      <AppCard title={t('settings.languageTitle')} subtitle={t('settings.languageDescription')}>
+        <LanguagePicker
+          title={t('settings.languageTitle')}
+          description={t('settings.languageDescription')}
+          value={data.appPreferences.appLanguage}
+          onChange={(appLanguage) => {
+            void saveAppPreferences({ appLanguage });
+          }}
+          showGreetingCycle={false}
+        />
+      </AppCard>
 
       <View style={styles.section}>
         <SectionHeader title="Security & reminders" />

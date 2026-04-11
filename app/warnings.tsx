@@ -26,6 +26,10 @@ const documentLabels = {
   boarding_pass: 'Boarding pass',
   hotel_booking: 'Hotel booking',
   excursion_ticket: 'Excursion ticket',
+  hire_car_booking: 'Hire car booking',
+  airport_lounge_pass: 'Airport lounge pass',
+  loyalty_card: 'Airline loyalty card',
+  rail_ticket: 'Rail ticket',
   custom: 'Custom document',
 } as const;
 

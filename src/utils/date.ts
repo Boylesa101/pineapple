@@ -1,14 +1,22 @@
 import {
   compareAsc,
   differenceInCalendarDays,
-  format,
-  formatDistanceStrict,
   isAfter,
   isBefore,
   isValid,
   parseISO,
   startOfDay,
 } from 'date-fns';
+import { getCurrentAppLanguage } from '@/i18n/runtime';
+
+function formatDateWithLocale(value: string | null | undefined, options: Intl.DateTimeFormatOptions, emptyLabel: string) {
+  const parsed = parseIsoDate(value);
+  if (!parsed) {
+    return emptyLabel;
+  }
+
+  return new Intl.DateTimeFormat(getCurrentAppLanguage(), options).format(parsed);
+}
 
 export function parseIsoDate(value: string | null | undefined) {
   if (!value) {
@@ -24,29 +32,19 @@ export function coerceDate(value: string | null | undefined, fallback = new Date
 }
 
 export function formatShortDate(value: string | null | undefined) {
-  const parsed = parseIsoDate(value);
-  if (!parsed) {
-    return 'Not set';
-  }
-
-  return format(parsed, 'dd MMM yyyy');
+  return formatDateWithLocale(value, { day: '2-digit', month: 'short', year: 'numeric' }, 'Not set');
 }
 
 export function formatDateTime(value: string | null | undefined) {
-  const parsed = parseIsoDate(value);
-  if (!parsed) {
-    return 'Not set';
-  }
-
-  return format(parsed, 'dd MMM yyyy, HH:mm');
+  return formatDateWithLocale(
+    value,
+    { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false },
+    'Not set'
+  );
 }
 
 export function formatTimelineDate(value: string) {
-  const parsed = parseIsoDate(value);
-  if (!parsed) {
-    return 'Date unavailable';
-  }
-  return format(parsed, 'EEE, dd MMM');
+  return formatDateWithLocale(value, { weekday: 'short', day: '2-digit', month: 'short' }, 'Date unavailable');
 }
 
 export function compareIsoDates(left: string, right: string) {
@@ -79,10 +77,13 @@ export function countdownLabel(dateIso: string) {
   const today = startOfDay(new Date());
 
   if (compareAsc(target, today) <= 0) {
-    return 'Today';
+    return new Intl.RelativeTimeFormat(getCurrentAppLanguage(), { numeric: 'auto' }).format(0, 'day');
   }
 
-  return formatDistanceStrict(target, today, { unit: 'day' });
+  return new Intl.RelativeTimeFormat(getCurrentAppLanguage(), { numeric: 'auto' }).format(
+    differenceInCalendarDays(target, today),
+    'day'
+  );
 }
 
 export function daysUntil(dateIso: string) {

@@ -338,6 +338,7 @@ export function createDemoSnapshot(): AppDataSnapshot {
     vibeCacheEntries: [],
     appPreferences: {
       id: 'app',
+      appLanguage: 'en-GB',
       notificationsEnabled: false,
       expiryRemindersEnabled: true,
       expiryReminderSchedule: [90, 30, 7, 1, 0],

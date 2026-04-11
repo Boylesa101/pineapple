@@ -1,5 +1,6 @@
 import { del, get, set } from 'idb-keyval';
 
+import { detectAppLanguage } from '@/i18n/config';
 import { createId } from '@/utils/ids';
 import { createShareCode } from '@/utils/shareCodes';
 import {
@@ -40,6 +41,7 @@ function now() {
 function defaultAppPreferences(timestamp = now()): AppPreferences {
   return {
     id: 'app',
+    appLanguage: detectAppLanguage(),
     notificationsEnabled: false,
     ...defaultAppExpiryPreferences(),
     profileName: '',

@@ -65,9 +65,9 @@ export function DocumentAddSheet({
         <ActionRow icon="health-and-safety" title="Scan health card" description="Scan a GHIC or EHIC and review expiry, issuer, and emergency details." onPress={onScanHealthCard} />
       </AppCard>
 
-      <AppCard title="Add other records" subtitle="Use a structured manual flow for documents that are better stored intentionally than scanned.">
+      <AppCard title="Add other records" subtitle="Use a structured manual flow for insurance records, travel tickets, lounge passes, hire-car vouchers, and loyalty cards.">
         <ActionRow icon="credit-card" title="Add payment card manually" description="Save a secure masked card record without exposing sensitive values by default." onPress={onAddPaymentCard} />
-        <ActionRow icon="description" title="Add formal document" description="Store insurance records, certificates, letters, passes, and confirmations." onPress={onAddFormalDocument} />
+        <ActionRow icon="description" title="Add formal document" description="Store insurance records, lounge passes, hire-car bookings, rail tickets, loyalty cards, and confirmations." onPress={onAddFormalDocument} />
       </AppCard>
 
       <AppCard title="Import PDF or image" subtitle="Use an existing image or PDF already on this device and route it into the right OCR review flow.">

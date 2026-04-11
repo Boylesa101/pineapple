@@ -7,6 +7,7 @@ import { colors, radii, spacing } from '@/constants/theme';
 import type { Document, Traveller } from '@/types/models';
 import { getDocumentExpiryInfo } from '@/utils/documentExpiry';
 import { deriveFormalDocumentData, getFormalDocumentVerificationStatus } from '@/utils/formalDocument';
+import { getFormalDocumentTheme } from '@/utils/documentTypes';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -47,6 +48,7 @@ export function FormalDocumentRecord({
   const record = deriveFormalDocumentData(document, traveller);
   const expiryInfo = getDocumentExpiryInfo(document.documentType, document.expiryDate);
   const verificationStatus = getFormalDocumentVerificationStatus(document);
+  const theme = getFormalDocumentTheme(document);
 
   function toggle() {
     if (interactive) {
@@ -81,22 +83,24 @@ export function FormalDocumentRecord({
       accessibilityRole="button"
       accessibilityLabel={`Open ${record.title || 'formal document'}`}
     >
-      <View style={[styles.cover, compact ? styles.coverCompact : null]}>
+      <View style={[styles.cover, { backgroundColor: theme.background, borderColor: theme.border }, compact ? styles.coverCompact : null]}>
         <View style={styles.coverHeader}>
-          <Text style={[styles.coverLabel, compact ? styles.coverLabelCompact : null]}>Official record</Text>
-          <MaterialIcons name="folder-open" size={compact ? 20 : 26} color="#E0C58F" />
+          <Text style={[styles.coverLabel, compact ? styles.coverLabelCompact : null, { color: theme.accent }]}>{theme.label}</Text>
+          <MaterialIcons name={theme.icon} size={compact ? 20 : 26} color={theme.accent} />
         </View>
         <View style={styles.coverBody}>
-          <Text style={[styles.coverTitle, compact ? styles.coverTitleCompact : null]} numberOfLines={2}>
+          <Text style={[styles.coverTitle, compact ? styles.coverTitleCompact : null, { color: theme.ink }]} numberOfLines={2}>
             {record.title || 'Formal document'}
           </Text>
-          <Text style={styles.coverIssuer} numberOfLines={2}>
+          <Text style={[styles.coverIssuer, { color: theme.muted }]} numberOfLines={2}>
             {record.issuer || 'Stored paperwork'}
           </Text>
         </View>
         <View style={styles.coverFooter}>
-          <Text style={styles.coverMeta} numberOfLines={1}>
-            {record.referenceCode || document.documentNumber || 'Tap to open'}
+          <Text style={[styles.coverMeta, { color: theme.accent }]} numberOfLines={1}>
+            {document.documentType === 'loyalty_card'
+              ? `${record.status || 'Member'} · ${record.referenceCode || document.documentNumber || 'Tap to open'}`
+              : record.referenceCode || document.documentNumber || 'Tap to open'}
           </Text>
         </View>
       </View>
@@ -116,9 +120,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: spacing.md,
     gap: spacing.md,
-    backgroundColor: '#8F5E3B',
     borderWidth: 1,
-    borderColor: '#A8754F',
     shadowColor: '#5B3A22',
     shadowOpacity: 0.2,
     shadowOffset: { width: 0, height: 10 },
@@ -136,7 +138,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   coverLabel: {
-    color: '#F2DEC4',
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
     textTransform: 'uppercase',
@@ -149,7 +150,6 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   coverTitle: {
-    color: colors.white,
     fontFamily: 'Poppins_600SemiBold',
     fontSize: 18,
     lineHeight: 22,
@@ -159,7 +159,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   coverIssuer: {
-    color: '#F1E2D1',
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
     lineHeight: 18,
@@ -168,7 +167,6 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   coverMeta: {
-    color: '#E6D0B0',
     fontFamily: 'Inter_600SemiBold',
     fontSize: 12,
     letterSpacing: 0.6,

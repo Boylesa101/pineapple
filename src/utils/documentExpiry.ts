@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, differenceInCalendarMonths, isValid, parseISO, startOfDay } from 'date-fns';
 
 import type {
+  AppLanguage,
   AppPreferences,
   Document,
   DocumentDraft,
@@ -265,6 +266,7 @@ export function normalizeAppPreferences(input: Partial<AppPreferences> & Pick<Ap
   const defaults = defaultAppExpiryPreferences();
   return {
     ...input,
+    appLanguage: (input.appLanguage ?? 'en-GB') as AppLanguage,
     expiryRemindersEnabled: input.expiryRemindersEnabled ?? defaults.expiryRemindersEnabled,
     expiryReminderSchedule: normalizeExpiryReminderSchedule(input.expiryReminderSchedule),
     expiryReminderSilent: input.expiryReminderSilent ?? defaults.expiryReminderSilent,

@@ -7,6 +7,7 @@ import { buildPackingTemplateItems, type PackingTemplateId } from '@/data/packin
 import { createDemoSnapshot } from '@/data/demo';
 import { isNotificationProofBuildVersion, withNotificationProofTrip } from '@/data/notificationProofBuild';
 import { PERSONAL_DOCUMENTS_LABEL, PERSONAL_DOCUMENTS_TRIP_ID, isPersonalDocumentsTripId } from '@/constants/vault';
+import { detectAppLanguage } from '@/i18n/config';
 import {
   clearAllData,
   deleteById,
@@ -94,6 +95,7 @@ const emptySnapshot: AppDataSnapshot = {
   vibeCacheEntries: [],
   appPreferences: {
     id: 'app',
+    appLanguage: detectAppLanguage(),
     notificationsEnabled: false,
     ...defaultAppExpiryPreferences(),
     profileName: '',

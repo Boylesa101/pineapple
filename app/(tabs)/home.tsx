@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { TripStackDeck } from '@/components/ui/TripStackDeck';
 import { colors, radii, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAppStore } from '@/store/useAppStore';
 import { tripDateRange } from '@/utils/format';
 import { getDashboardAlerts, getDocumentExpiryOverview, getTripBundle } from '@/utils/selectors';
@@ -19,6 +20,7 @@ import { filterVisibleTrips } from '@/utils/tripVisibility';
 export default function HomeScreen() {
   const router = useRouter();
   const { data, setActiveTrip } = useAppStore();
+  const { t } = useTranslation();
   const greetingName = data.appPreferences.profileName.trim() || 'traveller';
   const sortedTrips = useMemo(
     () => filterVisibleTrips([...data.trips]).sort((left, right) => left.startDate.localeCompare(right.startDate)),
@@ -67,7 +69,7 @@ export default function HomeScreen() {
       footer={
         <View style={styles.fabWrap}>
           <AppButton
-            label="New trip"
+            label={t('home.newTrip')}
             size="large"
             onPress={goToTrips}
             icon={<MaterialIcons name="add" size={20} color={colors.white} />}
@@ -78,7 +80,7 @@ export default function HomeScreen() {
     >
       <View style={styles.topBar}>
         <View style={styles.topCopy}>
-          <Text style={styles.topGreeting}>Hello {greetingName}</Text>
+          <Text style={styles.topGreeting}>{t('home.greeting', { name: greetingName })}</Text>
         </View>
         <View style={styles.topActions}>
           <Pressable onPress={() => router.push('/account')} style={styles.topIconButton} accessibilityLabel="Open account">
@@ -93,10 +95,10 @@ export default function HomeScreen() {
 
       <View style={styles.section}>
         <SectionHeader
-          title="Current trip"
+          title={t('home.currentTrip')}
           right={
             <Pressable onPress={goToTrips}>
-              <Text style={styles.viewAll}>View all</Text>
+              <Text style={styles.viewAll}>{t('home.viewAll')}</Text>
             </Pressable>
           }
         />
@@ -120,10 +122,10 @@ export default function HomeScreen() {
         ) : (
           <AppCard>
             <EmptyState
-              title="No trip yet"
-              description="Create your first trip to unlock the live dashboard, document vault, and emergency travel tools."
+              title={t('home.noTripYet')}
+              description={t('home.noTripDescription')}
             />
-            <AppButton label="Create your first trip" onPress={goToTrips} />
+            <AppButton label={t('home.createFirstTrip')} onPress={goToTrips} />
           </AppCard>
         )}
       </View>

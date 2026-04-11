@@ -1,13 +1,7 @@
 import type { Document, DocumentDraft, DocumentType, FormalDocumentData, Traveller, VerificationStatus } from '@/types/models';
+import { manualTravelDocumentTypes } from './documentTypes';
 
-export const FORMAL_DOCUMENT_TYPES: DocumentType[] = [
-  'insurance',
-  'visa',
-  'boarding_pass',
-  'hotel_booking',
-  'excursion_ticket',
-  'custom',
-];
+export const FORMAL_DOCUMENT_TYPES: DocumentType[] = [...manualTravelDocumentTypes];
 
 export function isFormalDocumentType(documentType: DocumentType) {
   return FORMAL_DOCUMENT_TYPES.includes(documentType);
@@ -45,6 +39,14 @@ function defaultTitleForType(documentType: DocumentType) {
       return 'Hotel confirmation';
     case 'excursion_ticket':
       return 'Excursion confirmation';
+    case 'hire_car_booking':
+      return 'Car hire voucher';
+    case 'airport_lounge_pass':
+      return 'Lounge access pass';
+    case 'loyalty_card':
+      return 'Airline loyalty card';
+    case 'rail_ticket':
+      return 'Rail ticket';
     case 'visa':
       return 'Visa record';
     default:

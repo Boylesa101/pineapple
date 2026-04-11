@@ -16,6 +16,10 @@ export type DocumentType =
   | 'boarding_pass'
   | 'hotel_booking'
   | 'excursion_ticket'
+  | 'hire_car_booking'
+  | 'airport_lounge_pass'
+  | 'loyalty_card'
+  | 'rail_ticket'
   | 'custom';
 export type ExpiryReminderLeadTime = 180 | 90 | 30 | 14 | 7 | 1 | 0;
 export type ExpiryReminderSchedule = ExpiryReminderLeadTime[];
@@ -62,6 +66,7 @@ export type TravelStyle = 'family_holidays' | 'city_breaks' | 'road_trips' | 'mi
 export type PinLength = number;
 export type VerificationStatus = 'verified' | 'review' | 'unverified';
 export type PassportVerificationStatus = VerificationStatus;
+export type AppLanguage = 'en-GB' | 'en-US' | 'fr-FR' | 'es-ES' | 'de-DE' | 'it-IT';
 
 export interface Trip {
   id: string;
@@ -327,6 +332,7 @@ export interface VibeCacheEntry {
 
 export interface AppPreferences {
   id: 'app';
+  appLanguage: AppLanguage;
   notificationsEnabled: boolean;
   expiryRemindersEnabled: boolean;
   expiryReminderSchedule: ExpiryReminderSchedule;

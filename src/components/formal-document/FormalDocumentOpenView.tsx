@@ -1,13 +1,16 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { DocumentPreviewPane } from '@/components/formal-document/DocumentPreviewPane';
 import { DocumentMetaRow } from '@/components/document-support/DocumentMetaRow';
 import { ExpiryBadge } from '@/components/document-support/ExpiryBadge';
 import { VerificationBadge } from '@/components/document-support/VerificationBadge';
+import { QRCodeImage } from '@/components/ui/QRCodeImage';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { Document, Traveller, VerificationStatus } from '@/types/models';
 import { formatShortDate } from '@/utils/date';
 import { deriveFormalDocumentData } from '@/utils/formalDocument';
+import { buildRailTicketQrPayload, getFormalDocumentDateLabels, getFormalDocumentTheme } from '@/utils/documentTypes';
 
 type Props = {
   document: Document;
@@ -21,10 +24,13 @@ export function FormalDocumentOpenView({ document, traveller, expiryBadge, verif
   const { width } = useWindowDimensions();
   const record = deriveFormalDocumentData(document, traveller);
   const horizontal = width >= 820;
+  const theme = getFormalDocumentTheme(document);
+  const dateLabels = getFormalDocumentDateLabels(document.documentType);
+  const railQrValue = document.documentType === 'rail_ticket' ? buildRailTicketQrPayload(document, traveller) : null;
 
   return (
-    <View style={[styles.record, horizontal ? styles.horizontal : styles.vertical]}>
-      <View style={[styles.panel, styles.metaPanel, horizontal ? styles.panelHalf : null]}>
+    <View style={[styles.record, { borderColor: theme.border }, horizontal ? styles.horizontal : styles.vertical]}>
+      <View style={[styles.panel, styles.metaPanel, { backgroundColor: document.documentType === 'rail_ticket' ? '#FFF4E5' : '#F7EFE2' }, horizontal ? styles.panelHalf : null]}>
         <View style={styles.header}>
           <Text style={styles.title}>{record.title || 'Formal document'}</Text>
           <VerificationBadge status={verificationStatus} />
@@ -36,19 +42,55 @@ export function FormalDocumentOpenView({ document, traveller, expiryBadge, verif
         <DocumentMetaRow label="Holder" value={document.holderName || traveller?.fullName || ''} borderColor="#E9DDCF" />
         <DocumentMetaRow label="Issuer" value={record.issuer} borderColor="#E9DDCF" />
         <DocumentMetaRow label="Reference" value={record.referenceCode || document.documentNumber} borderColor="#E9DDCF" />
-        <DocumentMetaRow label="Issue date" value={formatShortDate(document.issueDate)} borderColor="#E9DDCF" />
-        <DocumentMetaRow label="Expiry / renewal" value={formatShortDate(document.expiryDate)} borderColor="#E9DDCF" />
+        <DocumentMetaRow label={dateLabels.startLabel} value={formatShortDate(document.issueDate)} borderColor="#E9DDCF" />
+        <DocumentMetaRow label={dateLabels.endLabel} value={formatShortDate(document.expiryDate)} borderColor="#E9DDCF" />
         <DocumentMetaRow label="Location" value={record.location} borderColor="#E9DDCF" />
         <DocumentMetaRow label="Summary" value={record.summary || document.notes} borderColor="#E9DDCF" />
       </View>
 
       <View style={[styles.panel, styles.previewPanel, horizontal ? styles.panelHalf : null]}>
-        <DocumentPreviewPane
-          previewUri={document.previewUri}
-          localFileUri={document.localFileUri}
-          mimeType={document.mimeType}
-          onOpen={onOpenSource}
-        />
+        {document.documentType === 'rail_ticket' && railQrValue ? (
+          <View style={styles.ticketCard}>
+            <View style={styles.ticketTopRow}>
+              <View style={styles.ticketRoute}>
+                <Text style={styles.ticketLabel}>National Rail</Text>
+                <Text style={styles.ticketTitle}>{record.title || 'Rail ticket'}</Text>
+                <Text style={styles.ticketMeta}>{record.issuer || 'Stored operator'}</Text>
+              </View>
+              <MaterialIcons name={theme.icon} size={30} color={theme.accent} />
+            </View>
+            <View style={styles.ticketDetails}>
+              <View style={styles.ticketDetailBlock}>
+                <Text style={styles.ticketDetailLabel}>Travel</Text>
+                <Text style={styles.ticketDetailValue}>{formatShortDate(document.issueDate)}</Text>
+              </View>
+              <View style={styles.ticketDetailBlock}>
+                <Text style={styles.ticketDetailLabel}>Seat / coach</Text>
+                <Text style={styles.ticketDetailValue}>{record.location || 'Open seating'}</Text>
+              </View>
+              <View style={styles.ticketDetailBlock}>
+                <Text style={styles.ticketDetailLabel}>Ticket ref</Text>
+                <Text style={styles.ticketDetailValue}>{record.referenceCode || document.documentNumber || 'Stored'}</Text>
+              </View>
+            </View>
+            <View style={styles.ticketBottomRow}>
+              <View style={styles.ticketSummary}>
+                <Text style={styles.ticketDetailLabel}>Ticket notes</Text>
+                <Text style={styles.ticketSummaryText}>{record.summary || document.notes || 'Stored locally in Pineapple.'}</Text>
+              </View>
+              <View style={styles.ticketQrWrap}>
+                <QRCodeImage value={railQrValue} size={108} />
+              </View>
+            </View>
+          </View>
+        ) : (
+          <DocumentPreviewPane
+            previewUri={document.previewUri}
+            localFileUri={document.localFileUri}
+            mimeType={document.mimeType}
+            onOpen={onOpenSource}
+          />
+        )}
       </View>
     </View>
   );
@@ -105,5 +147,80 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: 'Inter_500Medium',
     fontSize: 12,
+  },
+  ticketCard: {
+    gap: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 2,
+    borderColor: '#E07F1E',
+    backgroundColor: '#F8A647',
+    padding: spacing.md,
+  },
+  ticketTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    alignItems: 'flex-start',
+  },
+  ticketRoute: {
+    flex: 1,
+    gap: 4,
+  },
+  ticketLabel: {
+    color: '#6C3B04',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  ticketTitle: {
+    color: '#3E2300',
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  ticketMeta: {
+    color: '#6C3B04',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+  },
+  ticketDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  ticketDetailBlock: {
+    minWidth: 100,
+    gap: 2,
+  },
+  ticketDetailLabel: {
+    color: '#7A3E00',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  ticketDetailValue: {
+    color: '#3E2300',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  ticketBottomRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'flex-end',
+  },
+  ticketSummary: {
+    flex: 1,
+    gap: 4,
+  },
+  ticketSummaryText: {
+    color: '#4A2A02',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  ticketQrWrap: {
+    alignItems: 'flex-end',
   },
 });

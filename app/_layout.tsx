@@ -21,6 +21,7 @@ import {
 import { PineappleMark } from '@/brand/PineappleMark';
 import { AppButton } from '@/components/AppButton';
 import { colors, spacing } from '@/constants/theme';
+import { setCurrentAppLanguage } from '@/i18n/runtime';
 import { addNotificationResponseListener, consumePendingNotificationTarget, getInitialNotificationTarget, type NotificationTarget } from '@/services/notifications';
 import { addTripTransferUrlListener, getInitialTripTransferTarget } from '@/services/tripTransfer';
 import { useAppStore } from '@/store/useAppStore';
@@ -132,6 +133,7 @@ export default function RootLayout() {
   const privacyOverlayVisible = useAppStore((state) => state.privacyOverlayVisible);
   const isUnlocked = useAppStore((state) => state.isUnlocked);
   const pinConfigured = useAppStore((state) => state.security.pinConfigured);
+  const appLanguage = useAppStore((state) => state.data.appPreferences.appLanguage);
   const setActiveTrip = useAppStore((state) => state.setActiveTrip);
   const segments = useSegments();
   const router = useRouter();
@@ -140,6 +142,10 @@ export default function RootLayout() {
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.authBlue).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    setCurrentAppLanguage(appLanguage);
+  }, [appLanguage]);
 
   useEffect(() => {
     bootstrap().catch(() => undefined);

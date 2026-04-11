@@ -129,6 +129,13 @@ const documentTypeLabels = {
   driving_licence: 'driving licence',
   payment_card: 'payment card',
   id_card: 'ID card',
+  boarding_pass: 'boarding pass',
+  hotel_booking: 'hotel booking',
+  excursion_ticket: 'excursion ticket',
+  hire_car_booking: 'hire car booking',
+  airport_lounge_pass: 'airport lounge pass',
+  loyalty_card: 'loyalty card',
+  rail_ticket: 'rail ticket',
   custom: 'document',
 } as const;
 
