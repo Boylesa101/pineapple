@@ -25,6 +25,10 @@ export function resolveAuthRoute({
   tripCount,
 }: ResolveAuthRouteOptions) {
   if (!hasCompletedOnboarding) {
+    if (onboardingStep === 'name') {
+      return currentPath === '/onboarding' ? null : '/onboarding';
+    }
+
     if (onboardingStep === 'pin') {
       return currentPath === '/setup-pin' ? null : '/setup-pin';
     }

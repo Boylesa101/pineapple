@@ -1,4 +1,3 @@
-// Replace these placeholder emails and URLs before production release.
 // This file is the single source of truth for Pineapple's in-app legal wording.
 // Keep this aligned with the actual shipped app behavior. Do not overstate security,
 // location usage, analytics, or cloud capabilities if the code does not support them.
@@ -16,11 +15,12 @@ export type FAQItem = {
 
 export const legalConfig = {
   appName: 'Pineapple',
-  tagline: 'Your travel essentials in one secure place — even offline.',
+  tagline: 'Your travel essentials in one calm place — even offline.',
   supportEmail: 'studiopixel101@gmail.com',
   privacyEmail: 'studiopixel101@gmail.com',
-  versionPlaceholder: 'Use the current app version here before release.',
-  releaseLabel: 'First public release candidate',
+  currentVersion: '2.2.7',
+  releaseLabel: 'Android stabilisation pass',
+  futurePlayStoreUrl: '#',
   developerName: 'Pineapple App',
   copyrightName: 'Pineapple App',
   smallPrint:
@@ -32,6 +32,7 @@ export const privacySummaryBullets = [
   'Pineapple does not require an account for basic use in the current release.',
   'Pineapple uses local notifications for reminders when you turn them on.',
   'The current audited release does not continuously track your location.',
+  'Pineapple web is a companion surface and does not support sensitive vault usage.',
 ] as const;
 
 export const homeHighlights = [
@@ -134,6 +135,7 @@ export const privacySections: ContentSection[] = [
     paragraphs: [
       'Pineapple helps you store travel documents, organise trips, view reminders, and keep emergency travel information easy to reach.',
       'The current release is designed around local-first use. Core travel data stays on the device, although some optional lookups need an internet connection when you choose to use them.',
+      'Pineapple web is a companion surface for product and support pages. The installed Android app remains the intended place for sensitive vault data, backups, and manual-share sync.',
     ],
   },
   {
@@ -169,6 +171,7 @@ export const privacySections: ContentSection[] = [
     paragraphs: [
       'Pineapple is local-first, but some optional features can contact third-party services when you choose to use them.',
       'Examples found in the current audited release include destination image lookup, hotel and address search, and Vibes or place suggestions. These features may send the search text or destination details needed to fetch results. This is not the same as account-based cloud sync.',
+      'Manual-share trip packets stay local to the devices and apps you choose to use. In the current release they are validated and integrity-checked, but they are not encrypted or cryptographically authenticated.',
     ],
     bullets: [
       'Destination and hotel image lookup may use services such as Pexels or Wikimedia Commons',
@@ -188,6 +191,7 @@ export const privacySections: ContentSection[] = [
     paragraphs: [
       'Pineapple includes app-locking, PIN support, optional biometrics where available, and additional protections for sensitive files and fields in parts of the app.',
       'No mobile app can promise perfect security. Pineapple is designed to reduce risk, but you should still keep your device protected and review what you store on it.',
+      'The installed Android app is the primary hardened surface. Pineapple web should not be treated as equally secure for sensitive travel records.',
     ],
   },
   {

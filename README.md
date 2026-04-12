@@ -118,14 +118,15 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Weather detail returns to the cleaner selected-day layout: scenic top card first, then the selected day’s hourly time, icon, and temperature rows directly underneath
 - The temporary `Transport Notification Proof Trip` is build-scoped and should be removed again after transport lock-screen verification is complete
 - Bootstrap correction: build-scoped proof-trip seeding now uses a safe in-place snapshot persist instead of a destructive full data replacement, so existing local data is not cleared during startup
-- Android icon correction: the adaptive monochrome icon now uses a proper transparent monochrome glyph asset for themed launcher icons
+- Android icon correction: the adaptive monochrome icon now uses a proper transparent monochrome glyph asset for themed launcher icons, and the checked-in launcher XML keeps the monochrome layer wired in
 - Dedicated expiry warnings screen with filters for all, expiring soon, expired, and notifications off
-- Optional manual-share trip sync with participant roles, invite records, conflict review, and trip-share export/import
+- Optional manual-share trip sync with participant roles, invite records, conflict review, trip-share export/import, record-level packet validation, and SHA-256 integrity checks for newly exported share files
 - Expanded settings surface for security, reminders, sync, backup/restore, and privacy masking
 - Trip sharing now supports Pineapple-owned shared files plus a trip-level Pineapple QR handoff route for smaller transfers
 - Account and traveller profiles can each keep an optional local profile photo stored in Pineapple-managed device storage
-- Five-screen first-launch onboarding with PIN setup, first-trip creation, and a setup checklist
+- Explicit first-launch onboarding in this exact order: language, name, PIN, biometrics, then passport / traveller setup
 - Blue first-run welcome/auth flow with setup-aware greeting copy and centered PIN pad layout
+- Pineapple web is treated as a companion surface; sensitive vault editing, encrypted backups, and manual-share sync stay disabled there and are intended for the installed Android app
 - Retryable startup recovery if local bootstrap fails unexpectedly
 - Lighter startup path with lazy file-directory creation for faster cold launch
 - Development-only demo data reset for QA
@@ -298,6 +299,7 @@ npx expo export --platform web
 - Biometric unlock is optional and device-dependent
 - Backup export/import uses password-protected AES encryption in the local backup layer
 - Shared trip sync is optional and manual-share only in phase 3
+- Shared-trip packets are validated and integrity-checked before import, but they are not encrypted or cryptographically authenticated in the current release
 - Conflict review is explicit; Pineapple does not silently overwrite local trip changes
 - Pineapple is currently shipped and tested as an installable mobile app, with the Android build remaining the main secure home for sensitive vault images
 - Notification text stays privacy-aware and does not include document numbers, images, or full document contents
@@ -367,7 +369,7 @@ npx expo export --platform web
 - Google Play draft copy and screenshot guidance: [docs/GOOGLE_PLAY_DRAFT.md](docs/GOOGLE_PLAY_DRAFT.md)
 - Internal release-readiness notes: [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md)
 - Legal and compliance release checklist:
-  - Replace placeholder support and privacy emails in `src/content/legal.ts`
+  - Confirm support and privacy emails in `src/content/legal.ts` still point at the live support inbox
   - Confirm final support and policy URLs in `src/content/legal.ts`
   - Verify whether analytics or crash reporting are enabled before Play submission
   - Recheck what data leaves the device for third-party lookups and keep legal wording aligned

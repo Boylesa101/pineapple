@@ -22,8 +22,6 @@
       "package": "com.pineapple.travel",
       "permissions": [
         "POST_NOTIFICATIONS",
-        "RECEIVE_BOOT_COMPLETED",
-        "SCHEDULE_EXACT_ALARM",
         "VIBRATE"
       ],
       "adaptiveIcon": {

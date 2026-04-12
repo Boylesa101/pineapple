@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -9,6 +9,7 @@ import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
 import { LanguagePicker } from '@/components/LanguagePicker';
 import { colors, spacing } from '@/constants/theme';
+import { setCurrentAppLanguage } from '@/i18n/runtime';
 import { translate } from '@/i18n/strings';
 import { useAppStore } from '@/store/useAppStore';
 import type { AppLanguage } from '@/types/models';
@@ -19,13 +20,22 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const saveAppPreferences = useAppStore((state) => state.saveAppPreferences);
   const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
+  const onboardingStep = useAppStore((state) => state.onboardingStep);
   const appPreferences = useAppStore((state) => state.data.appPreferences);
-  const [step, setStep] = useState<LocalStep>('language');
+  const [step, setStep] = useState<LocalStep>(onboardingStep === 'name' ? 'name' : 'language');
   const [submitting, setSubmitting] = useState(false);
   const [appLanguage, setAppLanguage] = useState<AppLanguage>(appPreferences.appLanguage);
   const [profileName, setProfileName] = useState(appPreferences.profileName);
 
   const trimmedName = useMemo(() => profileName.trim(), [profileName]);
+
+  useEffect(() => {
+    setCurrentAppLanguage(appLanguage);
+  }, [appLanguage]);
+
+  useEffect(() => {
+    setStep(onboardingStep === 'name' ? 'name' : 'language');
+  }, [onboardingStep]);
 
   async function saveLanguageAndContinue() {
     if (submitting) {
@@ -35,6 +45,7 @@ export default function OnboardingScreen() {
     setSubmitting(true);
     try {
       await saveAppPreferences({ appLanguage });
+      await setOnboardingStep('name');
       setStep('name');
     } catch (error) {
       if (__DEV__) {

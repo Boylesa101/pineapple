@@ -37,6 +37,7 @@ import {
 } from '@/services/backup';
 import { useAppStore } from '@/store/useAppStore';
 import type { ConflictStatus, ExpiryReminderLeadTime, PrivacyMaskingMode } from '@/types/models';
+import { isWebCompanionPolicyActive, sensitiveWebSupportMessage } from '@/utils/platformPolicy';
 import { canUseBiometrics } from '@/utils/security';
 import { toUserMessage } from '@/utils/userErrors';
 
@@ -136,6 +137,11 @@ export default function SettingsScreen() {
   }
 
   async function openBackupImport() {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Backups stay disabled on web', sensitiveWebSupportMessage);
+      return;
+    }
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/json', '*/*'],
@@ -167,6 +173,11 @@ export default function SettingsScreen() {
   }
 
   async function handleBackupAction() {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Backups stay disabled on web', sensitiveWebSupportMessage);
+      return;
+    }
+
     if (!backupPassword.trim()) {
       Alert.alert('Password required', 'Enter a password to continue.');
       return;
@@ -219,6 +230,11 @@ export default function SettingsScreen() {
   }
 
   async function handleImportSharedTrip() {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Manual-share sync stays disabled on web', sensitiveWebSupportMessage);
+      return;
+    }
+
     const result = await DocumentPicker.getDocumentAsync({
       type: ['application/json', '*/*'],
       copyToCacheDirectory: true,
@@ -303,6 +319,11 @@ export default function SettingsScreen() {
         title="Settings that travel with you"
         description="Manage security, reminders, local backups, privacy masking, and manual-share sync without leaving your device."
       />
+      {isWebCompanionPolicyActive() ? (
+        <AppCard title="Web companion limits">
+          <Text style={styles.meta}>{sensitiveWebSupportMessage}</Text>
+        </AppCard>
+      ) : null}
 
       <AppCard title={t('settings.languageTitle')} subtitle={t('settings.languageDescription')}>
         <LanguagePicker
@@ -487,12 +508,20 @@ export default function SettingsScreen() {
         <Text style={styles.meta}>
           Last sync: {data.appPreferences.lastSyncAt ? new Date(data.appPreferences.lastSyncAt).toLocaleString() : 'Never'}
         </Text>
-        <AppButton label="Import shared trip / sync file" tone="secondary" onPress={handleImportSharedTrip} />
+        <AppButton
+          label="Import shared trip / sync file"
+          tone="secondary"
+          onPress={handleImportSharedTrip}
+          disabled={isWebCompanionPolicyActive()}
+        />
         <Text style={styles.meta}>
           Trip transfer uses Pineapple-owned shared files and trip-level transfer QR codes. Open a trip and use Sharing and participants to show a Pineapple QR for that trip.
         </Text>
         <Text style={styles.meta}>
           Very detailed trips may still need the shared-trip file export because QR codes have limited capacity.
+        </Text>
+        <Text style={styles.meta}>
+          Shared-trip packets are validated and integrity-checked. They are not cloud sync, and they are not encrypted or authenticated in the current release.
         </Text>
       </AppCard>
 
@@ -528,8 +557,9 @@ export default function SettingsScreen() {
               setBackupSourceLabel(null);
               setBackupVisible(true);
             }}
+            disabled={isWebCompanionPolicyActive()}
           />
-          <AppButton label="Restore backup" tone="secondary" onPress={openBackupImport} />
+          <AppButton label="Restore backup" tone="secondary" onPress={openBackupImport} disabled={isWebCompanionPolicyActive()} />
         </View>
       </AppCard>
       </View>

@@ -19,6 +19,7 @@ import { isLiveDocumentScannerAvailable, scanDocumentWithLiveEdges } from '@/ser
 import { useAppStore } from '@/store/useAppStore';
 import { createEmptyPassportData, ensurePassportDraftData } from '@/utils/passport';
 import { applyPassportOcrToDraft, parsePassportOcrText } from '@/utils/passportOcr';
+import { isWebCompanionPolicyActive, sensitiveWebSupportMessage } from '@/utils/platformPolicy';
 import { validateDocument } from '@/utils/validation';
 import { cleanupImportedSource, copyIntoAppStorage, deleteLocalFile } from '@/utils/fileStorage';
 import { createId } from '@/utils/ids';
@@ -78,6 +79,11 @@ export default function TravellerSetupScreen() {
   }
 
   async function attachPassportImage(source: 'camera' | 'library') {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Use the Android app for passport images', sensitiveWebSupportMessage);
+      return;
+    }
+
     try {
       setScanGuidance(
         source === 'camera'
@@ -422,6 +428,7 @@ export default function TravellerSetupScreen() {
         <Text style={styles.body}>
           Set up your own passport after security is ready, then add anyone else you usually travel with. This stays as a Pineapple record and is not an official travel document.
         </Text>
+        {isWebCompanionPolicyActive() ? <Text style={styles.helper}>{sensitiveWebSupportMessage}</Text> : null}
 
         <View style={styles.choiceRow}>
           <Pressable style={[styles.choiceCard, documentChoice === 'passport_manual' ? styles.choiceCardActive : null]} onPress={() => setDocumentChoice('passport_manual')}>
@@ -429,10 +436,16 @@ export default function TravellerSetupScreen() {
             <Text style={[styles.choiceTitle, documentChoice === 'passport_manual' ? styles.choiceTitleActive : null]}>Manual passport</Text>
             <Text style={[styles.choiceBody, documentChoice === 'passport_manual' ? styles.choiceBodyActive : null]}>Type the passport fields now.</Text>
           </Pressable>
-          <Pressable style={[styles.choiceCard, documentChoice === 'passport_photo' ? styles.choiceCardActive : null]} onPress={() => setDocumentChoice('passport_photo')}>
+          <Pressable
+            style={[styles.choiceCard, documentChoice === 'passport_photo' ? styles.choiceCardActive : null]}
+            onPress={() => setDocumentChoice('passport_photo')}
+            disabled={isWebCompanionPolicyActive()}
+          >
             <MaterialIcons name="photo-camera" size={22} color={documentChoice === 'passport_photo' ? colors.white : colors.primaryBlue} />
             <Text style={[styles.choiceTitle, documentChoice === 'passport_photo' ? styles.choiceTitleActive : null]}>Photo / OCR</Text>
-            <Text style={[styles.choiceBody, documentChoice === 'passport_photo' ? styles.choiceBodyActive : null]}>Scan or import a passport image.</Text>
+            <Text style={[styles.choiceBody, documentChoice === 'passport_photo' ? styles.choiceBodyActive : null]}>
+              {isWebCompanionPolicyActive() ? 'Use the Android app for secure passport capture.' : 'Scan or import a passport image.'}
+            </Text>
           </Pressable>
           <Pressable style={[styles.choiceCard, documentChoice === 'skip' ? styles.choiceCardActive : null]} onPress={() => setDocumentChoice('skip')}>
             <MaterialIcons name="schedule" size={22} color={documentChoice === 'skip' ? colors.white : colors.primaryBlue} />

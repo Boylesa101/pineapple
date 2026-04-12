@@ -905,7 +905,7 @@ export async function deleteById(table: string, id: string) {
       next.syncConflicts = snapshot.syncConflicts.filter((item) => item.id !== id);
       break;
     default:
-      break;
+      throw new Error(`Unsupported delete table: ${table}`);
   }
 
   await writeSnapshot(next);

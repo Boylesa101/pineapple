@@ -9,7 +9,7 @@ import { AppHeader } from '@/components/ui/AppHeader';
 import { legalConfig, supportFaqs, supportIntroSections } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
 
-const versionLabel = Constants.expoConfig?.version ?? legalConfig.versionPlaceholder;
+const versionLabel = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? legalConfig.currentVersion;
 
 export default function SupportScreen() {
   return (

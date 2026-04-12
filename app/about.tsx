@@ -11,7 +11,7 @@ import { AppHeader } from '@/components/ui/AppHeader';
 import { aboutSections, legalConfig, privacySummaryBullets } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
 
-const versionLabel = Constants.expoConfig?.version ?? legalConfig.versionPlaceholder;
+const versionLabel = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? legalConfig.currentVersion;
 
 export default function AboutScreen() {
   const router = useRouter();

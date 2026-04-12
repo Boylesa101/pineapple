@@ -63,6 +63,7 @@ import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { formatAirportDisplay } from '@/utils/airports';
 import { relationshipLabel, tripDateRange } from '@/utils/format';
 import { getMissingInfoPrompts, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
+import { isWebCompanionPolicyActive, sensitiveWebSupportMessage } from '@/utils/platformPolicy';
 import { getPrimaryTransportType, getTransportDisplay, isAirTransportType } from '@/utils/transport';
 import { toUserMessage } from '@/utils/userErrors';
 import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, validateTraveller } from '@/utils/validation';
@@ -785,6 +786,11 @@ export default function TripDetailScreen() {
   }
 
   async function handleExportShare() {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Manual-share sync stays disabled on web', sensitiveWebSupportMessage);
+      return;
+    }
+
     try {
       await exportSharedTripFile(tripId);
       Alert.alert('Trip ready to share', 'Pineapple created a local share file and opened Android sharing so you can use Quick Share, Nearby Share, or another app.');
@@ -803,6 +809,11 @@ export default function TripDetailScreen() {
   }
 
   async function handleImportShare() {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Manual-share sync stays disabled on web', sensitiveWebSupportMessage);
+      return;
+    }
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/json', '*/*'],
@@ -1710,6 +1721,9 @@ export default function TripDetailScreen() {
         </View>
         <Text style={styles.helperText}>
           Scan the transfer QR with Pineapple installed. If the trip is too large for QR, use the Nearby / Quick Share button to send the local trip file through Android sharing instead.
+        </Text>
+        <Text style={styles.helperText}>
+          Shared-trip files are schema-validated and integrity-checked before import. They are not cloud sync, and they are not encrypted or authenticated in the current release.
         </Text>
         {bundle.conflicts.length ? (
           <View style={styles.conflictList}>

@@ -1,18 +1,84 @@
-import * as Sharing from 'expo-sharing';
+import CryptoJS from 'crypto-js';
 
 import type {
   AppDataSnapshot,
   ConflictStatus,
+  DestinationImageSource,
+  DestinationType,
+  EmergencyInfo,
+  HeroImageStatus,
+  HotelStay,
+  ItineraryEvent,
+  ItineraryType,
+  InviteStatus,
+  LuggageType,
+  PackingItem,
+  PackingAssignmentScope,
+  PackingCategory,
+  PackingPriority,
+  ParticipantRole,
+  ReminderSetting,
+  ReminderKind,
+  ReminderLeadTime,
+  RelationshipType,
   SharedTripPacket,
   SharedTripPacketData,
   SyncConflict,
+  TransportType,
+  TravelDirection,
+  TravelSegment,
+  Traveller,
+  Trip,
+  TripStatus,
+  TripInvite,
+  TripParticipant,
 } from '@/types/models';
 import { createId } from '@/utils/ids';
-import { writeUtf8File } from '@/utils/fileStorage';
-import { createShareCode } from '@/utils/shareCodes';
 import { getTripBundle, getTripById } from '@/utils/selectors';
 
 const MAX_SHARED_TRIP_PACKET_LENGTH = 1_000_000;
+const MAX_COLLECTION_SIZE = 250;
+const MAX_TEXT_LENGTH = 4_000;
+const MAX_LONG_TEXT_LENGTH = 20_000;
+const MAX_ID_LENGTH = 120;
+const SHARE_CODE_PATTERN = /^PINE-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+const SHARE_CODE_PREFIX = 'PINE';
+const BASE32_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+const transportTypes = new Set<TransportType>(['flight', 'private_flight', 'train', 'car', 'hire_car', 'taxi', 'ferry', 'eurotunnel']);
+const travelDirections = new Set<TravelDirection>(['outbound', 'return', 'other']);
+const packingCategories = new Set<PackingCategory>(['clothes', 'toiletries', 'documents', 'electronics', 'medicines', 'beach_pool', 'kids_baby', 'other']);
+const luggageTypes = new Set<LuggageType>(['carry_on', 'checked']);
+const packingScopes = new Set<PackingAssignmentScope>(['trip', 'travellers']);
+const packingPriorities = new Set<PackingPriority>(['essential', 'useful', 'optional']);
+const itineraryTypes = new Set<ItineraryType>(['excursion', 'meal', 'ticket', 'reminder', 'custom']);
+const reminderKinds = new Set<ReminderKind>([
+  'passport_expiry',
+  'ghic_expiry',
+  'packing_incomplete',
+  'trip_countdown_30_days',
+  'trip_countdown_7_days',
+  'trip_countdown_3_days',
+  'trip_countdown_1_day',
+  'trip_starts_tomorrow',
+  'trip_today',
+  'insurance_missing',
+  'transport_departure',
+  'flight_check_in',
+  'hotel_check_in',
+  'transfer_reminder',
+  'travel_mode_reminder',
+  'sos_ready',
+  'excursion_reminder',
+]);
+const reminderLeadTimes = new Set<ReminderLeadTime>([0, 1, 3, 6, 7, 30]);
+const participantRoles = new Set<ParticipantRole>(['owner', 'editor', 'viewer']);
+const inviteStatuses = new Set<InviteStatus>(['pending', 'accepted', 'revoked']);
+const tripStatuses = new Set<TripStatus>(['upcoming', 'active', 'completed']);
+const destinationTypes = new Set<DestinationType>(['country', 'place', 'unknown']);
+const destinationImageSources = new Set<DestinationImageSource>(['curated', 'pexels', 'wikimedia', 'fallback']);
+const heroImageStatuses = new Set<HeroImageStatus>(['idle', 'loading', 'ready', 'failed']);
+const relationshipTypes = new Set<RelationshipType>(['adult', 'child', 'infant', 'other']);
 
 function cloneSnapshot<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -20,6 +86,502 @@ function cloneSnapshot<T>(value: T): T {
 
 function now() {
   return new Date().toISOString();
+}
+
+function assertPacket(condition: unknown, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isIsoDate(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return false;
+  }
+
+  return !Number.isNaN(Date.parse(value));
+}
+
+function expectObject(value: unknown, message: string) {
+  assertPacket(isPlainObject(value), message);
+  return value;
+}
+
+function expectArray(value: unknown, message: string, maxLength = MAX_COLLECTION_SIZE) {
+  assertPacket(Array.isArray(value), message);
+  assertPacket(value.length <= maxLength, 'This shared trip file contains too much data to import safely.');
+  return value;
+}
+
+function expectString(
+  value: unknown,
+  message: string,
+  options: { maxLength?: number; allowEmpty?: boolean; pattern?: RegExp } = {}
+) {
+  const { maxLength = MAX_TEXT_LENGTH, allowEmpty = false, pattern } = options;
+  assertPacket(typeof value === 'string', message);
+  const normalized = value.trim();
+  assertPacket(allowEmpty || normalized.length > 0, message);
+  assertPacket(value.length <= maxLength, 'This shared trip file contains fields that are too large to import safely.');
+  if (pattern) {
+    assertPacket(pattern.test(value), message);
+  }
+  return value;
+}
+
+function expectOptionalString(value: unknown, message: string, maxLength = MAX_TEXT_LENGTH) {
+  assertPacket(value === null || typeof value === 'string', message);
+  if (typeof value === 'string') {
+    assertPacket(value.length <= maxLength, 'This shared trip file contains fields that are too large to import safely.');
+  }
+  return value as string | null;
+}
+
+function expectBoolean(value: unknown, message: string) {
+  assertPacket(typeof value === 'boolean', message);
+  return value;
+}
+
+function expectNumber(
+  value: unknown,
+  message: string,
+  options: { integer?: boolean; min?: number; max?: number } = {}
+) {
+  const { integer = false, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY } = options;
+  assertPacket(typeof value === 'number' && Number.isFinite(value), message);
+  assertPacket(!integer || Number.isInteger(value), message);
+  assertPacket(value >= min && value <= max, message);
+  return value;
+}
+
+function expectIsoDate(value: unknown, message: string) {
+  assertPacket(isIsoDate(value), message);
+  return value as string;
+}
+
+function expectEnum<T extends string>(value: unknown, allowed: Set<T>, message: string) {
+  assertPacket(typeof value === 'string' && allowed.has(value as T), message);
+  return value as T;
+}
+
+function expectNumberEnum<T extends number>(value: unknown, allowed: Set<T>, message: string) {
+  assertPacket(typeof value === 'number' && allowed.has(value as T), message);
+  return value as T;
+}
+
+function expectId(value: unknown, message: string) {
+  return expectString(value, message, {
+    allowEmpty: false,
+    maxLength: MAX_ID_LENGTH,
+    pattern: /^[a-z0-9_-]+$/i,
+  });
+}
+
+function expectStringArray(value: unknown, message: string, options: { maxLength?: number; maxItems?: number } = {}) {
+  const items = expectArray(value, message, options.maxItems ?? MAX_COLLECTION_SIZE);
+  return items.map((item) => expectString(item, message, { maxLength: options.maxLength ?? MAX_ID_LENGTH }));
+}
+
+function ensureUniqueIds(items: Array<{ id: string }>, label: string) {
+  const ids = new Set<string>();
+  for (const item of items) {
+    assertPacket(!ids.has(item.id), `This shared trip file has duplicate ${label} IDs.`);
+    ids.add(item.id);
+  }
+}
+
+function sanitizeSharedPacketPayload(packet: Omit<SharedTripPacket, 'integrity'>) {
+  return JSON.stringify(packet);
+}
+
+function hashSharedPacketPayload(packet: Omit<SharedTripPacket, 'integrity'>) {
+  return CryptoJS.SHA256(sanitizeSharedPacketPayload(packet)).toString();
+}
+
+function createPacketShareCode() {
+  const randomBytes = Uint8Array.from(Buffer.from(CryptoJS.lib.WordArray.random(5).toString(CryptoJS.enc.Hex), 'hex'));
+  let output = '';
+  let buffer = 0;
+  let bits = 0;
+
+  for (const byte of randomBytes) {
+    buffer = (buffer << 8) | byte;
+    bits += 8;
+
+    while (bits >= 5) {
+      bits -= 5;
+      output += BASE32_ALPHABET[(buffer >> bits) & 31];
+    }
+  }
+
+  if (bits > 0) {
+    output += BASE32_ALPHABET[(buffer << (5 - bits)) & 31];
+  }
+
+  const token = output.slice(0, 8);
+  return `${SHARE_CODE_PREFIX}-${token.slice(0, 4)}-${token.slice(4)}`;
+}
+
+function validateTrip(value: unknown): Trip {
+  const trip = expectObject(value, 'This shared trip file is missing the main trip record.');
+  return {
+    id: expectId(trip.id, 'This shared trip file contains an invalid trip ID.'),
+    name: expectString(trip.name, 'This shared trip file is missing the trip name.'),
+    destination: expectString(trip.destination, 'This shared trip file is missing the trip destination.'),
+    destinationType: expectEnum(trip.destinationType, destinationTypes, 'This shared trip file contains an invalid destination type.'),
+    startDate: expectIsoDate(trip.startDate, 'This shared trip file contains an invalid trip start date.'),
+    endDate: expectIsoDate(trip.endDate, 'This shared trip file contains an invalid trip end date.'),
+    destinationImageLocalPath: expectOptionalString(trip.destinationImageLocalPath, 'This shared trip file contains an invalid trip image path.'),
+    destinationImageRemoteUrl: expectOptionalString(trip.destinationImageRemoteUrl, 'This shared trip file contains an invalid trip image URL.'),
+    destinationImageSource: expectEnum(trip.destinationImageSource, destinationImageSources, 'This shared trip file contains an invalid trip image source.'),
+    attributionText: expectOptionalString(trip.attributionText, 'This shared trip file contains invalid trip attribution text.'),
+    attributionMeta: (trip.attributionMeta ?? null) as Trip['attributionMeta'],
+    coverImageUri: expectOptionalString(trip.coverImageUri, 'This shared trip file contains an invalid trip cover image path.'),
+    heroImageRemoteUrl: expectOptionalString(trip.heroImageRemoteUrl, 'This shared trip file contains an invalid hero image URL.'),
+    heroImageStatus: expectEnum(trip.heroImageStatus, heroImageStatuses, 'This shared trip file contains an invalid hero image state.'),
+    notes: expectString(trip.notes ?? '', 'This shared trip file contains invalid trip notes.', { allowEmpty: true, maxLength: MAX_LONG_TEXT_LENGTH }),
+    transferSummary: expectString(trip.transferSummary ?? '', 'This shared trip file contains invalid transfer details.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    transferProvider: expectString(trip.transferProvider ?? '', 'This shared trip file contains an invalid transfer provider.', {
+      allowEmpty: true,
+    }),
+    transferMethod: expectString(trip.transferMethod ?? '', 'This shared trip file contains an invalid transfer method.', {
+      allowEmpty: true,
+    }),
+    transferLocation: expectString(trip.transferLocation ?? '', 'This shared trip file contains an invalid transfer location.', {
+      allowEmpty: true,
+    }),
+    transferTime: trip.transferTime === null ? null : expectIsoDate(trip.transferTime, 'This shared trip file contains an invalid transfer time.'),
+    airportTravelDurationMinutes:
+      trip.airportTravelDurationMinutes === null
+        ? null
+        : expectNumber(trip.airportTravelDurationMinutes, 'This shared trip file contains an invalid airport transfer duration.', {
+            integer: true,
+            min: 0,
+            max: 24 * 60,
+          }),
+    transferNotes: expectString(trip.transferNotes ?? '', 'This shared trip file contains invalid transfer notes.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    status: expectEnum(trip.status, tripStatuses, 'This shared trip file contains an invalid trip status.'),
+    createdAt: expectIsoDate(trip.createdAt, 'This shared trip file contains an invalid trip creation date.'),
+    updatedAt: expectIsoDate(trip.updatedAt, 'This shared trip file contains an invalid trip update date.'),
+  };
+}
+
+function validateTraveller(value: unknown, tripId: string): Traveller {
+  const traveller = expectObject(value, 'This shared trip file contains an invalid traveller record.');
+  const validatedTripId = expectId(traveller.tripId, 'This shared trip file contains an invalid traveller trip ID.');
+  assertPacket(validatedTripId === tripId, 'This shared trip file mixes traveller records from another trip.');
+  return {
+    id: expectId(traveller.id, 'This shared trip file contains an invalid traveller ID.'),
+    tripId: validatedTripId,
+    fullName: expectString(traveller.fullName, 'This shared trip file contains a traveller with no name.'),
+    photoUri: expectOptionalString(traveller.photoUri ?? null, 'This shared trip file contains an invalid traveller photo path.'),
+    dateOfBirth: traveller.dateOfBirth === null ? null : expectIsoDate(traveller.dateOfBirth, 'This shared trip file contains an invalid traveller date of birth.'),
+    passportNationality: expectString(traveller.passportNationality ?? '', 'This shared trip file contains an invalid traveller nationality.', {
+      allowEmpty: true,
+    }),
+    passportNumber: expectString(traveller.passportNumber ?? '', 'This shared trip file contains an invalid traveller passport number.', {
+      allowEmpty: true,
+    }),
+    ghicNumber: expectString(traveller.ghicNumber ?? '', 'This shared trip file contains an invalid traveller GHIC number.', {
+      allowEmpty: true,
+    }),
+    medicalNote: expectString(traveller.medicalNote ?? '', 'This shared trip file contains an invalid traveller medical note.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    notes: expectString(traveller.notes ?? '', 'This shared trip file contains an invalid traveller note.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    avatarColor: expectString(traveller.avatarColor, 'This shared trip file contains an invalid traveller colour.', {
+      pattern: /^#[0-9a-f]{6}$/i,
+      maxLength: 7,
+    }),
+    relationshipType: expectEnum(traveller.relationshipType, relationshipTypes, 'This shared trip file contains an invalid traveller type.'),
+    createdAt: expectIsoDate(traveller.createdAt, 'This shared trip file contains an invalid traveller creation date.'),
+    updatedAt: expectIsoDate(traveller.updatedAt, 'This shared trip file contains an invalid traveller update date.'),
+  };
+}
+
+function validatePackingItem(value: unknown, tripId: string, travellerIds: Set<string>): PackingItem {
+  const item = expectObject(value, 'This shared trip file contains an invalid packing item.');
+  const validatedTripId = expectId(item.tripId, 'This shared trip file contains an invalid packing trip ID.');
+  assertPacket(validatedTripId === tripId, 'This shared trip file mixes packing items from another trip.');
+  const validatedTravellerIds = expectStringArray(item.travellerIds, 'This shared trip file contains invalid packing traveller links.');
+  for (const travellerId of validatedTravellerIds) {
+    assertPacket(travellerIds.has(travellerId), 'This shared trip file references a traveller that is not included.');
+  }
+  return {
+    id: expectId(item.id, 'This shared trip file contains an invalid packing item ID.'),
+    tripId: validatedTripId,
+    title: expectString(item.title, 'This shared trip file contains a packing item with no title.'),
+    category: expectEnum(item.category, packingCategories, 'This shared trip file contains an invalid packing category.'),
+    quantity: expectNumber(item.quantity, 'This shared trip file contains an invalid packing quantity.', {
+      integer: true,
+      min: 1,
+      max: 500,
+    }),
+    isPacked: expectBoolean(item.isPacked, 'This shared trip file contains an invalid packing state.'),
+    luggageType: expectEnum(item.luggageType, luggageTypes, 'This shared trip file contains an invalid luggage type.'),
+    assignmentScope: expectEnum(item.assignmentScope, packingScopes, 'This shared trip file contains an invalid packing assignment.'),
+    travellerIds: validatedTravellerIds,
+    priority: expectEnum(item.priority, packingPriorities, 'This shared trip file contains an invalid packing priority.'),
+    notes: expectString(item.notes ?? '', 'This shared trip file contains invalid packing notes.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    createdAt: expectIsoDate(item.createdAt, 'This shared trip file contains an invalid packing creation date.'),
+    updatedAt: expectIsoDate(item.updatedAt, 'This shared trip file contains an invalid packing update date.'),
+  };
+}
+
+function validateTravelSegment(value: unknown, tripId: string): TravelSegment {
+  const segment = expectObject(value, 'This shared trip file contains an invalid travel segment.');
+  const validatedTripId = expectId(segment.tripId, 'This shared trip file contains an invalid travel segment trip ID.');
+  assertPacket(validatedTripId === tripId, 'This shared trip file mixes travel segments from another trip.');
+  return {
+    id: expectId(segment.id, 'This shared trip file contains an invalid travel segment ID.'),
+    tripId: validatedTripId,
+    transportType: expectEnum(segment.transportType, transportTypes, 'This shared trip file contains an invalid transport type.'),
+    travelDirection: expectEnum(segment.travelDirection, travelDirections, 'This shared trip file contains an invalid travel direction.'),
+    airline: expectString(segment.airline ?? '', 'This shared trip file contains an invalid carrier name.', { allowEmpty: true }),
+    providerCode: expectString(segment.providerCode ?? '', 'This shared trip file contains an invalid transport provider code.', { allowEmpty: true }),
+    providerLogoUrl: expectOptionalString(segment.providerLogoUrl ?? null, 'This shared trip file contains an invalid provider logo URL.'),
+    flightNumber: expectString(segment.flightNumber ?? '', 'This shared trip file contains an invalid segment reference.', { allowEmpty: true }),
+    departureAirport: expectString(segment.departureAirport ?? '', 'This shared trip file contains an invalid departure label.', { allowEmpty: true }),
+    departureAirportCode: expectString(segment.departureAirportCode ?? '', 'This shared trip file contains an invalid departure code.', { allowEmpty: true, maxLength: 12 }),
+    arrivalAirport: expectString(segment.arrivalAirport ?? '', 'This shared trip file contains an invalid arrival label.', { allowEmpty: true }),
+    arrivalAirportCode: expectString(segment.arrivalAirportCode ?? '', 'This shared trip file contains an invalid arrival code.', { allowEmpty: true, maxLength: 12 }),
+    departureTime: expectIsoDate(segment.departureTime, 'This shared trip file contains an invalid departure time.'),
+    departureTimeZone: expectOptionalString(segment.departureTimeZone ?? null, 'This shared trip file contains an invalid departure timezone.', 120),
+    arrivalTime: expectIsoDate(segment.arrivalTime, 'This shared trip file contains an invalid arrival time.'),
+    terminal: expectString(segment.terminal ?? '', 'This shared trip file contains an invalid terminal field.', { allowEmpty: true, maxLength: 120 }),
+    gate: expectString(segment.gate ?? '', 'This shared trip file contains an invalid gate field.', { allowEmpty: true, maxLength: 120 }),
+    bookingRef: expectString(segment.bookingRef ?? '', 'This shared trip file contains an invalid booking reference.', { allowEmpty: true, maxLength: 120 }),
+    notificationSummary: expectString(segment.notificationSummary ?? '', 'This shared trip file contains an invalid reminder summary.', {
+      allowEmpty: true,
+      maxLength: MAX_TEXT_LENGTH,
+    }),
+    scheduledNotificationIds: expectStringArray(
+      segment.scheduledNotificationIds,
+      'This shared trip file contains invalid scheduled notification IDs.',
+      { maxLength: MAX_ID_LENGTH, maxItems: 20 }
+    ),
+    notes: expectString(segment.notes ?? '', 'This shared trip file contains invalid travel notes.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    createdAt: expectIsoDate(segment.createdAt, 'This shared trip file contains an invalid travel segment creation date.'),
+    updatedAt: expectIsoDate(segment.updatedAt, 'This shared trip file contains an invalid travel segment update date.'),
+  };
+}
+
+function validateHotelStay(value: unknown, tripId: string): HotelStay {
+  const hotel = expectObject(value, 'This shared trip file contains an invalid hotel stay.');
+  const validatedTripId = expectId(hotel.tripId, 'This shared trip file contains an invalid hotel stay trip ID.');
+  assertPacket(validatedTripId === tripId, 'This shared trip file mixes hotel stays from another trip.');
+  return {
+    id: expectId(hotel.id, 'This shared trip file contains an invalid hotel stay ID.'),
+    tripId: validatedTripId,
+    hotelName: expectString(hotel.hotelName, 'This shared trip file contains a hotel stay without a name.'),
+    address: expectString(hotel.address ?? '', 'This shared trip file contains an invalid hotel address.', { allowEmpty: true, maxLength: MAX_LONG_TEXT_LENGTH }),
+    city: expectString(hotel.city ?? '', 'This shared trip file contains an invalid hotel city.', { allowEmpty: true }),
+    country: expectString(hotel.country ?? '', 'This shared trip file contains an invalid hotel country.', { allowEmpty: true }),
+    latitude: hotel.latitude === null ? null : expectNumber(hotel.latitude, 'This shared trip file contains an invalid hotel latitude.', { min: -90, max: 90 }),
+    longitude: hotel.longitude === null ? null : expectNumber(hotel.longitude, 'This shared trip file contains an invalid hotel longitude.', { min: -180, max: 180 }),
+    hotelImageLocalPath: expectOptionalString(hotel.hotelImageLocalPath ?? null, 'This shared trip file contains an invalid hotel image path.'),
+    hotelImageRemoteUrl: expectOptionalString(hotel.hotelImageRemoteUrl ?? null, 'This shared trip file contains an invalid hotel image URL.'),
+    hotelImageSource: expectEnum(hotel.hotelImageSource, destinationImageSources, 'This shared trip file contains an invalid hotel image source.'),
+    hotelImageAttributionText: expectOptionalString(hotel.hotelImageAttributionText ?? null, 'This shared trip file contains invalid hotel attribution text.'),
+    hotelImageAttributionMeta: (hotel.hotelImageAttributionMeta ?? null) as HotelStay['hotelImageAttributionMeta'],
+    hotelImageStatus: expectEnum(hotel.hotelImageStatus, heroImageStatuses, 'This shared trip file contains an invalid hotel image state.'),
+    phone: expectString(hotel.phone ?? '', 'This shared trip file contains an invalid hotel phone.', { allowEmpty: true, maxLength: 120 }),
+    bookingRef: expectString(hotel.bookingRef ?? '', 'This shared trip file contains an invalid hotel booking reference.', { allowEmpty: true, maxLength: 120 }),
+    checkIn: expectIsoDate(hotel.checkIn, 'This shared trip file contains an invalid hotel check-in time.'),
+    checkOut: expectIsoDate(hotel.checkOut, 'This shared trip file contains an invalid hotel check-out time.'),
+    notes: expectString(hotel.notes ?? '', 'This shared trip file contains invalid hotel notes.', { allowEmpty: true, maxLength: MAX_LONG_TEXT_LENGTH }),
+    createdAt: expectIsoDate(hotel.createdAt, 'This shared trip file contains an invalid hotel creation date.'),
+    updatedAt: expectIsoDate(hotel.updatedAt, 'This shared trip file contains an invalid hotel update date.'),
+  };
+}
+
+function validateItineraryEvent(value: unknown, tripId: string): ItineraryEvent {
+  const event = expectObject(value, 'This shared trip file contains an invalid itinerary event.');
+  const validatedTripId = expectId(event.tripId, 'This shared trip file contains an invalid itinerary trip ID.');
+  assertPacket(validatedTripId === tripId, 'This shared trip file mixes itinerary events from another trip.');
+  return {
+    id: expectId(event.id, 'This shared trip file contains an invalid itinerary ID.'),
+    tripId: validatedTripId,
+    title: expectString(event.title, 'This shared trip file contains an itinerary item without a title.'),
+    type: expectEnum(event.type, itineraryTypes, 'This shared trip file contains an invalid itinerary type.'),
+    dateTime: expectIsoDate(event.dateTime, 'This shared trip file contains an invalid itinerary time.'),
+    location: expectString(event.location ?? '', 'This shared trip file contains an invalid itinerary location.', { allowEmpty: true, maxLength: MAX_LONG_TEXT_LENGTH }),
+    confirmationNumber: expectString(event.confirmationNumber ?? '', 'This shared trip file contains an invalid itinerary confirmation number.', {
+      allowEmpty: true,
+      maxLength: 120,
+    }),
+    notes: expectString(event.notes ?? '', 'This shared trip file contains invalid itinerary notes.', { allowEmpty: true, maxLength: MAX_LONG_TEXT_LENGTH }),
+    createdAt: expectIsoDate(event.createdAt, 'This shared trip file contains an invalid itinerary creation date.'),
+    updatedAt: expectIsoDate(event.updatedAt, 'This shared trip file contains an invalid itinerary update date.'),
+  };
+}
+
+function validateEmergencyInfo(value: unknown, tripId: string): EmergencyInfo | null {
+  if (value === null) {
+    return null;
+  }
+  const info = expectObject(value, 'This shared trip file contains an invalid emergency record.');
+  const validatedTripId = expectId(info.tripId, 'This shared trip file contains an invalid emergency trip ID.');
+  assertPacket(validatedTripId === tripId, 'This shared trip file mixes emergency details from another trip.');
+  return {
+    id: expectId(info.id, 'This shared trip file contains an invalid emergency record ID.'),
+    tripId: validatedTripId,
+    insurerEmergencyNumber: expectString(info.insurerEmergencyNumber ?? '', 'This shared trip file contains an invalid insurer emergency number.', {
+      allowEmpty: true,
+      maxLength: 120,
+    }),
+    hotelPhone: expectString(info.hotelPhone ?? '', 'This shared trip file contains an invalid hotel phone.', { allowEmpty: true, maxLength: 120 }),
+    airlinePhone: expectString(info.airlinePhone ?? '', 'This shared trip file contains an invalid airline phone.', { allowEmpty: true, maxLength: 120 }),
+    localEmergencyNote: expectString(info.localEmergencyNote ?? '', 'This shared trip file contains invalid local emergency notes.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    embassyConsulateNote: expectString(info.embassyConsulateNote ?? '', 'This shared trip file contains invalid embassy notes.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    travellerMedicalNote: expectString(info.travellerMedicalNote ?? '', 'This shared trip file contains invalid medical notes.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    emergencyContacts: expectString(info.emergencyContacts ?? '', 'This shared trip file contains invalid emergency contacts.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    createdAt: expectIsoDate(info.createdAt, 'This shared trip file contains an invalid emergency record creation date.'),
+    updatedAt: expectIsoDate(info.updatedAt, 'This shared trip file contains an invalid emergency record update date.'),
+  };
+}
+
+function validateReminderSetting(value: unknown, tripId: string): ReminderSetting {
+  const setting = expectObject(value, 'This shared trip file contains an invalid reminder setting.');
+  const validatedTripId = expectId(setting.tripId, 'This shared trip file contains an invalid reminder trip ID.');
+  assertPacket(validatedTripId === tripId, 'This shared trip file mixes reminder settings from another trip.');
+  return {
+    id: expectId(setting.id, 'This shared trip file contains an invalid reminder ID.'),
+    tripId: validatedTripId,
+    kind: expectEnum(setting.kind, reminderKinds, 'This shared trip file contains an invalid reminder type.'),
+    enabled: expectBoolean(setting.enabled, 'This shared trip file contains an invalid reminder enabled flag.'),
+    leadTimeDays: expectNumberEnum(setting.leadTimeDays, reminderLeadTimes, 'This shared trip file contains an invalid reminder lead time.'),
+    createdAt: expectIsoDate(setting.createdAt, 'This shared trip file contains an invalid reminder creation date.'),
+    updatedAt: expectIsoDate(setting.updatedAt, 'This shared trip file contains an invalid reminder update date.'),
+  };
+}
+
+function validateParticipant(value: unknown, tripId: string): TripParticipant {
+  const participant = expectObject(value, 'This shared trip file contains an invalid participant record.');
+  const validatedTripId = expectId(participant.tripId, 'This shared trip file contains an invalid participant trip ID.');
+  assertPacket(validatedTripId === tripId, 'This shared trip file mixes participant records from another trip.');
+  return {
+    id: expectId(participant.id, 'This shared trip file contains an invalid participant ID.'),
+    tripId: validatedTripId,
+    displayName: expectString(participant.displayName, 'This shared trip file contains a participant with no display name.'),
+    email: expectString(participant.email ?? '', 'This shared trip file contains an invalid participant email.', {
+      allowEmpty: true,
+      maxLength: 320,
+    }),
+    role: expectEnum(participant.role, participantRoles, 'This shared trip file contains an invalid participant role.'),
+    avatarColor: expectString(participant.avatarColor, 'This shared trip file contains an invalid participant colour.', {
+      pattern: /^#[0-9a-f]{6}$/i,
+      maxLength: 7,
+    }),
+    inviteCode: expectString(participant.inviteCode, 'This shared trip file contains an invalid participant invite code.', {
+      pattern: SHARE_CODE_PATTERN,
+      maxLength: 14,
+    }),
+    isLocalProfile: expectBoolean(participant.isLocalProfile, 'This shared trip file contains an invalid participant locality flag.'),
+    createdAt: expectIsoDate(participant.createdAt, 'This shared trip file contains an invalid participant creation date.'),
+    updatedAt: expectIsoDate(participant.updatedAt, 'This shared trip file contains an invalid participant update date.'),
+  };
+}
+
+function validateInvite(value: unknown, tripId: string): TripInvite {
+  const invite = expectObject(value, 'This shared trip file contains an invalid invite record.');
+  const validatedTripId = expectId(invite.tripId, 'This shared trip file contains an invalid invite trip ID.');
+  assertPacket(validatedTripId === tripId, 'This shared trip file mixes invite records from another trip.');
+  return {
+    id: expectId(invite.id, 'This shared trip file contains an invalid invite ID.'),
+    tripId: validatedTripId,
+    email: expectString(invite.email ?? '', 'This shared trip file contains an invalid invite email.', {
+      allowEmpty: true,
+      maxLength: 320,
+    }),
+    inviteCode: expectString(invite.inviteCode, 'This shared trip file contains an invalid invite code.', {
+      pattern: SHARE_CODE_PATTERN,
+      maxLength: 14,
+    }),
+    role: expectEnum(invite.role, participantRoles, 'This shared trip file contains an invalid invite role.'),
+    status: expectEnum(invite.status, inviteStatuses, 'This shared trip file contains an invalid invite status.'),
+    createdAt: expectIsoDate(invite.createdAt, 'This shared trip file contains an invalid invite creation date.'),
+    updatedAt: expectIsoDate(invite.updatedAt, 'This shared trip file contains an invalid invite update date.'),
+  };
+}
+
+function validateSharedTripPacketData(value: unknown): SharedTripPacketData {
+  const data = expectObject(value, 'This shared trip file is incomplete.');
+  const trip = validateTrip(data.trip);
+  const travellers = expectArray(data.travellers, 'This shared trip file is missing travellers.').map((item) => validateTraveller(item, trip.id));
+  ensureUniqueIds(travellers, 'traveller');
+  const travellerIds = new Set(travellers.map((item) => item.id));
+  const packingItems = expectArray(data.packingItems, 'This shared trip file is missing packing items.').map((item) =>
+    validatePackingItem(item, trip.id, travellerIds)
+  );
+  const travelSegments = expectArray(data.travelSegments, 'This shared trip file is missing travel segments.').map((item) =>
+    validateTravelSegment(item, trip.id)
+  );
+  const hotelStays = expectArray(data.hotelStays, 'This shared trip file is missing hotel stays.').map((item) => validateHotelStay(item, trip.id));
+  const itineraryEvents = expectArray(data.itineraryEvents, 'This shared trip file is missing itinerary items.').map((item) =>
+    validateItineraryEvent(item, trip.id)
+  );
+  const reminderSettings = expectArray(data.reminderSettings, 'This shared trip file is missing reminder settings.').map((item) =>
+    validateReminderSetting(item, trip.id)
+  );
+  const participants = expectArray(data.participants, 'This shared trip file is missing participants.').map((item) =>
+    validateParticipant(item, trip.id)
+  );
+  const invites = expectArray(data.invites, 'This shared trip file is missing invites.').map((item) => validateInvite(item, trip.id));
+  const emergencyInfo = validateEmergencyInfo(data.emergencyInfo ?? null, trip.id);
+
+  ensureUniqueIds(packingItems, 'packing item');
+  ensureUniqueIds(travelSegments, 'travel segment');
+  ensureUniqueIds(hotelStays, 'hotel stay');
+  ensureUniqueIds(itineraryEvents, 'itinerary item');
+  ensureUniqueIds(reminderSettings, 'reminder');
+  ensureUniqueIds(participants, 'participant');
+  ensureUniqueIds(invites, 'invite');
+
+  return {
+    trip,
+    travellers,
+    packingItems,
+    travelSegments,
+    hotelStays,
+    itineraryEvents,
+    emergencyInfo,
+    reminderSettings,
+    participants,
+    invites,
+  };
 }
 
 function buildSharedPacketData(snapshot: AppDataSnapshot, tripId: string): SharedTripPacketData {
@@ -51,23 +613,37 @@ export function createSharedTripPacket(snapshot: AppDataSnapshot, tripId: string
     bundle.participants.find((participant) => participant.role === 'owner' && participant.isLocalProfile)?.displayName ??
     bundle.participants[0]?.displayName ??
     'Pineapple user';
-  const shareCode = bundle.sharedTripState?.shareCode ?? createShareCode();
+  const shareCode = bundle.sharedTripState?.shareCode ?? createPacketShareCode();
 
   if (!trip) {
     throw new Error('Trip not found.');
   }
 
-  return {
-    format: 'pineapple-shared-trip',
-    version: 1,
+  const packetCore = {
+    format: 'pineapple-shared-trip' as const,
+    version: 2 as const,
     shareCode,
     generatedAt: now(),
     senderLabel,
     data: buildSharedPacketData(snapshot, tripId),
   };
+
+  return {
+    ...packetCore,
+    integrity: {
+      algorithm: 'sha256' as const,
+      payloadHash: hashSharedPacketPayload(packetCore),
+      encrypted: false,
+      authenticated: false,
+    },
+  };
 }
 
 export async function exportSharedTripPacket(snapshot: AppDataSnapshot, tripId: string) {
+  const [{ writeUtf8File }, Sharing] = await Promise.all([
+    import('@/utils/fileStorage'),
+    import('expo-sharing'),
+  ]);
   const packet = createSharedTripPacket(snapshot, tripId);
   const uri = await writeUtf8File(
     'exports',
@@ -85,29 +661,74 @@ export async function exportSharedTripPacket(snapshot: AppDataSnapshot, tripId: 
   return { packet, uri };
 }
 
-export function parseSharedTripPacket(contents: string) {
+export function parseSharedTripPacket(contents: string): SharedTripPacket {
   if (!contents || contents.length > MAX_SHARED_TRIP_PACKET_LENGTH) {
     throw new Error('This shared trip file is too large to import safely.');
   }
 
-  const packet = JSON.parse(contents) as SharedTripPacket;
-  if (packet.format !== 'pineapple-shared-trip' || packet.version !== 1) {
-    throw new Error('This shared trip file is not recognised.');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(contents);
+  } catch {
+    throw new Error('This shared trip file is not valid JSON.');
   }
-  if (
-    !packet.data?.trip?.id ||
-    !Array.isArray(packet.data.travellers) ||
-    !Array.isArray(packet.data.packingItems) ||
-    !Array.isArray(packet.data.travelSegments) ||
-    !Array.isArray(packet.data.hotelStays) ||
-    !Array.isArray(packet.data.itineraryEvents) ||
-    !Array.isArray(packet.data.reminderSettings) ||
-    !Array.isArray(packet.data.participants) ||
-    !Array.isArray(packet.data.invites)
-  ) {
-    throw new Error('This shared trip file is incomplete.');
+
+  const packet = expectObject(parsed, 'This shared trip file is not recognised.');
+  const format = expectString(packet.format, 'This shared trip file is not recognised.');
+  assertPacket(format === 'pineapple-shared-trip', 'This shared trip file is not recognised.');
+  const version = expectNumber(packet.version, 'This shared trip file is not recognised.', {
+    integer: true,
+    min: 1,
+    max: 2,
+  }) as 1 | 2;
+  const shareCode = expectString(packet.shareCode, 'This shared trip file contains an invalid share code.', {
+    pattern: SHARE_CODE_PATTERN,
+    maxLength: 14,
+  });
+  const generatedAt = expectIsoDate(packet.generatedAt, 'This shared trip file contains an invalid export date.');
+  const senderLabel = expectString(packet.senderLabel, 'This shared trip file contains an invalid sender label.', {
+    maxLength: 120,
+  });
+  const data = validateSharedTripPacketData(packet.data);
+
+  const basePacket = {
+    format: 'pineapple-shared-trip' as const,
+    version,
+    shareCode,
+    generatedAt,
+    senderLabel,
+    data,
+  };
+
+  if (version === 2) {
+    const integrity = expectObject(packet.integrity, 'This shared trip file is missing its integrity proof.');
+    const algorithm = expectString(integrity.algorithm, 'This shared trip file uses an unsupported integrity format.');
+    assertPacket(algorithm === 'sha256', 'This shared trip file uses an unsupported integrity format.');
+    const payloadHash = expectString(integrity.payloadHash, 'This shared trip file is missing its integrity proof.', {
+      pattern: /^[a-f0-9]{64}$/i,
+      maxLength: 64,
+    });
+    const encrypted = expectBoolean(integrity.encrypted, 'This shared trip file contains an invalid protection flag.');
+    const authenticated = expectBoolean(integrity.authenticated, 'This shared trip file contains an invalid protection flag.');
+    const expectedHash = hashSharedPacketPayload({ ...basePacket, version: 2 as const });
+    assertPacket(expectedHash === payloadHash, 'This shared trip file failed integrity checks and was not imported.');
+
+    return {
+      ...basePacket,
+      version: 2,
+      integrity: {
+        algorithm: 'sha256',
+        payloadHash,
+        encrypted,
+        authenticated,
+      },
+    };
   }
-  return packet;
+
+  return {
+    ...basePacket,
+    version: 1,
+  };
 }
 
 function replaceTripCollections(snapshot: AppDataSnapshot, packet: SharedTripPacket, tripId: string) {

@@ -1401,6 +1401,27 @@ export async function upsertSyncConflict(input: SyncConflictDraft) {
 
 export async function deleteById(table: string, id: string) {
   const db = await getDatabase();
+  const deleteSqlByTable: Record<string, string> = {
+    documents: 'DELETE FROM documents WHERE id = ?',
+    trips: 'DELETE FROM trips WHERE id = ?',
+    hotel_stays: 'DELETE FROM hotel_stays WHERE id = ?',
+    travellers: 'DELETE FROM travellers WHERE id = ?',
+    packing_items: 'DELETE FROM packing_items WHERE id = ?',
+    travel_segments: 'DELETE FROM travel_segments WHERE id = ?',
+    itinerary_events: 'DELETE FROM itinerary_events WHERE id = ?',
+    emergency_infos: 'DELETE FROM emergency_infos WHERE id = ?',
+    reminder_settings: 'DELETE FROM reminder_settings WHERE id = ?',
+    saved_vibes: 'DELETE FROM saved_vibes WHERE id = ?',
+    vibe_cache_entries: 'DELETE FROM vibe_cache_entries WHERE id = ?',
+    trip_participants: 'DELETE FROM trip_participants WHERE id = ?',
+    trip_invites: 'DELETE FROM trip_invites WHERE id = ?',
+    sync_conflicts: 'DELETE FROM sync_conflicts WHERE id = ?',
+  };
+  const deleteSql = deleteSqlByTable[table];
+  if (!deleteSql) {
+    throw new Error(`Unsupported delete table: ${table}`);
+  }
+
   if (table === 'documents') {
     const document = await db.getFirstAsync<{
       localFileUri: string;
@@ -1438,7 +1459,7 @@ export async function deleteById(table: string, id: string) {
     }
   }
 
-  await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, id);
+  await db.runAsync(deleteSql, id);
 }
 
 export async function clearAllData() {

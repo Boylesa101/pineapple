@@ -2,7 +2,7 @@
 
 ## Scope
 
-This pass focused on stabilising Pineapple for internal Android testing and Google Play preparation without changing the established visual language.
+This pass focused on stabilising Pineapple for internal Android testing and Google Play preparation without changing the established visual language. The shipped first-run path is now language, name, PIN, biometrics, then passport / traveller setup.
 
 ## Checks completed
 
@@ -15,12 +15,11 @@ This pass focused on stabilising Pineapple for internal Android testing and Goog
 
 ## Bugs fixed
 
-- Added a retryable startup error state instead of leaving bootstrap failures silent
-- Stopped notification permission prompts from being triggered during ordinary app refreshes
-- Added explicit permission handling and clearer messaging for photo imports
-- Added confirmation before deleting vault documents
-- Added warnings-screen row navigation so expiry items are easier to act on
-- Clarified onboarding and settings privacy copy around local-only file and email import behavior
+- Tightened onboarding completion to use explicit stored state with safer migration for older installs
+- Restored the intended first-run order so language and name no longer get skipped before PIN setup
+- Hardened shared-trip import with schema validation and integrity checks for newly exported packets
+- Removed stale Android exact-alarm and boot permissions from the checked-in native config
+- Clarified that Pineapple web is a companion surface rather than a supported sensitive-data surface
 
 ## Remaining known limitations
 

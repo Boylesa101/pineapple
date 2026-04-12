@@ -76,7 +76,7 @@
   "expo": {
     "doctor": {
       "appConfigFieldsNotSyncedCheck": {
-        "enabled": false
+        "enabled": true
       }
     }
   },

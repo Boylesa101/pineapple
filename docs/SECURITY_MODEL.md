@@ -37,10 +37,11 @@
 - Safe preferences such as auto-lock duration may be restored.
 - Backup restore replaces current local structured data.
 - Shared trip exchange in phase 3 is manual-share only. Full vault images are intentionally not part of the shared-trip packet.
+- Shared-trip packets are schema-validated and newly exported packets include a SHA-256 integrity hash, but they are not encrypted or cryptographically authenticated in the current release.
 - Conflicts are surfaced for manual review instead of silently overwriting local data.
 
 ## Known tradeoffs
 
 - PDFs are stored locally and can be opened with the device viewer, but they are not rendered inline inside the app yet.
 - Backup encryption is implemented in the app layer rather than a platform-specific encrypted archive format.
-- Web/PWA is a companion surface and should not be treated as the primary place for sensitive document storage.
+- Web/PWA is a companion surface and should not be treated as the primary place for sensitive document storage, encrypted backups, or manual-share sync.

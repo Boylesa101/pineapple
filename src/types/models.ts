@@ -502,11 +502,17 @@ export interface SharedTripPacketData {
 
 export interface SharedTripPacket {
   format: 'pineapple-shared-trip';
-  version: 1;
+  version: 1 | 2;
   shareCode: string;
   generatedAt: string;
   senderLabel: string;
   data: SharedTripPacketData;
+  integrity?: {
+    algorithm: 'sha256';
+    payloadHash: string;
+    encrypted: boolean;
+    authenticated: boolean;
+  };
 }
 
 export type TripDraft = Omit<Trip, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };

@@ -1,4 +1,4 @@
-export type OnboardingStep = 'language' | 'pin' | 'biometrics' | 'traveller_setup' | 'complete';
+export type OnboardingStep = 'language' | 'name' | 'pin' | 'biometrics' | 'traveller_setup' | 'complete';
 
 type OnboardingDeriveOptions = {
   pinConfigured: boolean;
@@ -9,7 +9,14 @@ type OnboardingDeriveOptions = {
 };
 
 export function isOnboardingStep(value: string | null | undefined): value is OnboardingStep {
-  return value === 'language' || value === 'pin' || value === 'biometrics' || value === 'traveller_setup' || value === 'complete';
+  return (
+    value === 'language' ||
+    value === 'name' ||
+    value === 'pin' ||
+    value === 'biometrics' ||
+    value === 'traveller_setup' ||
+    value === 'complete'
+  );
 }
 
 export function deriveOnboardingStep(
@@ -33,11 +40,11 @@ export function deriveOnboardingStep(
   }
 
   if (options.pinConfigured && hasProfileName) {
-    return 'traveller_setup';
+    return 'biometrics';
   }
 
   if (options.pinConfigured) {
-    return 'language';
+    return 'name';
   }
 
   if (hasProfileName) {

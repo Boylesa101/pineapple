@@ -87,6 +87,7 @@ import {
   manualTravelDocumentTypes,
 } from '@/utils/documentTypes';
 import { getDocumentVaultSetupState } from '@/utils/documentVaultSetup';
+import { isWebCompanionPolicyActive, sensitiveWebSupportMessage } from '@/utils/platformPolicy';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
 import { toUserMessage } from '@/utils/userErrors';
 import { validateDocument } from '@/utils/validation';
@@ -574,6 +575,11 @@ export default function VaultScreen() {
   }
 
   async function startDocumentFlow(action: 'scan' | 'ocr_import' | 'manual', documentType: DocumentType) {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Vault editing stays disabled on web', sensitiveWebSupportMessage);
+      return;
+    }
+
     if (action === 'manual') {
       setAddSheetVisible(false);
       openManualDocument(documentType);
@@ -767,6 +773,11 @@ export default function VaultScreen() {
   }
 
   async function handleVaultUnlock() {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Vault unlock stays disabled on web', sensitiveWebSupportMessage);
+      return;
+    }
+
     const valid = await unlockVaultWithPin(pin);
     if (!valid) {
       Alert.alert('Incorrect PIN', 'Try again.');
@@ -1521,7 +1532,17 @@ export default function VaultScreen() {
 
   return (
     <AppScreen
-      footer={<DocumentFloatingActionButton onPress={() => setAddSheetVisible(true)} />}
+      footer={
+        <DocumentFloatingActionButton
+          onPress={() => {
+            if (isWebCompanionPolicyActive()) {
+              Alert.alert('Vault editing stays disabled on web', sensitiveWebSupportMessage);
+              return;
+            }
+            setAddSheetVisible(true);
+          }}
+        />
+      }
       contentStyle={styles.screenContent}
     >
       <View style={styles.vaultHeader}>
@@ -1529,8 +1550,18 @@ export default function VaultScreen() {
           <Text style={styles.vaultEyebrow}>Pineapple</Text>
           <Text style={styles.vaultTitle}>Document Vault</Text>
           <Text style={styles.vaultSubtitle}>Travel-ready identity records, cards, passes, and supporting paperwork stored locally on this device.</Text>
+          {isWebCompanionPolicyActive() ? <Text style={styles.meta}>{sensitiveWebSupportMessage}</Text> : null}
         </View>
-        <Pressable onPress={() => setPinPromptVisible(true)} style={styles.vaultLockButton}>
+        <Pressable
+          onPress={() => {
+            if (isWebCompanionPolicyActive()) {
+              Alert.alert('Vault unlock stays disabled on web', sensitiveWebSupportMessage);
+              return;
+            }
+            setPinPromptVisible(true);
+          }}
+          style={styles.vaultLockButton}
+        >
           <MaterialIcons name={isVaultUnlocked ? 'verified-user' : 'lock-outline'} size={20} color={colors.primaryBlue} />
         </Pressable>
       </View>
