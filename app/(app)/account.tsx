@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { AvatarBadge } from '@/components/AvatarBadge';
+import { ChoiceChips } from '@/components/ChoiceChips';
 import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { MiniActionCard } from '@/components/ui/MiniActionCard';
@@ -32,6 +33,7 @@ export default function AccountScreen() {
   const primaryTraveller = travellers[0] ?? null;
   const fullName = primaryTraveller?.fullName || data.appPreferences.profileName || 'Pineapple traveller';
   const profilePhotoUri = data.appPreferences.profilePhotoUri;
+  const travelStyle = data.appPreferences.travelStyle;
   const initials = useMemo(() => initialsForName(fullName) || 'P', [fullName]);
 
   async function handleProfilePhotoPress() {
@@ -104,6 +106,25 @@ export default function AccountScreen() {
           <Text style={styles.statValue}>{travellers.length}</Text>
           <Text style={styles.statLabel}>Travellers</Text>
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeader title="Trip style" />
+        <AppCard>
+          <ChoiceChips<typeof travelStyle>
+            value={travelStyle}
+            onChange={(value) => {
+              void saveAppPreferences({ travelStyle: value });
+            }}
+            options={[
+              { label: 'Family', value: 'family_holidays' },
+              { label: 'City breaks', value: 'city_breaks' },
+              { label: 'Road trips', value: 'road_trips' },
+              { label: 'Mixed', value: 'mixed' },
+            ]}
+          />
+          <Text style={styles.profileHint}>Travel style lives here now instead of blocking first-run setup.</Text>
+        </AppCard>
       </View>
 
       <View style={styles.section}>

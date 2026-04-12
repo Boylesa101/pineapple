@@ -1,10 +1,52 @@
-export function deriveOnboardingCompletionStatus(
-  storedStatus: boolean | null,
-  options: { pinConfigured: boolean; tripCount: number }
-) {
-  if (storedStatus !== null) {
-    return storedStatus;
+export type OnboardingStep = 'language' | 'pin' | 'biometrics' | 'traveller_setup' | 'complete';
+
+type OnboardingDeriveOptions = {
+  pinConfigured: boolean;
+  profileName: string;
+  travellerCount: number;
+  documentCount: number;
+  tripCount: number;
+};
+
+export function isOnboardingStep(value: string | null | undefined): value is OnboardingStep {
+  return value === 'language' || value === 'pin' || value === 'biometrics' || value === 'traveller_setup' || value === 'complete';
+}
+
+export function deriveOnboardingStep(
+  storedStep: OnboardingStep | null,
+  legacyCompleted: boolean | null,
+  options: OnboardingDeriveOptions
+): OnboardingStep {
+  if (storedStep) {
+    return storedStep;
   }
 
-  return options.pinConfigured || options.tripCount > 0;
+  if (legacyCompleted === true) {
+    return 'complete';
+  }
+
+  const hasProfileName = Boolean(options.profileName.trim());
+  const hasEstablishedData = options.travellerCount > 0 || options.documentCount > 0 || options.tripCount > 0;
+
+  if (options.pinConfigured && hasProfileName && hasEstablishedData) {
+    return 'complete';
+  }
+
+  if (options.pinConfigured && hasProfileName) {
+    return 'traveller_setup';
+  }
+
+  if (options.pinConfigured) {
+    return 'language';
+  }
+
+  if (hasProfileName) {
+    return 'pin';
+  }
+
+  return 'language';
+}
+
+export function hasCompletedOnboarding(step: OnboardingStep) {
+  return step === 'complete';
 }

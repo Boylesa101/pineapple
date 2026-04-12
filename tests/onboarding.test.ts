@@ -1,15 +1,60 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deriveOnboardingCompletionStatus } from '@/utils/onboardingState';
+import { deriveOnboardingStep } from '@/utils/onboardingState';
 
-test('stored onboarding status wins when already set', () => {
-  assert.equal(deriveOnboardingCompletionStatus(false, { pinConfigured: true, tripCount: 2 }), false);
-  assert.equal(deriveOnboardingCompletionStatus(true, { pinConfigured: false, tripCount: 0 }), true);
+test('stored onboarding step wins when already set', () => {
+  assert.equal(
+    deriveOnboardingStep('traveller_setup', null, {
+      pinConfigured: true,
+      profileName: 'Andrew',
+      travellerCount: 0,
+      documentCount: 0,
+      tripCount: 0,
+    }),
+    'traveller_setup',
+  );
+  assert.equal(
+    deriveOnboardingStep('complete', false, {
+      pinConfigured: false,
+      profileName: '',
+      travellerCount: 0,
+      documentCount: 0,
+      tripCount: 0,
+    }),
+    'complete',
+  );
 });
 
-test('onboarding auto-completes for upgraded installs with a configured pin or trip data', () => {
-  assert.equal(deriveOnboardingCompletionStatus(null, { pinConfigured: true, tripCount: 0 }), true);
-  assert.equal(deriveOnboardingCompletionStatus(null, { pinConfigured: false, tripCount: 1 }), true);
-  assert.equal(deriveOnboardingCompletionStatus(null, { pinConfigured: false, tripCount: 0 }), false);
+test('legacy users only auto-complete when they have established profile data as well as usage data', () => {
+  assert.equal(
+    deriveOnboardingStep(null, null, {
+      pinConfigured: true,
+      profileName: 'Andrew',
+      travellerCount: 1,
+      documentCount: 2,
+      tripCount: 1,
+    }),
+    'complete',
+  );
+  assert.equal(
+    deriveOnboardingStep(null, null, {
+      pinConfigured: true,
+      profileName: '',
+      travellerCount: 0,
+      documentCount: 0,
+      tripCount: 0,
+    }),
+    'language',
+  );
+  assert.equal(
+    deriveOnboardingStep(null, null, {
+      pinConfigured: false,
+      profileName: 'Andrew',
+      travellerCount: 0,
+      documentCount: 0,
+      tripCount: 0,
+    }),
+    'pin',
+  );
 });

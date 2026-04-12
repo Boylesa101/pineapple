@@ -8,7 +8,7 @@ import { VerificationBadge } from '@/components/document-support/VerificationBad
 import { QRCodeImage } from '@/components/ui/QRCodeImage';
 import { colors, radii, spacing } from '@/constants/theme';
 import type { Document, Traveller, VerificationStatus } from '@/types/models';
-import { formatShortDate } from '@/utils/date';
+import { formatDateTime, formatShortDate } from '@/utils/date';
 import { deriveFormalDocumentData } from '@/utils/formalDocument';
 import { buildRailTicketQrPayload, getFormalDocumentDateLabels, getFormalDocumentTheme } from '@/utils/documentTypes';
 
@@ -27,6 +27,7 @@ export function FormalDocumentOpenView({ document, traveller, expiryBadge, verif
   const theme = getFormalDocumentTheme(document);
   const dateLabels = getFormalDocumentDateLabels(document.documentType);
   const railQrValue = document.documentType === 'rail_ticket' ? buildRailTicketQrPayload(document, traveller) : null;
+  const railTraveller = record.travellerName || document.holderName || traveller?.fullName || '';
 
   return (
     <View style={[styles.record, { borderColor: theme.border }, horizontal ? styles.horizontal : styles.vertical]}>
@@ -53,30 +54,61 @@ export function FormalDocumentOpenView({ document, traveller, expiryBadge, verif
           <View style={styles.ticketCard}>
             <View style={styles.ticketTopRow}>
               <View style={styles.ticketRoute}>
-                <Text style={styles.ticketLabel}>National Rail</Text>
+                <Text style={styles.ticketLabel}>Pineapple stored UK rail ticket</Text>
                 <Text style={styles.ticketTitle}>{record.title || 'Rail ticket'}</Text>
                 <Text style={styles.ticketMeta}>{record.issuer || 'Stored operator'}</Text>
               </View>
               <MaterialIcons name={theme.icon} size={30} color={theme.accent} />
             </View>
+            <View style={styles.ticketStrip}>
+              <Text style={styles.ticketStripText}>Not an official National Rail travel ticket. Check with the operator before travel.</Text>
+            </View>
             <View style={styles.ticketDetails}>
               <View style={styles.ticketDetailBlock}>
-                <Text style={styles.ticketDetailLabel}>Travel</Text>
+                <Text style={styles.ticketDetailLabel}>Date</Text>
                 <Text style={styles.ticketDetailValue}>{formatShortDate(document.issueDate)}</Text>
               </View>
               <View style={styles.ticketDetailBlock}>
-                <Text style={styles.ticketDetailLabel}>Seat / coach</Text>
-                <Text style={styles.ticketDetailValue}>{record.location || 'Open seating'}</Text>
+                <Text style={styles.ticketDetailLabel}>Departure</Text>
+                <Text style={styles.ticketDetailValue}>{formatDateTime(document.issueDate)}</Text>
               </View>
               <View style={styles.ticketDetailBlock}>
-                <Text style={styles.ticketDetailLabel}>Ticket ref</Text>
+                <Text style={styles.ticketDetailLabel}>Arrival</Text>
+                <Text style={styles.ticketDetailValue}>{formatDateTime(document.expiryDate)}</Text>
+              </View>
+              <View style={styles.ticketDetailBlock}>
+                <Text style={styles.ticketDetailLabel}>Class</Text>
+                <Text style={styles.ticketDetailValue}>{record.railClass || 'Standard'}</Text>
+              </View>
+              <View style={styles.ticketDetailBlock}>
+                <Text style={styles.ticketDetailLabel}>Type</Text>
+                <Text style={styles.ticketDetailValue}>{record.ticketType || 'Stored ticket'}</Text>
+              </View>
+              <View style={styles.ticketDetailBlock}>
+                <Text style={styles.ticketDetailLabel}>Coach / seat</Text>
+                <Text style={styles.ticketDetailValue}>
+                  {[record.coach, record.seat].filter(Boolean).join(' / ') || 'Open seating'}
+                </Text>
+              </View>
+              <View style={styles.ticketDetailBlock}>
+                <Text style={styles.ticketDetailLabel}>Booking ref</Text>
                 <Text style={styles.ticketDetailValue}>{record.referenceCode || document.documentNumber || 'Stored'}</Text>
+              </View>
+              <View style={styles.ticketDetailBlock}>
+                <Text style={styles.ticketDetailLabel}>Traveller</Text>
+                <Text style={styles.ticketDetailValue}>{railTraveller || 'Traveller'}</Text>
+              </View>
+              <View style={styles.ticketDetailBlock}>
+                <Text style={styles.ticketDetailLabel}>Fare</Text>
+                <Text style={styles.ticketDetailValue}>{record.fare || record.status || 'Stored fare'}</Text>
               </View>
             </View>
             <View style={styles.ticketBottomRow}>
               <View style={styles.ticketSummary}>
-                <Text style={styles.ticketDetailLabel}>Ticket notes</Text>
-                <Text style={styles.ticketSummaryText}>{record.summary || document.notes || 'Stored locally in Pineapple.'}</Text>
+                <Text style={styles.ticketDetailLabel}>Route / station</Text>
+                <Text style={styles.ticketSummaryText}>
+                  {[record.title, record.location].filter(Boolean).join(' • ') || record.summary || document.notes || 'Stored locally in Pineapple.'}
+                </Text>
               </View>
               <View style={styles.ticketQrWrap}>
                 <QRCodeImage value={railQrValue} size={108} />
@@ -161,6 +193,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
     alignItems: 'flex-start',
+  },
+  ticketStrip: {
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.42)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  ticketStripText: {
+    color: '#6C3B04',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    lineHeight: 15,
   },
   ticketRoute: {
     flex: 1,

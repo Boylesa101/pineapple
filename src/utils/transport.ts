@@ -124,6 +124,23 @@ const DISPLAY_BY_TRANSPORT: Record<TransportType, TransportDisplay> = {
     detailIcon: 'directions-car',
     directionOtherLabel: 'Other',
   },
+  hire_car: {
+    label: 'Hire car',
+    shortLabel: 'Hire car',
+    providerLabel: 'Rental company',
+    providerPlaceholder: 'Add rental company',
+    providerHelper: 'Add the hire-car company and keep the pickup details handy.',
+    serviceNumberLabel: 'Booking reference',
+    departureLabel: 'Pickup point',
+    arrivalLabel: 'Drop-off point',
+    terminalLabel: 'Pickup details',
+    gateLabel: 'Vehicle / counter note',
+    departureIcon: 'car-rental',
+    arrivalIcon: 'location-on',
+    cardIcon: 'car-rental',
+    detailIcon: 'car-rental',
+    directionOtherLabel: 'Other',
+  },
   taxi: {
     label: 'Taxi / ride',
     shortLabel: 'Taxi',
@@ -150,6 +167,7 @@ export function normalizeTransportType(value: string | null | undefined): Transp
     value === 'ferry' ||
     value === 'eurotunnel' ||
     value === 'car' ||
+    value === 'hire_car' ||
     value === 'taxi'
   ) {
     return value;

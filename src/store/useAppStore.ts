@@ -56,8 +56,8 @@ import { defaultAppExpiryPreferences } from '@/utils/documentExpiry';
 import { resolveDestinationType } from '@/utils/destinationImage';
 import { createId } from '@/utils/ids';
 import { clearMaterializedSecureFiles } from '@/utils/fileStorage';
-import { loadOnboardingComplete, persistOnboardingComplete } from '@/utils/onboarding';
-import { deriveOnboardingCompletionStatus } from '@/utils/onboardingState';
+import { loadLegacyOnboardingComplete, loadOnboardingState, persistOnboardingStep } from '@/utils/onboarding';
+import { deriveOnboardingStep, hasCompletedOnboarding, type OnboardingStep } from '@/utils/onboardingState';
 import { normalizeDestinationLabel } from '@/utils/trips';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
 import { createShareCode, isLegacyShareCode } from '@/utils/shareCodes';
@@ -123,6 +123,7 @@ type StoreState = {
   bootError: string | null;
   isUnlocked: boolean;
   hasCompletedOnboarding: boolean;
+  onboardingStep: OnboardingStep;
   privacyOverlayVisible: boolean;
   activeTripId: string | null;
   lastInteractionAt: number;
@@ -135,6 +136,7 @@ type StoreState = {
   bootstrap: () => Promise<void>;
   refreshData: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  setOnboardingStep: (step: OnboardingStep) => Promise<void>;
   setActiveTrip: (tripId: string | null) => void;
   noteInteraction: () => void;
   enforceInactivityLock: () => void;
@@ -291,6 +293,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
   bootError: null,
   isUnlocked: false,
   hasCompletedOnboarding: false,
+  onboardingStep: 'language',
   privacyOverlayVisible: false,
   activeTripId: null,
   lastInteractionAt: Date.now(),
@@ -308,10 +311,11 @@ export const useAppStore = create<StoreState>((set, get) => ({
     set({ isBusy: true, bootError: null });
     try {
       await clearMaterializedSecureFiles();
-      const [loadedSecurity, initialData, onboardingStatus] = await Promise.all([
+      const [loadedSecurity, initialData, storedOnboardingStep, legacyOnboardingComplete] = await Promise.all([
         loadSecurityConfig(),
         loadSnapshot(),
-        loadOnboardingComplete(),
+        loadOnboardingState(),
+        loadLegacyOnboardingComplete(),
       ]);
       let data = initialData;
       const security = loadedSecurity;
@@ -332,17 +336,21 @@ export const useAppStore = create<StoreState>((set, get) => ({
       }
 
       const visibleTrips = filterVisibleTrips(data.trips);
-      const hasCompletedOnboarding = deriveOnboardingCompletionStatus(onboardingStatus, {
+      const onboardingStep = deriveOnboardingStep(storedOnboardingStep, legacyOnboardingComplete, {
         pinConfigured: security.pinConfigured,
+        profileName: data.appPreferences.profileName,
+        travellerCount: data.travellers.length,
+        documentCount: data.documents.length,
         tripCount: visibleTrips.length,
       });
-      if (onboardingStatus === null && hasCompletedOnboarding) {
-        await persistOnboardingComplete(true);
+      if (storedOnboardingStep === null) {
+        await persistOnboardingStep(onboardingStep);
       }
       set({
         security,
         data,
-        hasCompletedOnboarding,
+        hasCompletedOnboarding: hasCompletedOnboarding(onboardingStep),
+        onboardingStep,
         activeTripId: visibleTrips[0]?.id ?? null,
         isUnlocked: false,
         isBootstrapped: true,
@@ -356,7 +364,8 @@ export const useAppStore = create<StoreState>((set, get) => ({
         console.log('[auth] bootstrap complete', {
           pinConfigured: security.pinConfigured,
           tripCount: visibleTrips.length,
-          hasCompletedOnboarding,
+          hasCompletedOnboarding: hasCompletedOnboarding(onboardingStep),
+          onboardingStep,
         });
       }
       if (!security.pinConfigured) {
@@ -380,8 +389,12 @@ export const useAppStore = create<StoreState>((set, get) => ({
     queueNotificationRefresh(snapshot, { requestPermissions: false });
   },
   completeOnboarding: async () => {
-    await persistOnboardingComplete(true);
-    set({ hasCompletedOnboarding: true });
+    await persistOnboardingStep('complete');
+    set({ hasCompletedOnboarding: true, onboardingStep: 'complete' });
+  },
+  setOnboardingStep: async (step) => {
+    await persistOnboardingStep(step);
+    set({ onboardingStep: step, hasCompletedOnboarding: hasCompletedOnboarding(step) });
   },
   setActiveTrip: (tripId) => set({ activeTripId: tripId }),
   noteInteraction: () => set({ lastInteractionAt: Date.now() }),

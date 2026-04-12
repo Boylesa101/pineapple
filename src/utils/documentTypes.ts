@@ -193,14 +193,18 @@ export function getFormalDocumentDateLabels(documentType: DocumentType) {
 export function buildRailTicketQrPayload(document: Pick<Document, 'holderName' | 'documentNumber' | 'issueDate' | 'expiryDate' | 'formalDocumentData'>, traveller?: Traveller | null) {
   return JSON.stringify({
     format: 'pineapple-rail-ticket',
-    holder: document.holderName || traveller?.fullName || '',
+    holder: document.formalDocumentData?.travellerName || document.holderName || traveller?.fullName || '',
     reference: document.formalDocumentData?.referenceCode || document.documentNumber,
     route: document.formalDocumentData?.title || '',
     operator: document.formalDocumentData?.issuer || '',
     departureAt: document.issueDate,
     arrivalAt: document.expiryDate,
-    seat: document.formalDocumentData?.location || '',
-    fare: document.formalDocumentData?.status || '',
+    class: document.formalDocumentData?.railClass || '',
+    ticketType: document.formalDocumentData?.ticketType || '',
+    coach: document.formalDocumentData?.coach || '',
+    seat: document.formalDocumentData?.seat || '',
+    station: document.formalDocumentData?.location || '',
+    fare: document.formalDocumentData?.fare || '',
     notes: document.formalDocumentData?.summary || '',
   });
 }

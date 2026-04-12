@@ -1,35 +1,49 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-export { deriveOnboardingCompletionStatus } from './onboardingState';
+import { isOnboardingStep, type OnboardingStep } from './onboardingState';
 
-const ONBOARDING_KEY = 'pineapple.onboarding.completed';
+const ONBOARDING_STATE_KEY = 'pineapple.onboarding.state';
+const LEGACY_ONBOARDING_KEY = 'pineapple.onboarding.completed';
 
 function canUseLocalStorage() {
   return Platform.OS === 'web' && typeof window !== 'undefined' && 'localStorage' in window;
 }
 
-export async function loadOnboardingComplete() {
+async function getStoredValue(key: string) {
   if (canUseLocalStorage()) {
-    const value = window.localStorage.getItem(ONBOARDING_KEY);
-    if (value === null) {
-      return null;
-    }
-    return value === 'true';
+    return window.localStorage.getItem(key);
   }
 
-  const raw = await SecureStore.getItemAsync(ONBOARDING_KEY);
-  if (raw === null) {
-    return null;
-  }
-  return raw === 'true';
+  return SecureStore.getItemAsync(key);
 }
 
-export async function persistOnboardingComplete(value: boolean) {
+async function setStoredValue(key: string, value: string) {
   if (canUseLocalStorage()) {
-    window.localStorage.setItem(ONBOARDING_KEY, String(value));
+    window.localStorage.setItem(key, value);
     return;
   }
 
-  await SecureStore.setItemAsync(ONBOARDING_KEY, String(value));
+  await SecureStore.setItemAsync(key, value);
+}
+
+export async function loadOnboardingState() {
+  const raw = await getStoredValue(ONBOARDING_STATE_KEY);
+  return isOnboardingStep(raw) ? raw : null;
+}
+
+export async function persistOnboardingStep(step: OnboardingStep) {
+  await Promise.all([
+    setStoredValue(ONBOARDING_STATE_KEY, step),
+    setStoredValue(LEGACY_ONBOARDING_KEY, String(step === 'complete')),
+  ]);
+}
+
+export async function loadLegacyOnboardingComplete() {
+  const raw = await getStoredValue(LEGACY_ONBOARDING_KEY);
+  if (raw === null) {
+    return null;
+  }
+
+  return raw === 'true';
 }

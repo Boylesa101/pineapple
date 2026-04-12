@@ -175,7 +175,7 @@ function getTransportReminderOffsets(type: TransportType) {
     return LONG_HAUL_TRANSPORT_OFFSETS;
   }
 
-  if (type === 'train' || type === 'taxi') {
+  if (type === 'train' || type === 'taxi' || type === 'hire_car') {
     return LOCAL_TRANSPORT_OFFSETS;
   }
 

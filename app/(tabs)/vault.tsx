@@ -2177,6 +2177,64 @@ export default function VaultScreen() {
                   }
                   multiline
                 />
+                {draft.documentType === 'rail_ticket' ? (
+                  <>
+                    <AppTextField
+                      label="Traveller"
+                      value={draft.formalDocumentData.travellerName ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, travellerName: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Class"
+                      value={draft.formalDocumentData.railClass ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, railClass: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Ticket type"
+                      value={draft.formalDocumentData.ticketType ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, ticketType: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Coach"
+                      value={draft.formalDocumentData.coach ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, coach: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Seat"
+                      value={draft.formalDocumentData.seat ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, seat: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Fare"
+                      value={draft.formalDocumentData.fare ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, fare: value } } : current
+                        )
+                      }
+                    />
+                  </>
+                ) : null}
               </ExtractedFieldEditor>
             ) : null}
             {draft.documentType === 'payment_card' && draft.paymentCardData ? (

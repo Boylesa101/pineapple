@@ -7,11 +7,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
 - Expo Go is no longer a supported Pineapple test path; use installable APKs for device testing and `.aab` for Play Store release
 - For a dev-only APK that still expects Metro, run `npm run apk:debug`
-- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.2.6-debug.apk`
+- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.2.7-debug.apk`
 - For the fastest direct phone testing on a modern device, run `npm run apk:release:arm64`
-- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.2.6-release-arm64.apk`
+- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.2.7-release-arm64.apk`
 - For direct phone testing without USB or Metro, run `npm run apk:release`
-- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.2.6-release.apk`
+- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.2.7-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
 - Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
 - When you are ready for Google Play, provide these environment variables before building:
@@ -35,6 +35,20 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
   - `npm run deploy:pinapple-dev -- --apk "new apk/<your file>.apk" --build-label "Internal test build"`
 - If `--apk` is omitted, Pineapple will automatically use the newest APK in `new apk/` or `build/apk/`
 - The deploy script uploads both the versioned APK object and the stable `downloads/pineapple-latest.apk` alias, updates the page metadata, and redeploys the Cloudflare Pages site
+
+### Android themed icon check
+
+- The Android adaptive icon config points at `./assets/android-icon-monochrome.png`, and the generated launcher XML in `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml` includes the monochrome layer
+- The monochrome source asset is a transparent single-colour glyph with no baked background and is regenerated from `scripts/generate-brand-assets.mjs`
+- Pixel / Google phone verification:
+  - build and install a fresh APK after the icon assets are regenerated
+  - long-press the home screen and enable `Themed icons`
+  - confirm the Pineapple launcher icon renders as the pineapple glyph rather than a filled square background
+
+### First-run order
+
+- First-run setup now follows this exact order: `Language` -> `Name` -> `PIN` -> `Biometrics` -> `Passport / traveller setup`
+- Travel style and profile photo no longer block PIN setup; profile photo lives in `Account`, and travel style lives in `Account` / `Settings`
 
 ### Core features
 
@@ -68,7 +82,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Home alerts now live behind the bell icon instead of taking over the dashboard, with a red-dot badge only when something needs attention
 - Reusable document expiry status system for passports, visas, GHIC / EHIC, travel insurance, driving licences, ID cards, and custom docs with expiry dates
 - Packing lists grouped by category with multi-traveller assignment, templates, duplicate action, and priority flags
-- Transport segment management with outbound/return direction support, dynamic flight/private-flight/train/ferry/eurotunnel/car/taxi modes, searchable operator suggestions where useful, stored provider codes, and safe local logo fallback handling
+- Transport segment management with outbound/return direction support, dynamic flight/private-flight/train/ferry/eurotunnel/car/hire-car/taxi modes, searchable operator suggestions where useful, stored provider codes, and safe local logo fallback handling
 - The flight provider picker now bundles 50 common airline brand marks locally so transport selection does not depend on remote logo URLs at runtime
 - Hotel stay management with free OpenStreetMap/Nominatim address search, editable address normalization, automatic free image lookup, and offline cache after the first successful fetch
 - Structured transfer/pickup management with provider, method, location, time, notes, and optional travel-to-airport duration stored directly on the trip
@@ -95,8 +109,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Sensitive structured record fields are also encrypted before Pineapple writes them into local storage, covering trips, travellers, document metadata, itinerary notes, emergency records, and sync payloads
 - Local reminders and notifications for trip countdown milestones, trip day, passport/GHIC expiry, missing insurance, packing completeness, per-segment transport departures, hotels, transfers, travel mode, SOS readiness, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
-- Version `2.2.6` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
-- Onboarding now asks what kind of trips Pineapple is mainly for, lets the main user decide whether to prepare lock-screen reminders later, and supports adding extra travellers plus optional passport basics during first setup
+- Version `2.2.7` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
+- First-run setup now starts with language choice, persists the selected app language immediately, then continues through name, PIN, biometrics, and optional passport / traveller setup
+- Vault travel records now expose hire-car bookings, airport lounge passes, airline loyalty cards, and a Pineapple-stored UK rail ticket record with local QR generation
+- UK rail ticket records stay explicitly honest: Pineapple stores a reference copy and QR payload for your own trip organisation, but it does not issue a valid National Rail travel ticket
+- Trip detail can now surface a visa-check warning or softer official-check prompt using destination-specific official immigration links when Pineapple can match the saved trip destination safely
 - Trip sharing now surfaces Android Nearby / Quick Share through the existing local exported trip file flow instead of sounding like a backend sync feature
 - Weather detail returns to the cleaner selected-day layout: scenic top card first, then the selected day’s hourly time, icon, and temperature rows directly underneath
 - The temporary `Transport Notification Proof Trip` is build-scoped and should be removed again after transport lock-screen verification is complete

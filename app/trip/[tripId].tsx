@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Linking from 'expo-linking';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -26,6 +27,7 @@ import { TypedDateField } from '@/components/TypedDateField';
 import { QRCodeImage } from '@/components/ui/QRCodeImage';
 import { colors, spacing } from '@/constants/theme';
 import { NOTIFICATION_PROOF_BUILD_VERSION, isNotificationProofTripId } from '@/data/notificationProofBuild';
+import { getVisaRequirementAssessment } from '@/content/visaRequirements';
 import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
 import { createReminderContent, describeTransportReminderMatrix } from '@/services/notificationPlanner';
 import {
@@ -276,6 +278,7 @@ export default function TripDetailScreen() {
   const [inviteDraft, setInviteDraft] = useState<TripInviteDraft | null>(null);
   const [connectionSegmentDraft, setConnectionSegmentDraft] = useState<TravelSegmentDraft | null>(null);
   const [transferQrVisible, setTransferQrVisible] = useState(false);
+  const [visaModalVisible, setVisaModalVisible] = useState(false);
   const [travellerPhotoBaselineUri, setTravellerPhotoBaselineUri] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<TripSection>('overview');
   const [destinationTimeInfo, setDestinationTimeInfo] = useState<DestinationLocalTimeInfo | null>(null);
@@ -314,6 +317,14 @@ export default function TripDetailScreen() {
     [bundle.travelSegments]
   );
   const primaryTransportType = useMemo(() => getPrimaryTransportType(bundle.travelSegments), [bundle.travelSegments]);
+  const primaryPassportCountryCode = useMemo(
+    () => bundle.documents.find((document) => document.documentType === 'passport')?.passportData?.countryCode ?? null,
+    [bundle.documents]
+  );
+  const visaAssessment = useMemo(
+    () => (trip ? getVisaRequirementAssessment(trip.destination, primaryPassportCountryCode) : null),
+    [primaryPassportCountryCode, trip]
+  );
   const primaryTransportDisplay = useMemo(
     () => (primaryTransportType ? getTransportDisplay(primaryTransportType) : null),
     [primaryTransportType]
@@ -353,6 +364,12 @@ export default function TripDetailScreen() {
     }
     setActiveSection('overview');
   }, [focus]);
+
+  useEffect(() => {
+    if (visaAssessment?.tone === 'warning') {
+      setVisaModalVisible(true);
+    }
+  }, [visaAssessment]);
   const departureDays = trip ? daysUntil(trip.startDate) : null;
   const remainingDays = trip ? daysLeft(trip.endDate) : null;
   const airportSetOffInfo = useMemo(
@@ -864,6 +881,7 @@ export default function TripDetailScreen() {
                 { label: 'Ferry', value: 'ferry' },
                 { label: 'Eurotunnel', value: 'eurotunnel' },
                 { label: 'Drive', value: 'car' },
+                { label: 'Hire car', value: 'hire_car' },
                 { label: 'Taxi', value: 'taxi' },
               ]}
             />
@@ -1235,6 +1253,20 @@ export default function TripDetailScreen() {
           {trip.notes || (trip.status === 'completed' ? 'This trip is complete and kept locally for reference.' : 'Add notes, reminders, and local context for the trip.')}
         </Text>
       </AppCard>
+
+      {visaAssessment ? (
+        <AppCard title={visaAssessment.tone === 'warning' ? 'Visa warning' : 'Visa check'}>
+          <Text style={styles.notes}>{visaAssessment.body}</Text>
+          <Text style={styles.notes}>Official source: {visaAssessment.officialSourceLabel}</Text>
+          <AppButton
+            label="Open official guidance"
+            tone={visaAssessment.tone === 'warning' ? 'primary' : 'secondary'}
+            onPress={() => {
+              void Linking.openURL(visaAssessment.officialUrl);
+            }}
+          />
+        </AppCard>
+      ) : null}
 
       <AppCard title="Trip overview">
         <View style={styles.metrics}>
@@ -1704,6 +1736,24 @@ export default function TripDetailScreen() {
           </View>
         ) : null}
       </AppCard>
+
+      <AppModal
+        visible={visaModalVisible}
+        title={visaAssessment?.title ?? 'Visa check'}
+        onClose={() => setVisaModalVisible(false)}
+      >
+        <Text style={styles.notes}>{visaAssessment?.body}</Text>
+        <Text style={styles.notes}>Official source: {visaAssessment?.officialSourceLabel ?? 'Official immigration guidance'}</Text>
+        <AppButton
+          label="Open official guidance"
+          onPress={() => {
+            if (visaAssessment?.officialUrl) {
+              void Linking.openURL(visaAssessment.officialUrl);
+            }
+          }}
+        />
+        <AppButton label="Close" tone="secondary" onPress={() => setVisaModalVisible(false)} />
+      </AppModal>
 
       <AppModal
         visible={modalKind === 'traveller'}

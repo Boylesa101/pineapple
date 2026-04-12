@@ -378,6 +378,7 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
         segment.transportType === 'ferry' ||
         segment.transportType === 'eurotunnel' ||
         segment.transportType === 'car' ||
+        segment.transportType === 'hire_car' ||
         segment.transportType === 'taxi'
           ? segment.transportType
           : 'flight',

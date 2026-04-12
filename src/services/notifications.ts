@@ -74,6 +74,7 @@ function normalizeTransportType(value: unknown): TransportType | null {
     value === 'private_flight' ||
     value === 'train' ||
     value === 'car' ||
+    value === 'hire_car' ||
     value === 'taxi' ||
     value === 'ferry' ||
     value === 'eurotunnel'

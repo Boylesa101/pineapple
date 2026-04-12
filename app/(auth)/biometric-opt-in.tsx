@@ -7,15 +7,15 @@ import { AppButton } from '@/components/AppButton';
 import { AppScreen } from '@/components/AppScreen';
 import { FingerprintIcon } from '@/components/FingerprintIcon';
 import { colors, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAppStore } from '@/store/useAppStore';
-import { getPostUnlockRoute } from '@/utils/authRoutes';
 import { authenticateBiometrics, canUseBiometrics } from '@/utils/security';
-import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 export default function BiometricOptInScreen() {
   const router = useRouter();
-  const tripCount = useAppStore((state) => filterVisibleTrips(state.data.trips).length);
   const updateSecurityPreferences = useAppStore((state) => state.updateSecurityPreferences);
+  const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
+  const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
   const [availabilityChecked, setAvailabilityChecked] = useState(false);
 
@@ -29,7 +29,8 @@ export default function BiometricOptInScreen() {
 
       if (!available && !cancelled) {
         void updateSecurityPreferences({ biometricEnabled: false });
-        router.replace(getPostUnlockRoute(tripCount));
+        void setOnboardingStep('traveller_setup');
+        router.replace('/traveller-setup');
         return;
       }
 
@@ -39,7 +40,7 @@ export default function BiometricOptInScreen() {
     return () => {
       cancelled = true;
     };
-  }, [router, tripCount, updateSecurityPreferences]);
+  }, [router, setOnboardingStep, updateSecurityPreferences]);
 
   async function finishSetup(enableBiometrics: boolean) {
     if (submitting) {
@@ -52,22 +53,25 @@ export default function BiometricOptInScreen() {
       if (enableBiometrics) {
         const result = await authenticateBiometrics();
         if (!result.success) {
-          Alert.alert('Biometrics unavailable', 'Pineapple kept your PIN as the unlock method for now.');
+          Alert.alert(t('biometrics.unavailableTitle'), t('biometrics.unavailableBody'));
           await updateSecurityPreferences({ biometricEnabled: false });
-          router.replace(getPostUnlockRoute(tripCount));
+          await setOnboardingStep('traveller_setup');
+          router.replace('/traveller-setup');
           return;
         }
       }
 
       await updateSecurityPreferences({ biometricEnabled: enableBiometrics });
-      router.replace(getPostUnlockRoute(tripCount));
+      await setOnboardingStep('traveller_setup');
+      router.replace('/traveller-setup');
     } catch (error) {
       if (__DEV__) {
         console.error('Biometric setup failed', error);
       }
-      Alert.alert('Setup could not continue', 'Pineapple could not finish biometric setup. Your PIN is still ready to use.');
+      Alert.alert(t('biometrics.errorTitle'), t('biometrics.errorBody'));
       await updateSecurityPreferences({ biometricEnabled: false });
-      router.replace(getPostUnlockRoute(tripCount));
+      await setOnboardingStep('traveller_setup');
+      router.replace('/traveller-setup');
     } finally {
       setSubmitting(false);
     }
@@ -81,17 +85,17 @@ export default function BiometricOptInScreen() {
           <View style={styles.iconWrap}>
           <FingerprintIcon size={42} color={colors.authBlue} />
           </View>
-          <Text style={styles.title}>Use fingerprint or face unlock on this device?</Text>
+          <Text style={styles.title}>{t('biometrics.title')}</Text>
           <Text style={styles.body}>
             {availabilityChecked
-              ? 'Your PIN stays as the fallback. Turn on biometrics now, or keep going and enable it later in Settings.'
-              : 'Checking biometric support on this device.'}
+              ? t('biometrics.body')
+              : t('biometrics.checking')}
           </Text>
         </View>
 
         <View style={styles.actions}>
           <AppButton
-            label="Enable biometrics"
+            label={t('biometrics.enable')}
             size="large"
             onPress={() => {
               void finishSetup(true);
@@ -100,7 +104,7 @@ export default function BiometricOptInScreen() {
             disabled={!availabilityChecked || submitting}
           />
           <AppButton
-            label="Not now"
+            label={t('biometrics.notNow')}
             tone="secondary"
             size="large"
             onPress={() => {

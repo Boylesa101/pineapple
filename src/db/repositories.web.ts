@@ -153,6 +153,7 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
           segment.transportType === 'ferry' ||
           segment.transportType === 'eurotunnel' ||
           segment.transportType === 'car' ||
+          segment.transportType === 'hire_car' ||
           segment.transportType === 'taxi'
             ? segment.transportType
             : 'flight',

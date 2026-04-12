@@ -6,11 +6,10 @@ import { PineappleMark } from '@/brand/PineappleMark';
 import { AppScreen } from '@/components/AppScreen';
 import { PinPad } from '@/components/PinPad';
 import { colors, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAppStore } from '@/store/useAppStore';
 import { canAdvancePinSetup, canConfirmPinSetup } from '@/utils/authFlow';
-import { getPostUnlockRoute } from '@/utils/authRoutes';
 import { canUseBiometrics } from '@/utils/security';
-import { filterVisibleTrips } from '@/utils/tripVisibility';
 
 const MAX_PIN_LENGTH = 12;
 
@@ -23,7 +22,8 @@ function nextFrame() {
 export default function SetupPinScreen() {
   const router = useRouter();
   const createPin = useAppStore((state) => state.createPin);
-  const tripCount = useAppStore((state) => filterVisibleTrips(state.data.trips).length);
+  const setOnboardingStep = useAppStore((state) => state.setOnboardingStep);
+  const { t } = useTranslation();
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [step, setStep] = useState<'create' | 'confirm'>('create');
@@ -81,7 +81,7 @@ export default function SetupPinScreen() {
     }
 
     if (confirmation !== pin) {
-      Alert.alert('PINs do not match', 'Enter the same PIN again to finish setup.');
+      Alert.alert(t('setupPin.mismatchTitle'), t('setupPin.mismatchBody'));
       setConfirmation('');
       setPin('');
       setStep('create');
@@ -95,33 +95,34 @@ export default function SetupPinScreen() {
       await nextFrame();
       await createPin(pin, pin.length);
       const biometricAvailable = await canUseBiometrics();
-      router.replace(biometricAvailable ? '/biometric-opt-in' : getPostUnlockRoute(tripCount));
+      await setOnboardingStep(biometricAvailable ? 'biometrics' : 'traveller_setup');
+      router.replace(biometricAvailable ? '/biometric-opt-in' : '/traveller-setup');
     } catch (error) {
       if (__DEV__) {
         console.error('PIN setup failed', error);
       }
-      Alert.alert('PIN setup failed', 'Pineapple could not save that PIN. Please try again.');
+      Alert.alert(t('setupPin.errorTitle'), t('setupPin.errorBody'));
     } finally {
       setSaving(false);
     }
-  }, [canEnter, confirmation, createPin, pin, router, saving, step, tripCount]);
+  }, [canEnter, confirmation, createPin, pin, router, saving, setOnboardingStep, step, t]);
 
   return (
     <AppScreen scroll={false} backgroundColor={colors.authBlue} hideBackgroundDecor contentStyle={styles.content}>
       <View style={styles.screen}>
         <View style={styles.topRail}>
           <PineappleMark size={76} />
-          <Text style={styles.title}>Let&apos;s get set up</Text>
+          <Text style={styles.title}>{t('setupPin.title')}</Text>
           <Text style={styles.subtitle}>
             {step === 'create'
-              ? 'Create a PIN with at least 4 digits, then press Enter.'
-              : 'Enter the same PIN again to confirm it.'}
+              ? t('setupPin.createBody')
+              : t('setupPin.confirmBody')}
           </Text>
         </View>
 
         <View style={styles.centerRail}>
           <Text style={styles.stepLabel}>
-            {saving ? 'Securing your PIN' : step === 'create' ? 'Create your PIN' : 'Confirm your PIN'}
+            {saving ? t('setupPin.savingLabel') : step === 'create' ? t('setupPin.createLabel') : t('setupPin.confirmLabel')}
           </Text>
           {saving ? <ActivityIndicator size="small" color={colors.white} /> : null}
           <PinPad
@@ -140,7 +141,7 @@ export default function SetupPinScreen() {
         </View>
 
         <View style={styles.bottomRail}>
-          <Text style={styles.bottomHint}>Biometric unlock comes next if this device already has fingerprint or face unlock set up.</Text>
+          <Text style={styles.bottomHint}>{t('setupPin.hint')}</Text>
         </View>
       </View>
     </AppScreen>

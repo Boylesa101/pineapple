@@ -45,7 +45,7 @@ function RouteGuard() {
   const router = useRouter();
   const pathname = usePathname();
   const rootNavigationState = useRootNavigationState();
-  const { isBootstrapped, security, isUnlocked, hasCompletedOnboarding, data } = useAppStore();
+  const { isBootstrapped, security, isUnlocked, hasCompletedOnboarding, onboardingStep, data } = useAppStore();
   const visibleTripCount = filterVisibleTrips(data.trips).length;
 
   useEffect(() => {
@@ -57,6 +57,7 @@ function RouteGuard() {
     const target = resolveAuthRoute({
       currentPath,
       hasCompletedOnboarding,
+      onboardingStep,
       pinConfigured: security.pinConfigured,
       isUnlocked,
       tripCount: visibleTripCount,
@@ -67,6 +68,7 @@ function RouteGuard() {
         currentPath,
         target,
         hasCompletedOnboarding,
+        onboardingStep,
         pinConfigured: security.pinConfigured,
         isUnlocked,
         tripCount: visibleTripCount,
@@ -79,6 +81,7 @@ function RouteGuard() {
   }, [
     visibleTripCount,
     hasCompletedOnboarding,
+    onboardingStep,
     isBootstrapped,
     isUnlocked,
     pathname,

@@ -15,6 +15,12 @@ export function createEmptyFormalDocumentData(): FormalDocumentData {
     location: '',
     status: 'Stored',
     summary: '',
+    railClass: '',
+    ticketType: '',
+    coach: '',
+    seat: '',
+    travellerName: '',
+    fare: '',
   };
 }
 
@@ -115,6 +121,12 @@ export function buildFormalDocumentCopyPayload(
     `Expiry date: ${document.expiryDate || 'Not set'}`,
     `Location: ${data.location || 'Not set'}`,
     `Status: ${data.status || 'Not set'}`,
+    `Class: ${data.railClass || 'Not set'}`,
+    `Ticket type: ${data.ticketType || 'Not set'}`,
+    `Coach: ${data.coach || 'Not set'}`,
+    `Seat: ${data.seat || 'Not set'}`,
+    `Traveller: ${data.travellerName || document.holderName || traveller?.fullName || 'Not set'}`,
+    `Fare: ${data.fare || 'Not set'}`,
     `Summary: ${data.summary || document.notes || 'Not set'}`,
   ].join('\n');
 }
