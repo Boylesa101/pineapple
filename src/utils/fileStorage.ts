@@ -371,6 +371,8 @@ export async function getManagedFileInfo(uri: string, fallbackMimeType?: string 
 }
 
 export async function materializeReadableFile(uri: string | null | undefined, fallbackMimeType?: string | null): Promise<MaterializedFile> {
+  // Callers are responsible for enforcing any higher-level vault unlock boundary before
+  // asking Pineapple to materialize an encrypted file into a readable cache path.
   if (!uri || Platform.OS === 'web' || !isEncryptedManagedFile(uri)) {
     return {
       uri: uri ?? '',

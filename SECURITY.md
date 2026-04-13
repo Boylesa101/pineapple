@@ -44,6 +44,8 @@ Pineapple is designed for local-first handling of sensitive travel data on Andro
   vault attachments and trip hero images are encrypted at rest in app storage
 - Backups:
   encrypted with PBKDF2-derived AES plus HMAC integrity
+- Vault document boundary:
+  sensitive Vault attachments, previews, scan viewers, and other materialized file opens are intended to stay blocked until the Vault unlock succeeds for the current session
 
 ### Honest limitation
 

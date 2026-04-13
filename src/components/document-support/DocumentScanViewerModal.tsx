@@ -17,15 +17,26 @@ type Props = {
   previewUri?: string | null;
   mimeType?: string | null;
   emptyText?: string;
+  allowManagedAccess?: boolean;
 };
 
-export function DocumentScanViewerModal({ visible, title, onClose, localFileUri, previewUri, mimeType, emptyText }: Props) {
+export function DocumentScanViewerModal({
+  visible,
+  title,
+  onClose,
+  localFileUri,
+  previewUri,
+  mimeType,
+  emptyText,
+  allowManagedAccess = true,
+}: Props) {
   const isPdf = isDocumentPdfSource(mimeType, localFileUri);
   const sourcePreviewUri = getDocumentSourcePreviewUri(previewUri, localFileUri, mimeType);
-  const imageUri = useManagedFileUri(sourcePreviewUri, mimeType);
-  const openableUri = useManagedFileUri(localFileUri, mimeType);
+  // Sensitive vault callers must keep allowManagedAccess false until vault unlock succeeds.
+  const imageUri = useManagedFileUri(sourcePreviewUri, mimeType, { enabled: visible && allowManagedAccess });
+  const openableUri = useManagedFileUri(localFileUri, mimeType, { enabled: visible && allowManagedAccess });
   const hasFile = Boolean(localFileUri);
-  const canOpen = Boolean(openableUri || (localFileUri && !isEncryptedManagedFile(localFileUri)));
+  const canOpen = allowManagedAccess && Boolean(openableUri || (localFileUri && !isEncryptedManagedFile(localFileUri)));
 
   return (
     <AppModal visible={visible} title={title} onClose={onClose}>

@@ -9,10 +9,11 @@ type Props = {
   mimeType?: string | null;
   style: StyleProp<ImageStyle>;
   contentFit?: ImageContentFit;
+  enabled?: boolean;
 };
 
-export function ManagedFileImage({ uri, mimeType, style, contentFit = 'cover' }: Props) {
-  const resolvedUri = useManagedFileUri(uri, mimeType);
+export function ManagedFileImage({ uri, mimeType, style, contentFit = 'cover', enabled = true }: Props) {
+  const resolvedUri = useManagedFileUri(uri, mimeType, { enabled });
 
   if (!resolvedUri) {
     return null;
