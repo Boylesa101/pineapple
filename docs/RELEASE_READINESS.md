@@ -20,6 +20,7 @@ This pass focused on stabilising Pineapple for internal Android testing and Goog
 - Hardened shared-trip import with schema validation and integrity checks for newly exported packets
 - Removed stale Android exact-alarm and boot permissions from the checked-in native config
 - Clarified that Pineapple web is a companion surface rather than a supported sensitive-data surface
+- Reduced obvious mixed-language UI by wiring the selected app language through traveller setup, account, warnings, trips, packing, itinerary, and the legal/support wrapper screens
 
 ## Remaining known limitations
 

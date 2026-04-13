@@ -19,7 +19,7 @@ export const legalConfig = {
   supportEmail: 'studiopixel101@gmail.com',
   privacyEmail: 'studiopixel101@gmail.com',
   currentVersion: '2.2.7',
-  releaseLabel: 'Android stabilisation pass',
+  releaseLabel: 'Repo review pass',
   futurePlayStoreUrl: '#',
   developerName: 'Pineapple App',
   copyrightName: 'Pineapple App',
@@ -127,7 +127,7 @@ export const privacySections: ContentSection[] = [
     heading: 'Who we are',
     paragraphs: [
       `${legalConfig.appName} is a travel companion app published by ${legalConfig.developerName}. This Privacy Policy explains how the current release handles information.`,
-      `If you have privacy questions, contact ${legalConfig.privacyEmail}. Replace this placeholder email before release.`,
+      `If you have privacy questions, contact ${legalConfig.privacyEmail}.`,
     ],
   },
   {
@@ -267,7 +267,7 @@ export const termsSections: ContentSection[] = [
   {
     heading: 'Contact',
     paragraphs: [
-      `For support questions, contact ${legalConfig.supportEmail}. Replace this placeholder email before release.`,
+      `For support questions, contact ${legalConfig.supportEmail}.`,
     ],
   },
 ];
@@ -277,7 +277,7 @@ export const supportIntroSections: ContentSection[] = [
     heading: 'Need help with Pineapple?',
     paragraphs: [
       'Use this page for app support, store-reviewer references, and launch-readiness contact details.',
-      `Support contact: ${legalConfig.supportEmail}. Replace this placeholder email before release.`,
+      `Support contact: ${legalConfig.supportEmail}.`,
     ],
   },
 ];
@@ -321,7 +321,7 @@ export const supportFaqs: FAQItem[] = [
 ];
 
 export const releaseChecklist = [
-  'Replace placeholder support and privacy email addresses.',
+  'Confirm the support and privacy email addresses remain monitored before release.',
   'Confirm any linked support or policy URLs before release.',
   'Update the Google Play listing link when the store page is live.',
   'Verify whether analytics, crash reporting, or any new SDKs have been added since this draft.',

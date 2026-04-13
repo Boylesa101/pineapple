@@ -14,6 +14,7 @@ import { TypedDateField } from '@/components/TypedDateField';
 import { DocumentScanFlowModal, type DocumentScanStage } from '@/components/document-support/DocumentScanFlowModal';
 import { colors, radii, spacing } from '@/constants/theme';
 import { PERSONAL_DOCUMENTS_TRIP_ID } from '@/constants/vault';
+import { useTranslation } from '@/hooks/useTranslation';
 import { recognizeDocumentText } from '@/services/documentTextOcr';
 import { isLiveDocumentScannerAvailable, scanDocumentWithLiveEdges } from '@/services/documentScanner';
 import { useAppStore } from '@/store/useAppStore';
@@ -51,6 +52,7 @@ function createTravellerDraft(): TravellerDraft {
 
 export default function TravellerSetupScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const completeOnboarding = useAppStore((state) => state.completeOnboarding);
   const ensurePersonalDocumentsTrip = useAppStore((state) => state.ensurePersonalDocumentsTrip);
   const saveTraveller = useAppStore((state) => state.saveTraveller);
@@ -80,7 +82,7 @@ export default function TravellerSetupScreen() {
 
   async function attachPassportImage(source: 'camera' | 'library') {
     if (isWebCompanionPolicyActive()) {
-      Alert.alert('Use the Android app for passport images', sensitiveWebSupportMessage);
+      Alert.alert(t('travellerSetup.photoOcrWebBody'), sensitiveWebSupportMessage);
       return;
     }
 
@@ -253,7 +255,7 @@ export default function TravellerSetupScreen() {
       (documentChoice === 'passport_photo' && Boolean(passportLocalFileUri));
 
     if (!documentReady || !companionsReady) {
-      Alert.alert('Setup needs a quick review', 'Finish the selected passport fields, or choose Skip for now before continuing.');
+      Alert.alert(t('travellerSetup.setupNeedsReviewTitle'), t('travellerSetup.setupNeedsReviewBody'));
       return;
     }
 
@@ -300,7 +302,7 @@ export default function TravellerSetupScreen() {
 
         const errors = validateDocument(draft);
         if (errors.length) {
-          Alert.alert('Passport needs attention', errors.join('\n'));
+          Alert.alert(t('travellerSetup.passportNeedsAttention'), errors.join('\n'));
           setSubmitting(false);
           return;
         }
@@ -368,7 +370,7 @@ export default function TravellerSetupScreen() {
 
         const errors = validateDocument(passportDraft);
         if (errors.length) {
-          Alert.alert('Traveller passport needs attention', `${fullName}: ${errors.join('\n')}`);
+          Alert.alert(t('travellerSetup.travellerPassportNeedsAttention'), `${fullName}: ${errors.join('\n')}`);
           setSubmitting(false);
           return;
         }
@@ -382,7 +384,7 @@ export default function TravellerSetupScreen() {
       if (__DEV__) {
         console.error('Traveller setup failed', error);
       }
-      Alert.alert('Setup could not continue', 'Pineapple could not finish traveller setup. Your saved data is still kept locally.');
+      Alert.alert(t('travellerSetup.setupErrorTitle'), t('travellerSetup.setupErrorBody'));
     } finally {
       setSubmitting(false);
     }
@@ -395,7 +397,7 @@ export default function TravellerSetupScreen() {
       footer={
         <View style={styles.footer}>
           <AppButton
-            label={documentChoice === 'skip' ? 'Finish setup' : 'Save and finish'}
+            label={documentChoice === 'skip' ? t('travellerSetup.finishSetup') : t('travellerSetup.saveAndFinish')}
             tone="secondary"
             size="large"
             style={styles.footerButton}
@@ -406,7 +408,7 @@ export default function TravellerSetupScreen() {
             loading={submitting}
           />
           <AppButton
-            label="Skip for now"
+            label={t('common.skipForNow')}
             tone="secondary"
             size="large"
             style={styles.footerButton}
@@ -424,17 +426,15 @@ export default function TravellerSetupScreen() {
         <View style={styles.badge}>
           <MaterialIcons name="badge" size={28} color={colors.primaryBlue} />
         </View>
-        <Text style={styles.heading}>Passport and traveller setup</Text>
-        <Text style={styles.body}>
-          Set up your own passport after security is ready, then add anyone else you usually travel with. This stays as a Pineapple record and is not an official travel document.
-        </Text>
+        <Text style={styles.heading}>{t('travellerSetup.title')}</Text>
+        <Text style={styles.body}>{t('travellerSetup.body')}</Text>
         {isWebCompanionPolicyActive() ? <Text style={styles.helper}>{sensitiveWebSupportMessage}</Text> : null}
 
         <View style={styles.choiceRow}>
           <Pressable style={[styles.choiceCard, documentChoice === 'passport_manual' ? styles.choiceCardActive : null]} onPress={() => setDocumentChoice('passport_manual')}>
             <MaterialIcons name="edit-note" size={22} color={documentChoice === 'passport_manual' ? colors.white : colors.primaryBlue} />
-            <Text style={[styles.choiceTitle, documentChoice === 'passport_manual' ? styles.choiceTitleActive : null]}>Manual passport</Text>
-            <Text style={[styles.choiceBody, documentChoice === 'passport_manual' ? styles.choiceBodyActive : null]}>Type the passport fields now.</Text>
+            <Text style={[styles.choiceTitle, documentChoice === 'passport_manual' ? styles.choiceTitleActive : null]}>{t('travellerSetup.manualPassport')}</Text>
+            <Text style={[styles.choiceBody, documentChoice === 'passport_manual' ? styles.choiceBodyActive : null]}>{t('travellerSetup.manualPassportBody')}</Text>
           </Pressable>
           <Pressable
             style={[styles.choiceCard, documentChoice === 'passport_photo' ? styles.choiceCardActive : null]}
@@ -442,26 +442,26 @@ export default function TravellerSetupScreen() {
             disabled={isWebCompanionPolicyActive()}
           >
             <MaterialIcons name="photo-camera" size={22} color={documentChoice === 'passport_photo' ? colors.white : colors.primaryBlue} />
-            <Text style={[styles.choiceTitle, documentChoice === 'passport_photo' ? styles.choiceTitleActive : null]}>Photo / OCR</Text>
+            <Text style={[styles.choiceTitle, documentChoice === 'passport_photo' ? styles.choiceTitleActive : null]}>{t('travellerSetup.photoOcr')}</Text>
             <Text style={[styles.choiceBody, documentChoice === 'passport_photo' ? styles.choiceBodyActive : null]}>
-              {isWebCompanionPolicyActive() ? 'Use the Android app for secure passport capture.' : 'Scan or import a passport image.'}
+              {isWebCompanionPolicyActive() ? t('travellerSetup.photoOcrWebBody') : t('travellerSetup.photoOcrBody')}
             </Text>
           </Pressable>
           <Pressable style={[styles.choiceCard, documentChoice === 'skip' ? styles.choiceCardActive : null]} onPress={() => setDocumentChoice('skip')}>
             <MaterialIcons name="schedule" size={22} color={documentChoice === 'skip' ? colors.white : colors.primaryBlue} />
-            <Text style={[styles.choiceTitle, documentChoice === 'skip' ? styles.choiceTitleActive : null]}>Skip</Text>
-            <Text style={[styles.choiceBody, documentChoice === 'skip' ? styles.choiceBodyActive : null]}>Add passports later in Vault.</Text>
+            <Text style={[styles.choiceTitle, documentChoice === 'skip' ? styles.choiceTitleActive : null]}>{t('travellerSetup.skip')}</Text>
+            <Text style={[styles.choiceBody, documentChoice === 'skip' ? styles.choiceBodyActive : null]}>{t('travellerSetup.skipBody')}</Text>
           </Pressable>
         </View>
 
         {documentChoice === 'passport_manual' ? (
           <View style={styles.form}>
-            <AppTextField label="Passport holder" value={passportHolderName} onChangeText={setPassportHolderName} placeholder={appPreferences.profileName || 'Traveller name'} />
-            <AppTextField label="Passport number" value={passportNumber} onChangeText={setPassportNumber} placeholder="123456789" />
-            <AppTextField label="Nationality" value={passportNationality} onChangeText={setPassportNationality} placeholder="British" />
-            <AppTextField label="Issuing country code" value={passportCountryCode} onChangeText={setPassportCountryCode} placeholder="GBR" />
-            <TypedDateField label="Date of birth" value={passportDateOfBirth} onChange={setPassportDateOfBirth} />
-            <TypedDateField label="Expiry date" value={passportExpiryDate} onChange={setPassportExpiryDate} />
+            <AppTextField label={t('travellerSetup.passportHolder')} value={passportHolderName} onChangeText={setPassportHolderName} placeholder={appPreferences.profileName || t('travellerSetup.travellerName')} />
+            <AppTextField label={t('travellerSetup.passportNumber')} value={passportNumber} onChangeText={setPassportNumber} placeholder="123456789" />
+            <AppTextField label={t('travellerSetup.nationality')} value={passportNationality} onChangeText={setPassportNationality} placeholder="British" />
+            <AppTextField label={t('travellerSetup.issuingCountryCode')} value={passportCountryCode} onChangeText={setPassportCountryCode} placeholder="GBR" />
+            <TypedDateField label={t('travellerSetup.dateOfBirth')} value={passportDateOfBirth} onChange={setPassportDateOfBirth} />
+            <TypedDateField label={t('travellerSetup.expiryDate')} value={passportExpiryDate} onChange={setPassportExpiryDate} />
           </View>
         ) : null}
 
@@ -469,8 +469,8 @@ export default function TravellerSetupScreen() {
           <View style={styles.form}>
             <Text style={styles.helper}>Capture or import a passport image now. Pineapple stores it locally and tries OCR on-device when available.</Text>
             <View style={styles.photoActionRow}>
-              <AppButton label="Capture passport" tone="outline" onPress={() => void attachPassportImage('camera')} />
-              <AppButton label="Choose image" tone="outline" onPress={() => void attachPassportImage('library')} />
+              <AppButton label={t('travellerSetup.capturePassport')} tone="outline" onPress={() => void attachPassportImage('camera')} />
+              <AppButton label={t('travellerSetup.chooseImage')} tone="outline" onPress={() => void attachPassportImage('library')} />
             </View>
             {passportPreviewUri ? (
               <View style={styles.passportPreviewWrap}>
@@ -482,39 +482,39 @@ export default function TravellerSetupScreen() {
         ) : null}
       </AppCard>
 
-      <AppCard title="Other travellers" subtitle="Add family or group travellers now, with optional passport basics for each person.">
+      <AppCard title={t('travellerSetup.otherTravellers')} subtitle={t('travellerSetup.otherTravellersBody')}>
         {travellers.map((traveller, index) => (
           <View key={traveller.id} style={[styles.travellerCard, index === travellers.length - 1 ? null : styles.travellerCardGap]}>
             <View style={styles.travellerHeader}>
-              <Text style={styles.travellerTitle}>{traveller.fullName.trim() || 'New traveller'}</Text>
+              <Text style={styles.travellerTitle}>{traveller.fullName.trim() || t('travellerSetup.newTraveller')}</Text>
               <Pressable onPress={() => setTravellers((current) => current.filter((item) => item.id !== traveller.id))}>
                 <MaterialIcons name="delete-outline" size={22} color={colors.textMuted} />
               </Pressable>
             </View>
             <AppTextField
-              label="Traveller name"
+              label={t('travellerSetup.travellerName')}
               value={traveller.fullName}
               onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, fullName: value }))}
               placeholder="Alex Pineapple"
             />
             <View style={styles.field}>
-              <Text style={styles.label}>Add passport basics</Text>
+              <Text style={styles.label}>{t('travellerSetup.addPassportBasics')}</Text>
               <ChoiceChips<'yes' | 'no'>
                 value={traveller.addPassport ? 'yes' : 'no'}
                 onChange={(value) => updateTraveller(traveller.id, (current) => ({ ...current, addPassport: value === 'yes' }))}
                 options={[
-                  { label: 'Yes', value: 'yes' },
-                  { label: 'No', value: 'no' },
+                  { label: t('common.yes'), value: 'yes' },
+                  { label: t('common.no'), value: 'no' },
                 ]}
               />
             </View>
             {traveller.addPassport ? (
               <View style={styles.form}>
-                <AppTextField label="Passport number" value={traveller.passportNumber} onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportNumber: value }))} />
-                <AppTextField label="Nationality" value={traveller.passportNationality} onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportNationality: value }))} />
-                <AppTextField label="Issuing country code" value={traveller.passportCountryCode} onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportCountryCode: value }))} />
-                <TypedDateField label="Date of birth" value={traveller.passportDateOfBirth} onChange={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportDateOfBirth: value }))} />
-                <TypedDateField label="Expiry date" value={traveller.passportExpiryDate} onChange={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportExpiryDate: value }))} />
+                <AppTextField label={t('travellerSetup.passportNumber')} value={traveller.passportNumber} onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportNumber: value }))} />
+                <AppTextField label={t('travellerSetup.nationality')} value={traveller.passportNationality} onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportNationality: value }))} />
+                <AppTextField label={t('travellerSetup.issuingCountryCode')} value={traveller.passportCountryCode} onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportCountryCode: value }))} />
+                <TypedDateField label={t('travellerSetup.dateOfBirth')} value={traveller.passportDateOfBirth} onChange={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportDateOfBirth: value }))} />
+                <TypedDateField label={t('travellerSetup.expiryDate')} value={traveller.passportExpiryDate} onChange={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportExpiryDate: value }))} />
               </View>
             ) : null}
           </View>

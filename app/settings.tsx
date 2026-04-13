@@ -316,11 +316,11 @@ export default function SettingsScreen() {
       />
 
       <HeroCard
-        title="Settings that travel with you"
-        description="Manage security, reminders, local backups, privacy masking, and manual-share sync without leaving your device."
+        title={t('settings.heroTitle')}
+        description={t('settings.heroBody')}
       />
       {isWebCompanionPolicyActive() ? (
-        <AppCard title="Web companion limits">
+        <AppCard title={t('settings.webLimitsTitle')}>
           <Text style={styles.meta}>{sensitiveWebSupportMessage}</Text>
         </AppCard>
       ) : null}
@@ -338,7 +338,7 @@ export default function SettingsScreen() {
       </AppCard>
 
       <View style={styles.section}>
-        <SectionHeader title="Security & reminders" />
+        <SectionHeader title={t('settings.securitySection')} />
       <AppCard title="Security">
         <Text style={styles.label}>App lock timer</Text>
         <ChoiceChips
@@ -486,7 +486,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Sync, privacy, and transfer" />
+        <SectionHeader title={t('settings.syncSection')} />
       <AppCard title="Sync" subtitle="Optional manual-share sync. Pineapple still works fully in local-only mode.">
         <View style={styles.chipRow}>
           <InfoChip label={data.appPreferences.syncEnabled ? 'Sync enabled' : 'Local-only mode'} tone={data.appPreferences.syncEnabled ? 'blue' : 'default'} />
@@ -542,7 +542,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Data and recovery" />
+        <SectionHeader title={t('settings.dataSection')} />
       <AppCard title="Backup & Restore" subtitle="Create encrypted local backup files and restore them later on this device.">
         <Text style={styles.meta}>
           Pineapple exports password-protected {PINEAPPLE_BACKUP_EXTENSION} files with your structured trip data and available local attachments. Store backups securely.
@@ -565,7 +565,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Conflict review" />
+        <SectionHeader title={t('settings.conflictSection')} />
       <AppCard title="Conflict review" subtitle="Pineapple never silently overwrites local trip changes.">
         {openConflicts.length ? (
           <View style={styles.conflictList}>
@@ -598,7 +598,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Privacy and legal" />
+        <SectionHeader title={t('settings.legalSection')} />
         <AppCard title="Privacy summary" subtitle="Keep the legal wording visible inside the app where travellers actually use it.">
           {privacySummaryBullets.map((item) => (
             <View key={item} style={styles.privacyRow}>

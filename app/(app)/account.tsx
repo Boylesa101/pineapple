@@ -12,6 +12,7 @@ import { AppHeader } from '@/components/ui/AppHeader';
 import { MiniActionCard } from '@/components/ui/MiniActionCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { colors, radii, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAppStore } from '@/store/useAppStore';
 import { chooseProfilePhoto, removeProfilePhoto } from '@/utils/profilePhotos';
 import { filterVisibleTrips } from '@/utils/tripVisibility';
@@ -27,6 +28,7 @@ function initialsForName(value: string) {
 
 export default function AccountScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data, saveAppPreferences } = useAppStore();
   const visibleTrips = useMemo(() => filterVisibleTrips(data.trips), [data.trips]);
   const travellers = data.travellers;
@@ -75,8 +77,8 @@ export default function AccountScreen() {
     <AppScreen scroll contentStyle={styles.screen}>
       <AppHeader
         badgeLabel="A"
-        title="Account"
-        subtitle="Profile and traveller setup"
+        title={t('account.title')}
+        subtitle={t('account.subtitle')}
         actionIcon="settings"
         onActionPress={() => router.push('/settings')}
       />
@@ -89,27 +91,27 @@ export default function AccountScreen() {
           </View>
         </Pressable>
         <Text style={styles.profileName}>{fullName}</Text>
-        <Text style={styles.profileSubtitle}>Primary traveller · Offline-first profile</Text>
-        <Text style={styles.profileHint}>{profilePhotoUri ? 'Tap photo to change it' : 'Tap blue circle to add a photo'}</Text>
+        <Text style={styles.profileSubtitle}>{t('account.profileSubtitle')}</Text>
+        <Text style={styles.profileHint}>{profilePhotoUri ? t('account.profileHintChange') : t('account.profileHintAdd')}</Text>
       </View>
 
       <View style={styles.statRow}>
         <View style={styles.statBox}>
           <Text style={styles.statValue}>{visibleTrips.length}</Text>
-          <Text style={styles.statLabel}>Trips</Text>
+          <Text style={styles.statLabel}>{t('account.tripsStat')}</Text>
         </View>
         <View style={styles.statBox}>
           <Text style={styles.statValue}>{data.documents.length}</Text>
-          <Text style={styles.statLabel}>Docs</Text>
+          <Text style={styles.statLabel}>{t('account.docsStat')}</Text>
         </View>
         <View style={styles.statBox}>
           <Text style={styles.statValue}>{travellers.length}</Text>
-          <Text style={styles.statLabel}>Travellers</Text>
+          <Text style={styles.statLabel}>{t('account.travellersStat')}</Text>
         </View>
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Trip style" />
+        <SectionHeader title={t('account.tripStyle')} />
         <AppCard>
           <ChoiceChips<typeof travelStyle>
             value={travelStyle}
@@ -117,18 +119,18 @@ export default function AccountScreen() {
               void saveAppPreferences({ travelStyle: value });
             }}
             options={[
-              { label: 'Family', value: 'family_holidays' },
-              { label: 'City breaks', value: 'city_breaks' },
-              { label: 'Road trips', value: 'road_trips' },
-              { label: 'Mixed', value: 'mixed' },
+              { label: t('account.familyStyle'), value: 'family_holidays' },
+              { label: t('account.cityBreaksStyle'), value: 'city_breaks' },
+              { label: t('account.roadTripsStyle'), value: 'road_trips' },
+              { label: t('account.mixedStyle'), value: 'mixed' },
             ]}
           />
-          <Text style={styles.profileHint}>Travel style lives here now instead of blocking first-run setup.</Text>
+          <Text style={styles.profileHint}>{t('account.tripStyleHint')}</Text>
         </AppCard>
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Family & travellers" />
+        <SectionHeader title={t('account.familyTravellers')} />
         <AppCard>
           {travellers.length ? (
             travellers.map((traveller, index) => (
@@ -142,57 +144,57 @@ export default function AccountScreen() {
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.rowAction}>Open</Text>
+                <Text style={styles.rowAction}>{t('account.openAction')}</Text>
               </Pressable>
             ))
           ) : (
             <Pressable onPress={() => router.push('/trips')} style={[styles.listItem, styles.listItemLast]}>
               <View style={styles.rowCopy}>
-                <Text style={styles.rowTitle}>Add traveller</Text>
-                <Text style={styles.rowDescription}>Create a family or group traveller profile</Text>
+                <Text style={styles.rowTitle}>{t('account.addTraveller')}</Text>
+                <Text style={styles.rowDescription}>{t('account.addTravellerBody')}</Text>
               </View>
-              <Text style={styles.rowAction}>Add</Text>
+              <Text style={styles.rowAction}>{t('account.addAction')}</Text>
             </Pressable>
           )}
         </AppCard>
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Account tools" />
+        <SectionHeader title={t('account.accountTools')} />
         <View style={styles.grid}>
           <MiniActionCard
             style={styles.gridItem}
             icon={<MaterialIcons name="lock" size={28} color={colors.primaryBlue} />}
-            title="Security"
-            description="PIN, biometric lock, and privacy settings."
+            title={t('account.toolSecurity')}
+            description={t('account.toolSecurityBody')}
             onPress={() => router.push('/settings')}
           />
           <MiniActionCard
             style={styles.gridItem}
             icon={<MaterialIcons name="backup" size={28} color={colors.primaryBlue} />}
-            title="Backups"
-            description="Create local encrypted backups and restore packs."
+            title={t('account.toolBackups')}
+            description={t('account.toolBackupsBody')}
             onPress={() => router.push('/settings')}
           />
           <MiniActionCard
             style={styles.gridItem}
             icon={<MaterialIcons name="upload-file" size={28} color={colors.primaryBlue} />}
-            title="Imports"
-            description="Add scans, files, and travel documents from your device."
+            title={t('account.toolImports')}
+            description={t('account.toolImportsBody')}
             onPress={() => router.push('/vault')}
           />
           <MiniActionCard
             style={styles.gridItem}
             icon={<MaterialIcons name="notifications" size={28} color={colors.primaryBlue} />}
-            title="Reminders"
-            description="Manage expiry and trip reminder preferences."
+            title={t('account.toolReminders')}
+            description={t('account.toolRemindersBody')}
             onPress={() => router.push('/settings')}
           />
           <MiniActionCard
             style={styles.gridItem}
             icon={<MaterialIcons name="policy" size={28} color={colors.primaryBlue} />}
-            title="About"
-            description="Privacy summary, support details, and legal pages."
+            title={t('account.toolAbout')}
+            description={t('account.toolAboutBody')}
             onPress={() => router.push('/about')}
           />
         </View>

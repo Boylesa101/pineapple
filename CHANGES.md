@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Repo review pass: re-audited the pushed branch instead of rebuilding features, confirmed hire-car bookings, lounge passes, loyalty presets, and rail-ticket QR support were already wired in the real Vault flow, and focused the new changes on the remaining onboarding, localization, legal, and web-policy gaps
+- Localization follow-through: first-run traveller setup, account, trips, packing, itinerary, warnings, and legal/support wrappers now respect the selected app language instead of falling back to obvious hard-coded English on those high-visibility routes
 - Completion pass: bumped release metadata to `2.2.7`, rebuilt the auth setup flow to `Language -> Name -> PIN -> Biometrics -> Passport / traveller setup`, and removed the old onboarding completion shortcut that incorrectly inferred completion from only a PIN or trip count
 - Android launcher fix: kept the adaptive icon monochrome path wired end-to-end, documented Pixel themed-icon verification, and prepared the native launcher resources for a fresh regenerated build
 - Account/setup cleanup: moved travel-style preference and profile-photo setup out of first-run so they no longer block reaching PIN

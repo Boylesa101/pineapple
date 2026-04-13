@@ -49,6 +49,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 
 - First-run setup now follows this exact order: `Language` -> `Name` -> `PIN` -> `Biometrics` -> `Passport / traveller setup`
 - Travel style and profile photo no longer block PIN setup; profile photo lives in `Account`, and travel style lives in `Account` / `Settings`
+- The chosen first-run language now applies immediately across onboarding, account, warnings, the main trip tools, and the in-app legal/support wrappers
 
 ### Core features
 

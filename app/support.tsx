@@ -8,22 +8,24 @@ import { LegalSectionCards } from '@/components/legal/LegalSectionCards';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { legalConfig, supportFaqs, supportIntroSections } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const versionLabel = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? legalConfig.currentVersion;
 
 export default function SupportScreen() {
+  const { t } = useTranslation();
   return (
     <AppScreen scroll contentStyle={styles.screen}>
-      <AppHeader badgeLabel="H" title="Support" subtitle="Help and release contact details" />
+      <AppHeader badgeLabel="H" title={t('legal.supportTitle')} subtitle={t('legal.supportSubtitle')} />
 
       <AppCard
-        title="Support details"
-        subtitle="Use this page for app help, reviewer checks, and launch support references."
+        title={t('legal.supportDetails')}
+        subtitle={t('legal.supportDetailsBody')}
         right={<MaterialIcons name="support-agent" size={22} color={colors.primaryBlue} />}
       >
-        <Text style={styles.meta}>Support email: {legalConfig.supportEmail}</Text>
-        <Text style={styles.meta}>App version: {versionLabel}</Text>
-        <Text style={styles.meta}>Release support label: {legalConfig.releaseLabel}</Text>
+        <Text style={styles.meta}>{t('legal.supportEmail', { email: legalConfig.supportEmail })}</Text>
+        <Text style={styles.meta}>{t('legal.version', { version: versionLabel })}</Text>
+        <Text style={styles.meta}>{t('legal.releaseLabel', { label: legalConfig.releaseLabel })}</Text>
       </AppCard>
 
       <LegalSectionCards sections={supportIntroSections} />
