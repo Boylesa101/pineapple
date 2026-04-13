@@ -287,6 +287,7 @@ test('transport reminders schedule the correct per-segment matrix with travel ro
       '2026-04-06T19:00:00.000Z'
     ),
     createTransportSegment(snapshot, 'segment_train', 'train', '2026-03-27T12:00:00.000Z', '2026-03-27T14:00:00.000Z'),
+    createTransportSegment(snapshot, 'segment_hire_car', 'hire_car', '2026-03-27T12:30:00.000Z', '2026-03-27T13:30:00.000Z'),
     createTransportSegment(snapshot, 'segment_taxi', 'taxi', '2026-03-27T13:00:00.000Z', '2026-03-27T14:00:00.000Z'),
   ];
   snapshot.reminderSettings = [createReminderSetting(snapshot, 'transport_departure', 0)];
@@ -295,7 +296,7 @@ test('transport reminders schedule the correct per-segment matrix with travel ro
     (item) => item.kind === 'transport_departure'
   );
 
-  assert.equal(reminders.length, 25);
+  assert.equal(reminders.length, 27);
   assert.equal(reminders.every((item) => item.channelId === 'pineapple-transport'), true);
   assert.equal(
     reminders.filter((item) => item.transportSegmentId === 'segment_flight').length,
@@ -314,6 +315,10 @@ test('transport reminders schedule the correct per-segment matrix with travel ro
     2
   );
   assert.equal(
+    reminders.filter((item) => item.transportSegmentId === 'segment_hire_car').length,
+    2
+  );
+  assert.equal(
     reminders.filter((item) => item.transportSegmentId === 'segment_taxi').length,
     2
   );
@@ -329,6 +334,10 @@ test('transport reminders schedule the correct per-segment matrix with travel ro
   );
   assert.equal(
     reminders.some((item) => item.transportSegmentId === 'segment_taxi' && item.title.includes('Taxi to Heathrow Terminal 5 arrives in 15 minutes')),
+    true
+  );
+  assert.equal(
+    reminders.some((item) => item.transportSegmentId === 'segment_hire_car' && item.title.includes('Hire car')),
     true
   );
   assert.equal(

@@ -49,7 +49,7 @@ Pineapple is designed for local-first handling of sensitive travel data on Andro
 
 Pineapple does not currently use SQLCipher or full database-engine encryption. It protects sensitive fields before they are written and keeps non-sensitive query/routing fields plaintext where the app needs them for navigation, filtering, reminders, and local queries.
 
-Manual-share trip packets are validated and newly exported packets include a SHA-256 integrity hash, but they are not encrypted or cryptographically authenticated in the current release.
+Manual-share trip packets now use a dedicated encrypted envelope with PBKDF2-derived AES and HMAC integrity. Receivers must enter the separately shared transfer code before Pineapple can decrypt and import the trip.
 
 Pineapple web is a companion surface and should not be treated as equivalent to the installed Android app for sensitive vault data, encrypted backups, or manual-share sync.
 

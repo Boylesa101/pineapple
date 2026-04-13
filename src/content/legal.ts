@@ -18,7 +18,7 @@ export const legalConfig = {
   tagline: 'Your travel essentials in one calm place — even offline.',
   supportEmail: 'studiopixel101@gmail.com',
   privacyEmail: 'studiopixel101@gmail.com',
-  currentVersion: '2.2.7',
+  currentVersion: '2.2.8',
   releaseLabel: 'Repo review pass',
   futurePlayStoreUrl: '#',
   developerName: 'Pineapple App',
@@ -171,7 +171,7 @@ export const privacySections: ContentSection[] = [
     paragraphs: [
       'Pineapple is local-first, but some optional features can contact third-party services when you choose to use them.',
       'Examples found in the current audited release include destination image lookup, hotel and address search, and Vibes or place suggestions. These features may send the search text or destination details needed to fetch results. This is not the same as account-based cloud sync.',
-      'Manual-share trip packets stay local to the devices and apps you choose to use. In the current release they are validated and integrity-checked, but they are not encrypted or cryptographically authenticated.',
+      'Manual-share trip packets stay local to the devices and apps you choose to use. In the current release they are encrypted with a transfer code, integrity-checked before import, and still require you to share that transfer code separately.',
     ],
     bullets: [
       'Destination and hotel image lookup may use services such as Pexels or Wikimedia Commons',

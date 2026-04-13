@@ -402,7 +402,7 @@ export interface SyncConflict {
   summary: string;
   localUpdatedAt: string;
   incomingUpdatedAt: string;
-  incomingPayload: string;
+  incomingRecord: SharedTripConflictRecord;
   status: ConflictStatus;
   createdAt: string;
   updatedAt: string;
@@ -502,17 +502,35 @@ export interface SharedTripPacketData {
 
 export interface SharedTripPacket {
   format: 'pineapple-shared-trip';
-  version: 1 | 2;
+  version: 3;
   shareCode: string;
   generatedAt: string;
   senderLabel: string;
   data: SharedTripPacketData;
-  integrity?: {
-    algorithm: 'sha256';
-    payloadHash: string;
-    encrypted: boolean;
-    authenticated: boolean;
-  };
+}
+
+export interface SharedTripConflictRecord {
+  senderLabel: string;
+  packetVersion: SharedTripPacket['version'];
+  data: SharedTripPacketData;
+}
+
+export interface SharedTripSecureEnvelope {
+  format: 'pineapple-shared-trip-secure';
+  version: 1;
+  encryption: 'aes-256-cbc+hmac-sha256';
+  kdf: 'pbkdf2';
+  iterations: number;
+  salt: string;
+  iv: string;
+  mac: string;
+  ciphertext: string;
+}
+
+export interface SharedTripExportResult {
+  uri: string;
+  transferCode: string;
+  envelope: SharedTripSecureEnvelope;
 }
 
 export type TripDraft = Omit<Trip, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };

@@ -39,7 +39,6 @@ import {
   type DestinationQuickFacts,
   type DestinationWeatherForecast,
 } from '@/services/tripInsightsService';
-import { createSharedTripPacket } from '@/services/sync';
 import { buildTripTransferQrPayload } from '@/services/tripTransfer';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
 import { findTransportProvider } from '@/data/transportProviders';
@@ -261,6 +260,7 @@ export default function TripDetailScreen() {
     exportTripPdfFile,
     saveTripInvite,
     exportSharedTripFile,
+    prepareSharedTripTransfer,
     importSharedTripFile,
     resolveSyncConflictChoice,
     deleteRecord,
@@ -279,6 +279,12 @@ export default function TripDetailScreen() {
   const [inviteDraft, setInviteDraft] = useState<TripInviteDraft | null>(null);
   const [connectionSegmentDraft, setConnectionSegmentDraft] = useState<TravelSegmentDraft | null>(null);
   const [transferQrVisible, setTransferQrVisible] = useState(false);
+  const [transferQrPackage, setTransferQrPackage] = useState<ReturnType<typeof buildTripTransferQrPayload> | null>(null);
+  const [transferQrCode, setTransferQrCode] = useState<string | null>(null);
+  const [sharedImportVisible, setSharedImportVisible] = useState(false);
+  const [sharedImportContents, setSharedImportContents] = useState<string | null>(null);
+  const [sharedImportCode, setSharedImportCode] = useState('');
+  const [sharedImportSourceLabel, setSharedImportSourceLabel] = useState('shared trip');
   const [visaModalVisible, setVisaModalVisible] = useState(false);
   const [travellerPhotoBaselineUri, setTravellerPhotoBaselineUri] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<TripSection>('overview');
@@ -384,19 +390,6 @@ export default function TripDetailScreen() {
           },
     [bundle.travelSegments, trip]
   );
-  const tripTransferQr = useMemo(() => {
-    if (!trip) {
-      return null;
-    }
-
-    try {
-      const packet = createSharedTripPacket(data, tripId);
-      return buildTripTransferQrPayload(JSON.stringify(packet));
-    } catch {
-      return null;
-    }
-  }, [data, trip, tripId]);
-
   useEffect(() => {
     let cancelled = false;
     const destination = trip?.destination.trim() ?? '';
@@ -792,20 +785,76 @@ export default function TripDetailScreen() {
     }
 
     try {
-      await exportSharedTripFile(tripId);
-      Alert.alert('Trip ready to share', 'Pineapple created a local share file and opened Android sharing so you can use Quick Share, Nearby Share, or another app.');
+      const result = await exportSharedTripFile(tripId);
+      Alert.alert(
+        'Encrypted trip ready to share',
+        `Pineapple created an encrypted share file and opened Android sharing. Share this transfer code separately with the receiver:\n\n${result.transferCode}`
+      );
     } catch (error) {
       Alert.alert('Share export failed', toUserMessage(error, 'Unable to export that shared trip right now.'));
     }
   }
 
-  function openTransferQr() {
-    if (!tripTransferQr) {
-      Alert.alert('Transfer QR unavailable', 'Pineapple could not prepare a transfer QR for this trip right now.');
+  async function openTransferQr() {
+    try {
+      const transfer = await prepareSharedTripTransfer(tripId);
+      const qrPayload = buildTripTransferQrPayload(transfer.encryptedContents);
+      if (!qrPayload.fitsQr) {
+        Alert.alert(
+          'Transfer QR unavailable',
+          'This encrypted trip is too large to fit safely inside a QR code. Use the encrypted share file instead.'
+        );
+        return;
+      }
+
+      setTransferQrPackage(qrPayload);
+      setTransferQrCode(transfer.transferCode);
+      setTransferQrVisible(true);
+    } catch (error) {
+      Alert.alert('Transfer QR unavailable', toUserMessage(error, 'Pineapple could not prepare a secure transfer QR for this trip right now.'));
+    }
+  }
+
+  function openSharedTripImport(contents: string, sourceLabel: string) {
+    if (!contents.trim()) {
+      Alert.alert('Shared trip unavailable', 'That encrypted shared trip was empty.');
       return;
     }
 
-    setTransferQrVisible(true);
+    setSharedImportContents(contents);
+    setSharedImportSourceLabel(sourceLabel);
+    setSharedImportCode('');
+    setSharedImportVisible(true);
+  }
+
+  function closeSharedTripImportModal() {
+    setSharedImportVisible(false);
+    setSharedImportContents(null);
+    setSharedImportCode('');
+    setSharedImportSourceLabel('shared trip');
+  }
+
+  async function confirmSharedTripImport() {
+    if (!sharedImportContents) {
+      return;
+    }
+
+    if (!sharedImportCode.trim()) {
+      Alert.alert('Transfer code needed', 'Enter the transfer code to decrypt this shared trip.');
+      return;
+    }
+
+    try {
+      const outcome = await importSharedTripFile(sharedImportContents, sharedImportCode);
+      closeSharedTripImportModal();
+      if (outcome.mode === 'conflict') {
+        Alert.alert('Conflict detected', 'The incoming encrypted shared trip was stored for manual conflict review.');
+      } else {
+        Alert.alert('Shared trip imported', 'Trip data was updated from the encrypted shared trip.');
+      }
+    } catch (error) {
+      Alert.alert('Share import failed', toUserMessage(error, 'Unable to decrypt or import that shared trip right now.'));
+    }
   }
 
   async function handleImportShare() {
@@ -824,12 +873,7 @@ export default function TripDetailScreen() {
       }
 
       const contents = await FileSystem.readAsStringAsync(result.assets[0].uri);
-      const outcome = await importSharedTripFile(contents);
-      if (outcome.mode === 'conflict') {
-        Alert.alert('Conflict detected', 'The incoming shared trip was stored for manual conflict review.');
-      } else {
-        Alert.alert('Shared trip imported', 'Trip data was updated from the incoming share file.');
-      }
+      openSharedTripImport(contents, result.assets[0].name ?? 'shared trip file');
     } catch (error) {
       Alert.alert('Share import failed', toUserMessage(error, 'Unable to import that shared trip right now.'));
     }
@@ -1671,7 +1715,7 @@ export default function TripDetailScreen() {
         })}
       </AppCard>
 
-      <AppCard title="Sharing and participants" subtitle="Share locally with Pineapple QR transfer, Android Quick Share, or an exported trip file.">
+      <AppCard title="Sharing and participants" subtitle="Share locally with an encrypted Pineapple QR transfer or encrypted trip file.">
         <View style={styles.chipRow}>
           <InfoChip label={`Share code ${bundle.sharedTripState?.shareCode ?? 'Pending'}`} tone="blue" />
           <InfoChip
@@ -1715,15 +1759,15 @@ export default function TripDetailScreen() {
         </View>
         <View style={styles.buttonWrap}>
           <AppButton label="Invite by email / code" tone="secondary" onPress={openInviteEditor} />
-          <AppButton label="Show transfer QR" tone="secondary" onPress={openTransferQr} />
-          <AppButton label="Share with Nearby / Quick Share" onPress={handleExportShare} />
+          <AppButton label="Show encrypted transfer QR" tone="secondary" onPress={() => void openTransferQr()} />
+          <AppButton label="Share encrypted file" onPress={handleExportShare} />
           <AppButton label="Import update" tone="secondary" onPress={handleImportShare} />
         </View>
         <Text style={styles.helperText}>
-          Scan the transfer QR with Pineapple installed. If the trip is too large for QR, use the Nearby / Quick Share button to send the local trip file through Android sharing instead.
+          Scan the transfer QR with Pineapple installed on the other device, then enter the transfer code there. If the encrypted trip is too large for QR, use the encrypted file share flow instead.
         </Text>
         <Text style={styles.helperText}>
-          Shared-trip files are schema-validated and integrity-checked before import. They are not cloud sync, and they are not encrypted or authenticated in the current release.
+          Shared-trip transfers are encrypted with a one-time transfer code, integrity-checked before import, and kept local to the devices you choose to use. Pineapple still does not offer cloud sync.
         </Text>
         {bundle.conflicts.length ? (
           <View style={styles.conflictList}>
@@ -2161,21 +2205,42 @@ export default function TripDetailScreen() {
         <AppButton label="Generate PDF" onPress={handleExportPdf} />
       </AppModal>
 
-      <AppModal visible={transferQrVisible} title="Trip transfer QR" onClose={() => setTransferQrVisible(false)}>
-        {tripTransferQr?.fitsQr ? (
+      <AppModal
+        visible={transferQrVisible}
+        title="Encrypted trip transfer QR"
+        onClose={() => {
+          setTransferQrVisible(false);
+          setTransferQrPackage(null);
+          setTransferQrCode(null);
+        }}
+      >
+        {transferQrPackage?.fitsQr ? (
           <>
-            <Text style={styles.notes}>Scan this with Pineapple installed on the other device to import the trip directly.</Text>
+            <Text style={styles.notes}>Scan this with Pineapple installed on the other device, then enter the transfer code shown below.</Text>
             <View style={styles.transferQrCard}>
-              <QRCodeImage value={tripTransferQr.externalUrl} size={232} />
+              <QRCodeImage value={transferQrPackage.externalUrl} size={232} />
             </View>
-            <Text style={styles.helperText}>If the other phone is locked, unlock Pineapple first and scan again if needed.</Text>
+            {transferQrCode ? <Text style={styles.notes}>Transfer code: {transferQrCode}</Text> : null}
+            <Text style={styles.helperText}>The code is not embedded in the QR. Share it separately with the receiver.</Text>
           </>
         ) : (
           <>
-            <Text style={styles.notes}>This trip is too detailed to fit safely inside a QR code.</Text>
-            <Text style={styles.helperText}>Use Export shared trip instead, then import the shared file on the receiving phone.</Text>
+            <Text style={styles.notes}>This encrypted trip is too detailed to fit safely inside a QR code.</Text>
+            <Text style={styles.helperText}>Use the encrypted file-share flow instead, then import the file on the receiving phone.</Text>
           </>
         )}
+      </AppModal>
+
+      <AppModal visible={sharedImportVisible} title="Decrypt shared trip" onClose={closeSharedTripImportModal}>
+        <Text style={styles.notes}>Selected source: {sharedImportSourceLabel}</Text>
+        <Text style={styles.helperText}>Enter the transfer code that was shared separately with the encrypted trip.</Text>
+        <AppTextField
+          label="Transfer code"
+          value={sharedImportCode}
+          onChangeText={setSharedImportCode}
+          placeholder="PINE-ABCD-EFGH"
+        />
+        <AppButton label="Decrypt and import" onPress={() => void confirmSharedTripImport()} />
       </AppModal>
     </AppScreen>
   );

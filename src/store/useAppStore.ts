@@ -38,7 +38,14 @@ import { getTransportNotificationSummary } from '@/services/notificationPlanner'
 import { queueNotificationRefresh } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
 import { protectStructuredDataAtRest } from '@/services/structuredDataProtection';
-import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, resolveConflict } from '@/services/sync';
+import {
+  createSharedTripPacket,
+  createEncryptedSharedTripTransfer,
+  exportSharedTripPacket,
+  importSharedTripPacket,
+  parseSharedTripPacket,
+  resolveConflict,
+} from '@/services/sync';
 import {
   authenticateBiometrics,
   canUseBiometrics,
@@ -173,8 +180,9 @@ type StoreState = {
   exportTripPdfFile: (tripId: string, options: PdfExportOptions) => Promise<string>;
   exportBackupFile: (password: string) => Promise<{ uri: string; exportedAt: string; attachmentCount: number; skippedAttachmentCount: number }>;
   importBackupFile: (encryptedContents: string, password: string) => Promise<void>;
-  exportSharedTripFile: (tripId: string) => Promise<string>;
-  importSharedTripFile: (contents: string) => Promise<{ mode: 'created' | 'updated' | 'conflict'; tripId?: string }>;
+  exportSharedTripFile: (tripId: string, transferCode?: string) => Promise<{ uri: string; transferCode: string }>;
+  prepareSharedTripTransfer: (tripId: string, transferCode?: string) => Promise<{ encryptedContents: string; transferCode: string }>;
+  importSharedTripFile: (contents: string, transferCode: string) => Promise<{ mode: 'created' | 'updated' | 'conflict'; tripId?: string }>;
   resolveSyncConflictChoice: (conflictId: string, resolution: ConflictStatus) => Promise<void>;
   deleteRecord: (table: string, id: string) => Promise<void>;
   resetWithDemoData: () => Promise<void>;
@@ -879,12 +887,13 @@ export const useAppStore = create<StoreState>((set, get) => ({
       lastInteractionAt: Date.now(),
     });
   },
-  exportSharedTripFile: async (tripId) => {
-    const { uri, packet } = await exportSharedTripPacket(get().data, tripId);
+  exportSharedTripFile: async (tripId, transferCode) => {
+    const { uri, transferCode: generatedTransferCode } = await exportSharedTripPacket(get().data, tripId, transferCode);
     const currentState = get().data.sharedTripStates.find((item) => item.tripId === tripId);
+    const shareCode = currentState?.shareCode ?? createSharedTripPacket(get().data, tripId).shareCode;
     await upsertSharedTripState({
       tripId,
-      shareCode: currentState?.shareCode ?? packet.shareCode,
+      shareCode,
       syncEnabled: get().data.appPreferences.syncEnabled,
       syncStatus: get().data.appPreferences.syncEnabled ? 'pending_import' : 'local_only',
       lastSyncAt: get().data.appPreferences.syncEnabled ? new Date().toISOString() : currentState?.lastSyncAt ?? null,
@@ -893,10 +902,17 @@ export const useAppStore = create<StoreState>((set, get) => ({
       lastKnownRemoteUpdatedAt: currentState?.lastKnownRemoteUpdatedAt ?? null,
     });
     await get().refreshData();
-    return uri;
+    return { uri, transferCode: generatedTransferCode };
   },
-  importSharedTripFile: async (contents) => {
-    const packet = parseSharedTripPacket(contents);
+  prepareSharedTripTransfer: async (tripId, transferCode) => {
+    const { envelopeContents, transferCode: generatedTransferCode } = createEncryptedSharedTripTransfer(get().data, tripId, transferCode);
+    return {
+      encryptedContents: envelopeContents,
+      transferCode: generatedTransferCode,
+    };
+  },
+  importSharedTripFile: async (contents, transferCode) => {
+    const packet = parseSharedTripPacket(contents, transferCode);
     const result = importSharedTripPacket(get().data, packet);
     await replaceAllData(result.snapshot);
     await get().refreshData();

@@ -7,11 +7,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
 - Expo Go is no longer a supported Pineapple test path; use installable APKs for device testing and `.aab` for Play Store release
 - For a dev-only APK that still expects Metro, run `npm run apk:debug`
-- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.2.7-debug.apk`
+- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.2.8-debug.apk`
 - For the fastest direct phone testing on a modern device, run `npm run apk:release:arm64`
-- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.2.7-release-arm64.apk`
+- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.2.8-release-arm64.apk`
 - For direct phone testing without USB or Metro, run `npm run apk:release`
-- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.2.7-release.apk`
+- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.2.8-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
 - Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
 - When you are ready for Google Play, provide these environment variables before building:
@@ -110,18 +110,18 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Sensitive structured record fields are also encrypted before Pineapple writes them into local storage, covering trips, travellers, document metadata, itinerary notes, emergency records, and sync payloads
 - Local reminders and notifications for trip countdown milestones, trip day, passport/GHIC expiry, missing insurance, packing completeness, per-segment transport departures, hotels, transfers, travel mode, SOS readiness, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
-- Version `2.2.7` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
+- Version `2.2.8` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel/hire-car segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
 - First-run setup now starts with language choice, persists the selected app language immediately, then continues through name, PIN, biometrics, and optional passport / traveller setup
 - Vault travel records now expose hire-car bookings, airport lounge passes, airline loyalty cards, and a Pineapple-stored UK rail ticket record with local QR generation
 - UK rail ticket records stay explicitly honest: Pineapple stores a reference copy and QR payload for your own trip organisation, but it does not issue a valid National Rail travel ticket
 - Trip detail can now surface a visa-check warning or softer official-check prompt using destination-specific official immigration links when Pineapple can match the saved trip destination safely
-- Trip sharing now surfaces Android Nearby / Quick Share through the existing local exported trip file flow instead of sounding like a backend sync feature
+- Trip sharing now uses Pineapple-owned encrypted trip files and encrypted QR handoff for smaller transfers instead of plaintext packets or backend sync wording
 - Weather detail returns to the cleaner selected-day layout: scenic top card first, then the selected day’s hourly time, icon, and temperature rows directly underneath
 - The temporary `Transport Notification Proof Trip` is build-scoped and should be removed again after transport lock-screen verification is complete
 - Bootstrap correction: build-scoped proof-trip seeding now uses a safe in-place snapshot persist instead of a destructive full data replacement, so existing local data is not cleared during startup
 - Android icon correction: the adaptive monochrome icon now uses a proper transparent monochrome glyph asset for themed launcher icons, and the checked-in launcher XML keeps the monochrome layer wired in
 - Dedicated expiry warnings screen with filters for all, expiring soon, expired, and notifications off
-- Optional manual-share trip sync with participant roles, invite records, conflict review, trip-share export/import, record-level packet validation, and SHA-256 integrity checks for newly exported share files
+- Optional manual-share trip sync with participant roles, invite records, conflict review, encrypted trip-share export/import, transfer-code-gated QR handoff, and record-level packet validation after decryption
 - Expanded settings surface for security, reminders, sync, backup/restore, and privacy masking
 - Trip sharing now supports Pineapple-owned shared files plus a trip-level Pineapple QR handoff route for smaller transfers
 - Account and traveller profiles can each keep an optional local profile photo stored in Pineapple-managed device storage
@@ -300,7 +300,8 @@ npx expo export --platform web
 - Biometric unlock is optional and device-dependent
 - Backup export/import uses password-protected AES encryption in the local backup layer
 - Shared trip sync is optional and manual-share only in phase 3
-- Shared-trip packets are validated and integrity-checked before import, but they are not encrypted or cryptographically authenticated in the current release
+- Shared-trip packets now export as encrypted `.pineappleshare` files using a dedicated Pineapple secure envelope; the receiving device must enter the separately shared transfer code before import
+- Shared-trip QR transfer carries only the encrypted envelope for smaller trips; the decryption code is not embedded in the QR and must be shared out-of-band
 - Conflict review is explicit; Pineapple does not silently overwrite local trip changes
 - Pineapple is currently shipped and tested as an installable mobile app, with the Android build remaining the main secure home for sensitive vault images
 - Notification text stays privacy-aware and does not include document numbers, images, or full document contents
@@ -352,7 +353,7 @@ npx expo export --platform web
 ### Current phase 3 additions
 
 - Local on-device notification scheduling with global enable/disable plus trip-level reminder toggles
-- Optional shared-trip packet export/import and manual-share sync state
+- Optional encrypted shared-trip export/import and manual-share sync state
 - Participant avatars, invite records, and conflict review UI
 - Settings hub for security, reminders, sync, backup, and privacy preferences
 - Improved Travel Mode with a next-action card and today timeline

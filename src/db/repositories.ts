@@ -33,6 +33,7 @@ import type {
   ReminderSettingDraft,
   SavedVibeDraft,
   SharedTripStateDraft,
+  SharedTripConflictRecord,
   SyncConflictDraft,
   TravelSegmentDraft,
   TravellerDraft,
@@ -125,6 +126,48 @@ function parseFormalDocumentData(value: unknown) {
   } catch {
     return null;
   }
+}
+
+function parseIncomingConflictRecord(value: unknown): SharedTripConflictRecord | null {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (
+      parsed &&
+      typeof parsed.senderLabel === 'string' &&
+      typeof parsed.packetVersion === 'number' &&
+      parsed.data &&
+      typeof parsed.data === 'object'
+    ) {
+      return {
+        senderLabel: parsed.senderLabel,
+        packetVersion: parsed.packetVersion === 3 ? 3 : 3,
+        data: parsed.data as SharedTripConflictRecord['data'],
+      };
+    }
+
+    if (
+      parsed &&
+      parsed.format === 'pineapple-shared-trip' &&
+      typeof parsed.senderLabel === 'string' &&
+      typeof parsed.version === 'number' &&
+      parsed.data &&
+      typeof parsed.data === 'object'
+    ) {
+      return {
+        senderLabel: parsed.senderLabel,
+        packetVersion: 3,
+        data: parsed.data as SharedTripConflictRecord['data'],
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 async function cleanupDocumentFiles(
@@ -496,14 +539,21 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     }))
   );
 
-  const decryptedSyncConflicts = await Promise.all(
+  const decryptedSyncConflicts = (await Promise.all(
     syncConflicts.map(async (conflict) => ({
-      ...conflict,
+      conflict,
       shareCode: (await decryptField(conflict.shareCode)) ?? '',
       summary: (await decryptField(conflict.summary)) ?? '',
-      incomingPayload: (await decryptField(conflict.incomingPayload)) ?? '',
+      incomingRecord: parseIncomingConflictRecord((await decryptField(conflict.incomingPayload)) ?? ''),
     }))
-  );
+  ))
+    .filter((item) => item.incomingRecord)
+    .map((item) => ({
+      ...item.conflict,
+      shareCode: item.shareCode,
+      summary: item.summary,
+      incomingRecord: item.incomingRecord!,
+    }));
 
   return {
     trips: decryptedTrips,
@@ -1369,7 +1419,7 @@ export async function upsertSyncConflict(input: SyncConflictDraft) {
   const id = input.id ?? createId('conflict');
   const encryptedShareCode = (await encryptField(input.shareCode)) ?? '';
   const encryptedSummary = (await encryptField(input.summary)) ?? '';
-  const encryptedIncomingPayload = (await encryptField(input.incomingPayload)) ?? '';
+  const encryptedIncomingPayload = (await encryptField(JSON.stringify(input.incomingRecord))) ?? '';
 
   await db.runAsync(
     `INSERT INTO sync_conflicts (

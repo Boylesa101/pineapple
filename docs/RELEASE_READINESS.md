@@ -17,7 +17,7 @@ This pass focused on stabilising Pineapple for internal Android testing and Goog
 
 - Tightened onboarding completion to use explicit stored state with safer migration for older installs
 - Restored the intended first-run order so language and name no longer get skipped before PIN setup
-- Hardened shared-trip import with schema validation and integrity checks for newly exported packets
+- Hardened shared-trip transfer with encrypted export/import, transfer-code-gated QR handoff, schema validation after decryption, and integrity verification before import
 - Removed stale Android exact-alarm and boot permissions from the checked-in native config
 - Clarified that Pineapple web is a companion surface rather than a supported sensitive-data surface
 - Reduced obvious mixed-language UI by wiring the selected app language through traveller setup, account, warnings, trips, packing, itinerary, and the legal/support wrapper screens

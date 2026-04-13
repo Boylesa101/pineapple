@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+- Encrypted shared-trip transfer: replaced plaintext trip-share JSON with a dedicated `pineapple-shared-trip-secure` envelope using PBKDF2-derived AES encryption plus HMAC integrity, added transfer-code-gated import, and kept QR handoff honest by excluding the decryption secret from the QR payload
+- Conflict hardening: sync conflicts now keep a normalized incoming record instead of depending on a persisted plaintext packet string, and legacy plaintext share files are rejected with a re-export prompt
+- Hire-car verification: confirmed `hire_car` is wired through trip editing, transport summaries, and local notification planning, then added runtime coverage so the proof build and tests exercise it as a real transport path
+- Release metadata: bumped the app, docs, and APK artifact version line to `2.2.8`
 - Repo review pass: re-audited the pushed branch instead of rebuilding features, confirmed hire-car bookings, lounge passes, loyalty presets, and rail-ticket QR support were already wired in the real Vault flow, and focused the new changes on the remaining onboarding, localization, legal, and web-policy gaps
 - Localization follow-through: first-run traveller setup, account, trips, packing, itinerary, warnings, and legal/support wrappers now respect the selected app language instead of falling back to obvious hard-coded English on those high-visibility routes
-- Completion pass: bumped release metadata to `2.2.7`, rebuilt the auth setup flow to `Language -> Name -> PIN -> Biometrics -> Passport / traveller setup`, and removed the old onboarding completion shortcut that incorrectly inferred completion from only a PIN or trip count
+- Completion pass: bumped release metadata to `2.2.8`, rebuilt the auth setup flow to `Language -> Name -> PIN -> Biometrics -> Passport / traveller setup`, and removed the old onboarding completion shortcut that incorrectly inferred completion from only a PIN or trip count
 - Android launcher fix: kept the adaptive icon monochrome path wired end-to-end, documented Pixel themed-icon verification, and prepared the native launcher resources for a fresh regenerated build
 - Account/setup cleanup: moved travel-style preference and profile-photo setup out of first-run so they no longer block reaching PIN
 - Transport/document completion: added a distinct `Hire car` transport mode, kept `Hire car booking` and `Airport lounge pass` in the real Vault add/edit flow, and expanded the rail ticket fields and renderer
@@ -18,9 +22,9 @@
 - Vibes honesty cleanup: missing venue photos now fall back with a clearer “Official photo unavailable” state instead of implying the image is still loading
 - Transport reminder audit and rebuild: replaced the old generic `flight_check_in` path with a per-segment `transport_departure` scheduler that now covers flights, ferries, Eurotunnel, trains, and taxis with the required reminder matrix and trip/segment deep links
 - Notification diagnostics: Settings now exposes runtime support, permission state, Android channel visibility and importance, future scheduled count, and the next scheduled transport alerts so lock-screen behavior can be checked from inside the app
-- Transport proof trip: version `2.2.7` seeds a temporary `Transport Notification Proof Trip` with one flight, train, taxi, ferry, and Eurotunnel segment, then compresses the reminder cadence into a short on-device verification window
+- Transport proof trip: version `2.2.8` seeds a temporary `Transport Notification Proof Trip` with one flight, train, taxi, ferry, Eurotunnel, and hire-car segment, then compresses the reminder cadence into a short on-device verification window
 - Transport trip UX: each saved segment now shows its lock-screen alert summary plus the next few scheduled reminders directly inside the trip travel section
-- Build metadata: bumped the app and APK artifact line to `2.2.7`, added Android notification permissions for testing, and kept the proof build removable after verification
+- Build metadata: bumped the app and APK artifact line to `2.2.8`, added Android notification permissions for testing, and kept the proof build removable after verification
 - Onboarding copy cleanup: the first setup slides no longer push reminder wording too early, keeping notification setup in Settings instead of the welcome flow
 - Weather cleanup: restored the cleaner hourly outlook row design while keeping the newer scenic destination card and 7-day forecast
 - Vibes image fallback: when Tripadvisor has no usable venue photo, the worker now tries the venue website's Open Graph or Twitter preview image instead of leaving more cards without a real place photo

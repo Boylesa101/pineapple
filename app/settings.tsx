@@ -87,6 +87,10 @@ export default function SettingsScreen() {
   const [backupPassword, setBackupPassword] = useState('');
   const [backupSource, setBackupSource] = useState<string | null>(null);
   const [backupSourceLabel, setBackupSourceLabel] = useState<string | null>(null);
+  const [sharedImportVisible, setSharedImportVisible] = useState(false);
+  const [sharedImportContents, setSharedImportContents] = useState<string | null>(null);
+  const [sharedImportCode, setSharedImportCode] = useState('');
+  const [sharedImportSourceLabel, setSharedImportSourceLabel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notificationAccess, setNotificationAccess] = useState<boolean | null>(null);
   const [notificationDiagnostics, setNotificationDiagnostics] = useState<NotificationDiagnostics | null>(null);
@@ -121,6 +125,13 @@ export default function SettingsScreen() {
     setBackupPassword('');
     setBackupSource(null);
     setBackupSourceLabel(null);
+  }
+
+  function closeSharedImportModal() {
+    setSharedImportVisible(false);
+    setSharedImportContents(null);
+    setSharedImportCode('');
+    setSharedImportSourceLabel(null);
   }
 
   async function confirmRestore() {
@@ -246,16 +257,40 @@ export default function SettingsScreen() {
 
     try {
       const contents = await FileSystem.readAsStringAsync(result.assets[0].uri);
-      const outcome = await importSharedTripFile(contents);
-      if (outcome.mode === 'conflict') {
-        Alert.alert('Conflict detected', 'Pineapple stored the incoming share as a conflict for manual review.');
-      } else {
-        Alert.alert('Shared trip imported', 'Trip data was merged into your local database.');
-      }
+      setSharedImportContents(contents);
+      setSharedImportSourceLabel(result.assets[0].name ?? 'shared trip file');
+      setSharedImportCode('');
+      setSharedImportVisible(true);
     } catch (error) {
       Alert.alert(
         'Import failed',
         toUserMessage(error, 'Pineapple could not import that shared trip file.')
+      );
+    }
+  }
+
+  async function confirmSharedTripImport() {
+    if (!sharedImportContents) {
+      return;
+    }
+
+    if (!sharedImportCode.trim()) {
+      Alert.alert('Transfer code needed', 'Enter the transfer code to decrypt this shared trip.');
+      return;
+    }
+
+    try {
+      const outcome = await importSharedTripFile(sharedImportContents, sharedImportCode);
+      closeSharedImportModal();
+      if (outcome.mode === 'conflict') {
+        Alert.alert('Conflict detected', 'Pineapple stored the incoming encrypted share as a conflict for manual review.');
+      } else {
+        Alert.alert('Shared trip imported', 'Trip data was merged into your local database from the encrypted share.');
+      }
+    } catch (error) {
+      Alert.alert(
+        'Import failed',
+        toUserMessage(error, 'Pineapple could not decrypt or import that shared trip file.')
       );
     }
   }
@@ -515,13 +550,13 @@ export default function SettingsScreen() {
           disabled={isWebCompanionPolicyActive()}
         />
         <Text style={styles.meta}>
-          Trip transfer uses Pineapple-owned shared files and trip-level transfer QR codes. Open a trip and use Sharing and participants to show a Pineapple QR for that trip.
+          Trip transfer uses Pineapple-owned encrypted shared files and trip-level encrypted transfer QR codes. Open a trip and use Sharing and participants to show a Pineapple QR for that trip.
         </Text>
         <Text style={styles.meta}>
-          Very detailed trips may still need the shared-trip file export because QR codes have limited capacity.
+          Very detailed trips may still need encrypted file export because QR codes have limited capacity even after Pineapple encrypts the transfer payload.
         </Text>
         <Text style={styles.meta}>
-          Shared-trip packets are validated and integrity-checked. They are not cloud sync, and they are not encrypted or authenticated in the current release.
+          Shared-trip transfers are encrypted with a transfer code, integrity-checked before import, and stay local to the apps and devices you choose to use. Pineapple still does not offer cloud sync.
         </Text>
       </AppCard>
 
@@ -660,6 +695,18 @@ export default function SettingsScreen() {
           <Text style={styles.meta}>Restoring replaces the current Pineapple data on this device after confirmation.</Text>
         ) : null}
         <AppButton label={backupAction === 'export' ? 'Create backup' : 'Restore backup'} onPress={handleBackupAction} loading={busy} />
+      </AppModal>
+
+      <AppModal visible={sharedImportVisible} title="Decrypt shared trip" onClose={closeSharedImportModal}>
+        <Text style={styles.meta}>Selected source: {sharedImportSourceLabel ?? 'Encrypted shared trip'}</Text>
+        <Text style={styles.meta}>Enter the transfer code that was shared separately with the encrypted trip file.</Text>
+        <AppTextField
+          label="Transfer code"
+          value={sharedImportCode}
+          onChangeText={setSharedImportCode}
+          placeholder="PINE-ABCD-EFGH"
+        />
+        <AppButton label="Decrypt and import" onPress={() => void confirmSharedTripImport()} />
       </AppModal>
     </AppScreen>
   );

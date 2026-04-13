@@ -22,7 +22,10 @@ import type {
   ReminderLeadTime,
   RelationshipType,
   SharedTripPacket,
+  SharedTripConflictRecord,
   SharedTripPacketData,
+  SharedTripExportResult,
+  SharedTripSecureEnvelope,
   SyncConflict,
   TransportType,
   TravelDirection,
@@ -44,6 +47,7 @@ const MAX_ID_LENGTH = 120;
 const SHARE_CODE_PATTERN = /^PINE-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 const SHARE_CODE_PREFIX = 'PINE';
 const BASE32_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const SHARED_TRIP_PBKDF2_ITERATIONS = 150000;
 
 const transportTypes = new Set<TransportType>(['flight', 'private_flight', 'train', 'car', 'hire_car', 'taxi', 'ferry', 'eurotunnel']);
 const travelDirections = new Set<TravelDirection>(['outbound', 'return', 'other']);
@@ -194,15 +198,7 @@ function ensureUniqueIds(items: Array<{ id: string }>, label: string) {
   }
 }
 
-function sanitizeSharedPacketPayload(packet: Omit<SharedTripPacket, 'integrity'>) {
-  return JSON.stringify(packet);
-}
-
-function hashSharedPacketPayload(packet: Omit<SharedTripPacket, 'integrity'>) {
-  return CryptoJS.SHA256(sanitizeSharedPacketPayload(packet)).toString();
-}
-
-function createPacketShareCode() {
+function createTransferCode() {
   const randomBytes = Uint8Array.from(Buffer.from(CryptoJS.lib.WordArray.random(5).toString(CryptoJS.enc.Hex), 'hex'));
   let output = '';
   let buffer = 0;
@@ -224,6 +220,16 @@ function createPacketShareCode() {
 
   const token = output.slice(0, 8);
   return `${SHARE_CODE_PREFIX}-${token.slice(0, 4)}-${token.slice(4)}`;
+}
+
+function normalizeTransferCode(value: string) {
+  return value.trim();
+}
+
+function assertTransferCode(value: string) {
+  const normalized = normalizeTransferCode(value);
+  assertPacket(normalized.length >= 8, 'Enter the transfer code to decrypt this shared trip.');
+  return normalized;
 }
 
 function validateTrip(value: unknown): Trip {
@@ -613,55 +619,103 @@ export function createSharedTripPacket(snapshot: AppDataSnapshot, tripId: string
     bundle.participants.find((participant) => participant.role === 'owner' && participant.isLocalProfile)?.displayName ??
     bundle.participants[0]?.displayName ??
     'Pineapple user';
-  const shareCode = bundle.sharedTripState?.shareCode ?? createPacketShareCode();
+  const shareCode = bundle.sharedTripState?.shareCode ?? createTransferCode();
 
   if (!trip) {
     throw new Error('Trip not found.');
   }
 
-  const packetCore = {
+  return {
     format: 'pineapple-shared-trip' as const,
-    version: 2 as const,
+    version: 3 as const,
     shareCode,
     generatedAt: now(),
     senderLabel,
     data: buildSharedPacketData(snapshot, tripId),
   };
+}
+
+function serializeSharedTripPacket(packet: SharedTripPacket) {
+  return JSON.stringify(packet);
+}
+
+export function createSharedTripSecureEnvelope(packet: SharedTripPacket, transferCode: string): SharedTripSecureEnvelope {
+  const normalizedCode = assertTransferCode(transferCode);
+  const salt = CryptoJS.lib.WordArray.random(16);
+  const iv = CryptoJS.lib.WordArray.random(16);
+  const keyMaterial = CryptoJS.PBKDF2(normalizedCode, salt, {
+    keySize: 512 / 32,
+    iterations: SHARED_TRIP_PBKDF2_ITERATIONS,
+    hasher: CryptoJS.algo.SHA256,
+  });
+  const encryptionKey = CryptoJS.lib.WordArray.create(keyMaterial.words.slice(0, 8), 32);
+  const macKey = CryptoJS.lib.WordArray.create(keyMaterial.words.slice(8, 16), 32);
+  const ciphertext = CryptoJS.AES.encrypt(serializeSharedTripPacket(packet), encryptionKey, {
+    iv,
+    mode: CryptoJS.mode.CBC,
+    padding: CryptoJS.pad.Pkcs7,
+  }).ciphertext.toString(CryptoJS.enc.Base64);
+  const saltHex = salt.toString();
+  const ivHex = iv.toString();
+  const mac = CryptoJS.HmacSHA256(
+    `${ciphertext}.${ivHex}.${saltHex}.${SHARED_TRIP_PBKDF2_ITERATIONS}.pineapple-shared-trip-secure`,
+    macKey
+  ).toString();
 
   return {
-    ...packetCore,
-    integrity: {
-      algorithm: 'sha256' as const,
-      payloadHash: hashSharedPacketPayload(packetCore),
-      encrypted: false,
-      authenticated: false,
-    },
+    format: 'pineapple-shared-trip-secure',
+    version: 1,
+    encryption: 'aes-256-cbc+hmac-sha256',
+    kdf: 'pbkdf2',
+    iterations: SHARED_TRIP_PBKDF2_ITERATIONS,
+    salt: saltHex,
+    iv: ivHex,
+    mac,
+    ciphertext,
   };
 }
 
-export async function exportSharedTripPacket(snapshot: AppDataSnapshot, tripId: string) {
+export function createEncryptedSharedTripTransfer(snapshot: AppDataSnapshot, tripId: string, providedTransferCode?: string) {
+  const packet = createSharedTripPacket(snapshot, tripId);
+  const transferCode = providedTransferCode?.trim() || createTransferCode();
+  const envelope = createSharedTripSecureEnvelope(packet, transferCode);
+  const envelopeContents = JSON.stringify(envelope);
+
+  return {
+    packet,
+    envelope,
+    envelopeContents,
+    transferCode,
+  };
+}
+
+export async function exportSharedTripPacket(
+  snapshot: AppDataSnapshot,
+  tripId: string,
+  providedTransferCode?: string
+): Promise<SharedTripExportResult> {
   const [{ writeUtf8File }, Sharing] = await Promise.all([
     import('@/utils/fileStorage'),
     import('expo-sharing'),
   ]);
-  const packet = createSharedTripPacket(snapshot, tripId);
+  const { packet, envelope, transferCode } = createEncryptedSharedTripTransfer(snapshot, tripId, providedTransferCode);
   const uri = await writeUtf8File(
     'exports',
-    `pineapple-share-${packet.data.trip.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'trip'}.pineappleshare.json`,
-    JSON.stringify(packet, null, 2)
+    `pineapple-share-${packet.data.trip.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'trip'}.pineappleshare`,
+    JSON.stringify(envelope, null, 2)
   );
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/json',
-      dialogTitle: `${packet.data.trip.name} · Nearby / Quick Share`,
+      dialogTitle: `${packet.data.trip.name} · Encrypted Nearby / Quick Share`,
     });
   }
 
-  return { packet, uri };
+  return { uri, transferCode, envelope };
 }
 
-export function parseSharedTripPacket(contents: string): SharedTripPacket {
+function parseSharedTripSecureEnvelope(contents: string): SharedTripSecureEnvelope {
   if (!contents || contents.length > MAX_SHARED_TRIP_PACKET_LENGTH) {
     throw new Error('This shared trip file is too large to import safely.');
   }
@@ -673,14 +727,101 @@ export function parseSharedTripPacket(contents: string): SharedTripPacket {
     throw new Error('This shared trip file is not valid JSON.');
   }
 
+  const envelope = expectObject(parsed, 'This shared trip file is not recognised.');
+  const format = expectString(envelope.format, 'This shared trip file is not recognised.');
+  if (format === 'pineapple-shared-trip') {
+    throw new Error('Plaintext shared-trip files are no longer supported. Export the trip again from Pineapple to create an encrypted transfer.');
+  }
+  assertPacket(format === 'pineapple-shared-trip-secure', 'This shared trip file is not recognised.');
+  const version = expectNumber(envelope.version, 'This shared trip file is not recognised.', {
+    integer: true,
+    min: 1,
+    max: 1,
+  }) as 1;
+  const encryption = expectString(envelope.encryption, 'This shared trip file uses an unsupported encryption format.');
+  assertPacket(encryption === 'aes-256-cbc+hmac-sha256', 'This shared trip file uses an unsupported encryption format.');
+  const kdf = expectString(envelope.kdf, 'This shared trip file uses an unsupported key derivation format.');
+  assertPacket(kdf === 'pbkdf2', 'This shared trip file uses an unsupported key derivation format.');
+  const iterations = expectNumber(envelope.iterations, 'This shared trip file contains invalid encryption settings.', {
+    integer: true,
+    min: 100000,
+    max: 500000,
+  });
+  const salt = expectString(envelope.salt, 'This shared trip file contains invalid encryption settings.', {
+    pattern: /^[a-f0-9]{32}$/i,
+    maxLength: 32,
+  });
+  const iv = expectString(envelope.iv, 'This shared trip file contains invalid encryption settings.', {
+    pattern: /^[a-f0-9]{32}$/i,
+    maxLength: 32,
+  });
+  const mac = expectString(envelope.mac, 'This shared trip file failed integrity checks.', {
+    pattern: /^[a-f0-9]{64}$/i,
+    maxLength: 64,
+  });
+  const ciphertext = expectString(envelope.ciphertext, 'This shared trip file is incomplete.', {
+    maxLength: MAX_SHARED_TRIP_PACKET_LENGTH,
+  });
+
+  return {
+    format: 'pineapple-shared-trip-secure',
+    version,
+    encryption: 'aes-256-cbc+hmac-sha256',
+    kdf: 'pbkdf2',
+    iterations,
+    salt,
+    iv,
+    mac,
+    ciphertext,
+  };
+}
+
+export function parseSharedTripPacket(contents: string, transferCode: string): SharedTripPacket {
+  const envelope = parseSharedTripSecureEnvelope(contents);
+  const normalizedCode = assertTransferCode(transferCode);
+  const salt = CryptoJS.enc.Hex.parse(envelope.salt);
+  const iv = CryptoJS.enc.Hex.parse(envelope.iv);
+  const keyMaterial = CryptoJS.PBKDF2(normalizedCode, salt, {
+    keySize: 512 / 32,
+    iterations: envelope.iterations,
+    hasher: CryptoJS.algo.SHA256,
+  });
+  const encryptionKey = CryptoJS.lib.WordArray.create(keyMaterial.words.slice(0, 8), 32);
+  const macKey = CryptoJS.lib.WordArray.create(keyMaterial.words.slice(8, 16), 32);
+  const expectedMac = CryptoJS.HmacSHA256(
+    `${envelope.ciphertext}.${envelope.iv}.${envelope.salt}.${envelope.iterations}.pineapple-shared-trip-secure`,
+    macKey
+  ).toString();
+  assertPacket(expectedMac === envelope.mac, 'Shared-trip integrity check failed. The transfer code or file may be invalid.');
+
+  const decrypted = CryptoJS.AES.decrypt(
+    {
+      ciphertext: CryptoJS.enc.Base64.parse(envelope.ciphertext),
+    } as CryptoJS.lib.CipherParams,
+    encryptionKey,
+    {
+      iv,
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7,
+    }
+  ).toString(CryptoJS.enc.Utf8);
+  assertPacket(Boolean(decrypted), 'Unable to decrypt this shared trip. Check the transfer code and try again.');
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decrypted);
+  } catch {
+    throw new Error('The decrypted shared-trip contents were invalid.');
+  }
+
   const packet = expectObject(parsed, 'This shared trip file is not recognised.');
   const format = expectString(packet.format, 'This shared trip file is not recognised.');
   assertPacket(format === 'pineapple-shared-trip', 'This shared trip file is not recognised.');
   const version = expectNumber(packet.version, 'This shared trip file is not recognised.', {
     integer: true,
-    min: 1,
-    max: 2,
-  }) as 1 | 2;
+    min: 3,
+    max: 3,
+  }) as 3;
   const shareCode = expectString(packet.shareCode, 'This shared trip file contains an invalid share code.', {
     pattern: SHARE_CODE_PATTERN,
     maxLength: 14,
@@ -691,43 +832,13 @@ export function parseSharedTripPacket(contents: string): SharedTripPacket {
   });
   const data = validateSharedTripPacketData(packet.data);
 
-  const basePacket = {
-    format: 'pineapple-shared-trip' as const,
+  return {
+    format: 'pineapple-shared-trip',
     version,
     shareCode,
     generatedAt,
     senderLabel,
     data,
-  };
-
-  if (version === 2) {
-    const integrity = expectObject(packet.integrity, 'This shared trip file is missing its integrity proof.');
-    const algorithm = expectString(integrity.algorithm, 'This shared trip file uses an unsupported integrity format.');
-    assertPacket(algorithm === 'sha256', 'This shared trip file uses an unsupported integrity format.');
-    const payloadHash = expectString(integrity.payloadHash, 'This shared trip file is missing its integrity proof.', {
-      pattern: /^[a-f0-9]{64}$/i,
-      maxLength: 64,
-    });
-    const encrypted = expectBoolean(integrity.encrypted, 'This shared trip file contains an invalid protection flag.');
-    const authenticated = expectBoolean(integrity.authenticated, 'This shared trip file contains an invalid protection flag.');
-    const expectedHash = hashSharedPacketPayload({ ...basePacket, version: 2 as const });
-    assertPacket(expectedHash === payloadHash, 'This shared trip file failed integrity checks and was not imported.');
-
-    return {
-      ...basePacket,
-      version: 2,
-      integrity: {
-        algorithm: 'sha256',
-        payloadHash,
-        encrypted,
-        authenticated,
-      },
-    };
-  }
-
-  return {
-    ...basePacket,
-    version: 1,
   };
 }
 
@@ -779,7 +890,11 @@ function buildConflict(packet: SharedTripPacket, tripId: string, localUpdatedAt:
     summary: `Manual sync conflict for ${packet.data.trip.name}`,
     localUpdatedAt,
     incomingUpdatedAt: packet.data.trip.updatedAt,
-    incomingPayload: JSON.stringify(packet),
+    incomingRecord: {
+      senderLabel: packet.senderLabel,
+      packetVersion: packet.version,
+      data: cloneSnapshot(packet.data),
+    },
     status: 'open',
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -836,7 +951,14 @@ export function resolveConflict(snapshot: AppDataSnapshot, conflictId: string, r
   let next = cloneSnapshot(snapshot);
 
   if (resolution === 'resolved_use_incoming') {
-    const packet = parseSharedTripPacket(conflict.incomingPayload);
+    const packet: SharedTripPacket = {
+      format: 'pineapple-shared-trip',
+      version: conflict.incomingRecord.packetVersion,
+      shareCode: conflict.shareCode,
+      generatedAt: timestamp,
+      senderLabel: conflict.incomingRecord.senderLabel,
+      data: cloneSnapshot(conflict.incomingRecord.data),
+    };
     next = replaceTripCollections(next, packet, conflict.tripId);
   }
 

@@ -37,7 +37,7 @@
 - Safe preferences such as auto-lock duration may be restored.
 - Backup restore replaces current local structured data.
 - Shared trip exchange in phase 3 is manual-share only. Full vault images are intentionally not part of the shared-trip packet.
-- Shared-trip packets are schema-validated and newly exported packets include a SHA-256 integrity hash, but they are not encrypted or cryptographically authenticated in the current release.
+- Shared-trip exchange now uses a dedicated `pineapple-shared-trip-secure` envelope with PBKDF2-derived AES encryption plus HMAC integrity, and the receiving device must enter the separately shared transfer code before import.
 - Conflicts are surfaced for manual review instead of silently overwriting local data.
 
 ## Known tradeoffs

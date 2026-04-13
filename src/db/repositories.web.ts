@@ -22,6 +22,7 @@ import type {
   PackingItemDraft,
   ReminderSettingDraft,
   SavedVibeDraft,
+  SharedTripConflictRecord,
   SharedTripStateDraft,
   SyncConflictDraft,
   TravelSegmentDraft,
@@ -78,6 +79,47 @@ function emptySnapshot(timestamp = now()): AppDataSnapshot {
     sharedTripStates: [],
     syncConflicts: [],
   };
+}
+
+function parseIncomingConflictRecord(value: unknown): SharedTripConflictRecord | null {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (
+      parsed &&
+      typeof parsed.senderLabel === 'string' &&
+      typeof parsed.packetVersion === 'number' &&
+      parsed.data &&
+      typeof parsed.data === 'object'
+    ) {
+      return {
+        senderLabel: parsed.senderLabel,
+        packetVersion: 3,
+        data: parsed.data as SharedTripConflictRecord['data'],
+      };
+    }
+
+    if (
+      parsed &&
+      parsed.format === 'pineapple-shared-trip' &&
+      typeof parsed.senderLabel === 'string' &&
+      parsed.data &&
+      typeof parsed.data === 'object'
+    ) {
+      return {
+        senderLabel: parsed.senderLabel,
+        packetVersion: 3,
+        data: parsed.data as SharedTripConflictRecord['data'],
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function normalizeScheduledNotificationIds(value: unknown) {
@@ -267,13 +309,20 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
       }))
     ),
     syncConflicts: await Promise.all(
-      (snapshot.syncConflicts ?? []).map(async (conflict) => ({
-        ...conflict,
-        shareCode: (await decryptStructuredValue(conflict.shareCode)) ?? '',
-        summary: (await decryptStructuredValue(conflict.summary)) ?? '',
-        incomingPayload: (await decryptStructuredValue(conflict.incomingPayload)) ?? '',
-      }))
-    ),
+      (snapshot.syncConflicts ?? []).map(async (conflict) => {
+        const incomingRecord = parseIncomingConflictRecord((await decryptStructuredValue((conflict as any).incomingPayload)) ?? '');
+        if (!incomingRecord) {
+          return null;
+        }
+
+        return {
+          ...conflict,
+          shareCode: (await decryptStructuredValue(conflict.shareCode)) ?? '',
+          summary: (await decryptStructuredValue(conflict.summary)) ?? '',
+          incomingRecord,
+        };
+      })
+    ).then((items) => items.filter((item): item is NonNullable<typeof item> => Boolean(item))),
   } as AppDataSnapshot;
 }
 
@@ -438,7 +487,7 @@ async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         ...conflict,
         shareCode: (await encryptStructuredValue(conflict.shareCode)) ?? '',
         summary: (await encryptStructuredValue(conflict.summary)) ?? '',
-        incomingPayload: (await encryptStructuredValue(conflict.incomingPayload)) ?? '',
+        incomingPayload: (await encryptStructuredValue(JSON.stringify(conflict.incomingRecord))) ?? '',
       }))
     ),
   } as AppDataSnapshot;
