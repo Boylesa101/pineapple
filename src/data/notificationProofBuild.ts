@@ -2,7 +2,7 @@ import { addDays, addHours, addMinutes } from 'date-fns';
 
 import type { AppDataSnapshot, ReminderKind, ReminderSetting, TravelSegment, Trip } from '@/types/models';
 
-export const NOTIFICATION_PROOF_BUILD_VERSION = '2.2.6';
+export const NOTIFICATION_PROOF_BUILD_VERSION = '2.2.8';
 export const NOTIFICATION_PROOF_TRIP_ID = 'trip_transport_notification_proof';
 
 const NOTIFICATION_PROOF_SEGMENTS: Array<{
@@ -52,6 +52,54 @@ const NOTIFICATION_PROOF_SEGMENTS: Array<{
     terminal: 'Platform 4',
     gate: 'Coach B',
     bookingRef: 'PROOF-TRN',
+  },
+  {
+    id: 'segment_notification_proof_bus',
+    transportType: 'bus',
+    airline: 'National Express',
+    providerCode: 'NX',
+    flightNumber: 'A8',
+    departureAirport: 'Birmingham Coach Station',
+    departureAirportCode: '',
+    arrivalAirport: 'London Victoria Coach Station',
+    arrivalAirportCode: '',
+    departureOffsetHours: 14,
+    arrivalOffsetHours: 16,
+    terminal: 'Stand 12',
+    gate: 'Coach bay B',
+    bookingRef: 'PROOF-BUS',
+  },
+  {
+    id: 'segment_notification_proof_underground',
+    transportType: 'underground',
+    airline: 'London Underground',
+    providerCode: 'LU',
+    flightNumber: 'Piccadilly line',
+    departureAirport: 'King’s Cross St Pancras',
+    departureAirportCode: '',
+    arrivalAirport: 'Heathrow Terminal 5',
+    arrivalAirportCode: '',
+    departureOffsetHours: 15,
+    arrivalOffsetHours: 16,
+    terminal: 'Westbound platform',
+    gate: 'Piccadilly line',
+    bookingRef: 'PROOF-TUBE',
+  },
+  {
+    id: 'segment_notification_proof_metro',
+    transportType: 'metro',
+    airline: 'Tyne and Wear Metro',
+    providerCode: 'TWM',
+    flightNumber: 'Green line',
+    departureAirport: 'Monument',
+    departureAirportCode: '',
+    arrivalAirport: 'Newcastle Airport',
+    arrivalAirportCode: '',
+    departureOffsetHours: 16,
+    arrivalOffsetHours: 17,
+    terminal: 'Platform 2',
+    gate: 'Airport service',
+    bookingRef: 'PROOF-MET',
   },
   {
     id: 'segment_notification_proof_taxi',
@@ -119,7 +167,7 @@ const LEGACY_REMINDER_OFFSETS_MINUTES: Partial<Record<ReminderKind, number>> = {
 };
 
 function getTransportSummary(transportType: TravelSegment['transportType']) {
-  if (transportType === 'train' || transportType === 'taxi') {
+  if (transportType === 'train' || transportType === 'bus' || transportType === 'underground' || transportType === 'metro' || transportType === 'taxi') {
     return 'Lock screen alerts 1h • 15m';
   }
 
@@ -181,13 +229,13 @@ export function withNotificationProofTrip(snapshot: AppDataSnapshot, now = new D
     destinationImageLocalPath: null,
     destinationImageRemoteUrl: null,
     destinationImageSource: 'fallback',
-    attributionText: 'Temporary 2.2.6 transport notification verification trip',
-    attributionMeta: { source: 'fallback', sourceLabel: 'Temporary 2.2.6 transport notification verification trip' },
+    attributionText: 'Temporary 2.2.8 transport notification verification trip',
+    attributionMeta: { source: 'fallback', sourceLabel: 'Temporary 2.2.8 transport notification verification trip' },
     coverImageUri: null,
     heroImageRemoteUrl: null,
     heroImageStatus: 'idle',
     notes:
-      'Temporary seeded trip for Pineapple 2.2.6 transport notification verification. Remove after on-device lock-screen proof is confirmed.',
+      'Temporary seeded trip for Pineapple 2.2.8 transport notification verification. Remove after on-device lock-screen proof is confirmed.',
     transferSummary: 'Transport departure proof trip',
     transferProvider: '',
     transferMethod: '',

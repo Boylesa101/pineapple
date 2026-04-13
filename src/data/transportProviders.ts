@@ -59,6 +59,19 @@ function trainProvider(code: string, name: string, searchKey: string, accentColo
   };
 }
 
+function networkProvider(type: 'bus' | 'underground' | 'metro', code: string, name: string, searchKey: string, accentColor: string) {
+  return {
+    type,
+    code,
+    name,
+    logoXml: createMonogramLogoXml(code, accentColor),
+    logoUrl: null,
+    accentColor,
+    label: `${name} (${code})`,
+    searchKey,
+  };
+}
+
 const providers: TransportProviderSuggestion[] = [
   flightProvider('BA', 'British Airways', 'ba british airways london uk', '#2E5B9D'),
   flightProvider('QR', 'Qatar Airways', 'qr qatar airways doha', '#6A1A45'),
@@ -120,6 +133,19 @@ const providers: TransportProviderSuggestion[] = [
   trainProvider('SNCF', 'SNCF Connect', 'sncf france train paris lyon', '#E20074'),
   trainProvider('DB', 'Deutsche Bahn', 'db deutsche bahn germany train berlin', '#D50032'),
   trainProvider('RENFE', 'Renfe', 'renfe spain train madrid barcelona', '#6E2C91'),
+  networkProvider('bus', 'NX', 'National Express', 'nx national express bus coach uk', '#003D73'),
+  networkProvider('bus', 'MEGA', 'Megabus', 'mega megabus bus coach uk europe', '#FFCC00'),
+  networkProvider('bus', 'FLIX', 'FlixBus', 'flix flixbus coach bus europe', '#78BE20'),
+  networkProvider('bus', 'ARR', 'Arriva', 'arr arriva bus uk europe', '#00A3E0'),
+  networkProvider('bus', 'STG', 'Stagecoach', 'stg stagecoach bus uk', '#003A70'),
+  networkProvider('underground', 'LU', 'London Underground', 'lu london underground tube tfl', '#0019A8'),
+  networkProvider('underground', 'GLA', 'Glasgow Subway', 'gla glasgow subway underground scotland', '#F28C00'),
+  networkProvider('underground', 'MTR', 'MTR', 'mtr hong kong underground metro', '#D50032'),
+  networkProvider('metro', 'TWM', 'Tyne and Wear Metro', 'twm tyne wear metro nexus newcastle sunderland', '#FFD100'),
+  networkProvider('metro', 'PAR', 'Paris Metro', 'par paris metro ratp france', '#003087'),
+  networkProvider('metro', 'MAD', 'Metro de Madrid', 'mad metro madrid spain', '#255AA8'),
+  networkProvider('metro', 'BER', 'Berlin U-Bahn', 'ber berlin u-bahn ubahn germany metro', '#005CA9'),
+  networkProvider('metro', 'NYC', 'New York City Subway', 'nyc new york city subway metro mta', '#0039A6'),
 ];
 
 export function searchTransportProviders(query: string, type: TransportType) {

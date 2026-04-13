@@ -175,7 +175,7 @@ function getTransportReminderOffsets(type: TransportType) {
     return LONG_HAUL_TRANSPORT_OFFSETS;
   }
 
-  if (type === 'train' || type === 'taxi' || type === 'hire_car') {
+  if (type === 'train' || type === 'bus' || type === 'underground' || type === 'metro' || type === 'taxi' || type === 'hire_car') {
     return LOCAL_TRANSPORT_OFFSETS;
   }
 
@@ -201,6 +201,10 @@ function buildTransportReminderTitle(segment: TravelSegment, offset: TransportRe
 
   if (segment.transportType === 'eurotunnel') {
     return `Eurotunnel to ${destinationLabel} departs ${offset.phrase}`;
+  }
+
+  if (segment.transportType === 'bus' || segment.transportType === 'underground' || segment.transportType === 'metro') {
+    return `${getTransportDisplay(segment.transportType).label} to ${destinationLabel} leaves ${offset.phrase}`;
   }
 
   return `${getTransportDisplay(segment.transportType).label} to ${destinationLabel} departs ${offset.phrase}`;

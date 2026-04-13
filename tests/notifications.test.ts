@@ -131,6 +131,12 @@ function createTransportSegment(
     airline:
       transportType === 'train'
         ? 'LNER'
+        : transportType === 'bus'
+          ? 'National Express'
+          : transportType === 'underground'
+            ? 'London Underground'
+            : transportType === 'metro'
+              ? 'Tyne and Wear Metro'
         : transportType === 'taxi'
           ? 'Uber'
           : transportType === 'ferry'
@@ -143,6 +149,12 @@ function createTransportSegment(
     flightNumber:
       transportType === 'train'
         ? '1D24'
+        : transportType === 'bus'
+          ? 'A8'
+          : transportType === 'underground'
+            ? 'Piccadilly line'
+            : transportType === 'metro'
+              ? 'Green line'
         : transportType === 'taxi'
           ? 'RIDE-11'
           : transportType === 'ferry'
@@ -153,6 +165,12 @@ function createTransportSegment(
     departureAirport:
       transportType === 'train'
         ? 'York Station'
+        : transportType === 'bus'
+          ? 'Birmingham Coach Station'
+          : transportType === 'underground'
+            ? 'King’s Cross St Pancras'
+            : transportType === 'metro'
+              ? 'Monument'
         : transportType === 'taxi'
           ? 'Home pickup'
           : transportType === 'ferry'
@@ -164,6 +182,12 @@ function createTransportSegment(
     arrivalAirport:
       transportType === 'train'
         ? 'London Kings Cross'
+        : transportType === 'bus'
+          ? 'London Victoria Coach Station'
+          : transportType === 'underground'
+            ? 'Heathrow Terminal 5'
+            : transportType === 'metro'
+              ? 'Newcastle Airport'
         : transportType === 'taxi'
           ? 'Heathrow Terminal 5'
           : transportType === 'ferry'
@@ -287,6 +311,9 @@ test('transport reminders schedule the correct per-segment matrix with travel ro
       '2026-04-06T19:00:00.000Z'
     ),
     createTransportSegment(snapshot, 'segment_train', 'train', '2026-03-27T12:00:00.000Z', '2026-03-27T14:00:00.000Z'),
+    createTransportSegment(snapshot, 'segment_bus', 'bus', '2026-03-27T12:10:00.000Z', '2026-03-27T13:40:00.000Z'),
+    createTransportSegment(snapshot, 'segment_underground', 'underground', '2026-03-27T12:20:00.000Z', '2026-03-27T13:00:00.000Z'),
+    createTransportSegment(snapshot, 'segment_metro', 'metro', '2026-03-27T12:25:00.000Z', '2026-03-27T13:05:00.000Z'),
     createTransportSegment(snapshot, 'segment_hire_car', 'hire_car', '2026-03-27T12:30:00.000Z', '2026-03-27T13:30:00.000Z'),
     createTransportSegment(snapshot, 'segment_taxi', 'taxi', '2026-03-27T13:00:00.000Z', '2026-03-27T14:00:00.000Z'),
   ];
@@ -296,7 +323,7 @@ test('transport reminders schedule the correct per-segment matrix with travel ro
     (item) => item.kind === 'transport_departure'
   );
 
-  assert.equal(reminders.length, 27);
+  assert.equal(reminders.length, 33);
   assert.equal(reminders.every((item) => item.channelId === 'pineapple-transport'), true);
   assert.equal(
     reminders.filter((item) => item.transportSegmentId === 'segment_flight').length,
@@ -315,6 +342,18 @@ test('transport reminders schedule the correct per-segment matrix with travel ro
     2
   );
   assert.equal(
+    reminders.filter((item) => item.transportSegmentId === 'segment_bus').length,
+    2
+  );
+  assert.equal(
+    reminders.filter((item) => item.transportSegmentId === 'segment_underground').length,
+    2
+  );
+  assert.equal(
+    reminders.filter((item) => item.transportSegmentId === 'segment_metro').length,
+    2
+  );
+  assert.equal(
     reminders.filter((item) => item.transportSegmentId === 'segment_hire_car').length,
     2
   );
@@ -330,6 +369,18 @@ test('transport reminders schedule the correct per-segment matrix with travel ro
   );
   assert.equal(
     reminders.some((item) => item.transportSegmentId === 'segment_train' && item.title.includes('in 1 hour')),
+    true
+  );
+  assert.equal(
+    reminders.some((item) => item.transportSegmentId === 'segment_bus' && item.title.includes('Bus')),
+    true
+  );
+  assert.equal(
+    reminders.some((item) => item.transportSegmentId === 'segment_underground' && item.title.includes('Underground')),
+    true
+  );
+  assert.equal(
+    reminders.some((item) => item.transportSegmentId === 'segment_metro' && item.title.includes('Metro')),
     true
   );
   assert.equal(
@@ -353,12 +404,12 @@ test('transport notification proof trip compresses all transport types into a fa
     (item) => item.kind === 'transport_departure' && item.activeTripId === NOTIFICATION_PROOF_TRIP_ID
   );
 
-  assert.equal(reminders.length, 25);
+  assert.equal(reminders.length, 31);
   assert.equal(reminders[0]?.date.toISOString(), '2026-03-27T10:02:00.000Z');
-  assert.equal(reminders[24]?.date.toISOString(), '2026-03-27T10:26:00.000Z');
+  assert.equal(reminders[30]?.date.toISOString(), '2026-03-27T10:32:00.000Z');
   assert.deepEqual(
     new Set(reminders.map((item) => item.transportType)),
-    new Set(['flight', 'train', 'taxi', 'ferry', 'eurotunnel'])
+    new Set(['flight', 'train', 'bus', 'underground', 'metro', 'taxi', 'ferry', 'eurotunnel'])
   );
   assert.equal(
     reminders.some((item) => item.href?.includes(`segmentId=segment_notification_proof_train`)),

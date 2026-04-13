@@ -2,7 +2,18 @@ export type TripStatus = 'upcoming' | 'active' | 'completed';
 export type DestinationType = 'country' | 'place' | 'unknown';
 export type HeroImageStatus = 'idle' | 'loading' | 'ready' | 'failed';
 export type DestinationImageSource = 'curated' | 'pexels' | 'wikimedia' | 'fallback';
-export type TransportType = 'flight' | 'private_flight' | 'train' | 'car' | 'hire_car' | 'taxi' | 'ferry' | 'eurotunnel';
+export type TransportType =
+  | 'flight'
+  | 'private_flight'
+  | 'train'
+  | 'bus'
+  | 'underground'
+  | 'metro'
+  | 'car'
+  | 'hire_car'
+  | 'taxi'
+  | 'ferry'
+  | 'eurotunnel';
 export type TravelDirection = 'outbound' | 'return' | 'other';
 export type VibeCategory = 'eat' | 'drink' | 'visit' | 'do';
 export type DocumentType =

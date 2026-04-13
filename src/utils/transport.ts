@@ -73,6 +73,57 @@ const DISPLAY_BY_TRANSPORT: Record<TransportType, TransportDisplay> = {
     detailIcon: 'train',
     directionOtherLabel: 'Other',
   },
+  bus: {
+    label: 'Bus / coach',
+    shortLabel: 'Bus',
+    providerLabel: 'Bus operator',
+    providerPlaceholder: 'Search bus or coach operator',
+    providerHelper: 'Add the bus or coach operator and keep the stop details handy.',
+    serviceNumberLabel: 'Route / coach number',
+    departureLabel: 'Departure stop',
+    arrivalLabel: 'Arrival stop',
+    terminalLabel: 'Stand / bay',
+    gateLabel: 'Seat / stop note',
+    departureIcon: 'directions-bus',
+    arrivalIcon: 'directions-bus',
+    cardIcon: 'directions-bus',
+    detailIcon: 'directions-bus',
+    directionOtherLabel: 'Other',
+  },
+  underground: {
+    label: 'Underground',
+    shortLabel: 'Tube',
+    providerLabel: 'Underground network',
+    providerPlaceholder: 'Search underground system',
+    providerHelper: 'Add the network and line so the station details stay easy to scan.',
+    serviceNumberLabel: 'Line / service',
+    departureLabel: 'Departure station',
+    arrivalLabel: 'Arrival station',
+    terminalLabel: 'Platform / entrance',
+    gateLabel: 'Line / platform note',
+    departureIcon: 'subway',
+    arrivalIcon: 'subway',
+    cardIcon: 'subway',
+    detailIcon: 'subway',
+    directionOtherLabel: 'Other',
+  },
+  metro: {
+    label: 'Metro',
+    shortLabel: 'Metro',
+    providerLabel: 'Metro network',
+    providerPlaceholder: 'Search metro system',
+    providerHelper: 'Add the metro network and line so the station details stay easy to scan.',
+    serviceNumberLabel: 'Line / service',
+    departureLabel: 'Departure station',
+    arrivalLabel: 'Arrival station',
+    terminalLabel: 'Platform / entrance',
+    gateLabel: 'Line / platform note',
+    departureIcon: 'subway',
+    arrivalIcon: 'subway',
+    cardIcon: 'subway',
+    detailIcon: 'subway',
+    directionOtherLabel: 'Other',
+  },
   ferry: {
     label: 'Ferry',
     shortLabel: 'Ferry',
@@ -164,6 +215,9 @@ export function normalizeTransportType(value: string | null | undefined): Transp
   if (
     value === 'private_flight' ||
     value === 'train' ||
+    value === 'bus' ||
+    value === 'underground' ||
+    value === 'metro' ||
     value === 'ferry' ||
     value === 'eurotunnel' ||
     value === 'car' ||
@@ -189,7 +243,7 @@ export function supportsAirportFields(type: TransportType) {
 }
 
 export function supportsProviderSuggestions(type: TransportType) {
-  return type === 'flight' || type === 'private_flight' || type === 'train';
+  return type === 'flight' || type === 'private_flight' || type === 'train' || type === 'bus' || type === 'underground' || type === 'metro';
 }
 
 export function getPrimaryTransportType(travelSegments: TravelSegment[]): TransportType | null {

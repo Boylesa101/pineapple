@@ -49,7 +49,7 @@ const SHARE_CODE_PREFIX = 'PINE';
 const BASE32_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const SHARED_TRIP_PBKDF2_ITERATIONS = 150000;
 
-const transportTypes = new Set<TransportType>(['flight', 'private_flight', 'train', 'car', 'hire_car', 'taxi', 'ferry', 'eurotunnel']);
+const transportTypes = new Set<TransportType>(['flight', 'private_flight', 'train', 'bus', 'underground', 'metro', 'car', 'hire_car', 'taxi', 'ferry', 'eurotunnel']);
 const travelDirections = new Set<TravelDirection>(['outbound', 'return', 'other']);
 const packingCategories = new Set<PackingCategory>(['clothes', 'toiletries', 'documents', 'electronics', 'medicines', 'beach_pool', 'kids_baby', 'other']);
 const luggageTypes = new Set<LuggageType>(['carry_on', 'checked']);
