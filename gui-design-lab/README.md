@@ -18,6 +18,10 @@ npm install
 npm run dev
 ```
 
+Local development runs on:
+
+- `http://localhost:4321`
+
 Build for Cloudflare Pages:
 
 ```bash
