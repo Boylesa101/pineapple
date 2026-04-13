@@ -111,10 +111,20 @@ Page 01 Home Dashboard is the most complete screen and should be the reference w
 ## Cloudflare Pages deployment
 
 1. Push the repo to GitHub.
-2. Create a Cloudflare Pages project pointing at the `gui-design-lab` directory.
-3. Set build command to `npm run build`.
-4. Set output directory to `dist`.
-5. Keep framework preset as Vite if Cloudflare detects it.
+2. Create a Cloudflare Pages project named `pineapplegui`.
+3. Point the project at the `gui-design-lab` directory in this repo.
+4. Set build command to `npm run build`.
+5. Set output directory to `dist`.
+6. Keep framework preset as Vite if Cloudflare detects it.
+
+The repo also includes:
+
+- `wrangler.toml`
+
+That file declares the intended Cloudflare Pages project name and output directory:
+
+- name: `pineapplegui`
+- pages build output: `dist`
 
 ## Reminder
 
