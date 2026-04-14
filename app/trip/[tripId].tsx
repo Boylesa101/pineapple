@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Linking from 'expo-linking';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
@@ -26,10 +25,6 @@ import { TransportProviderSearchField } from '@/components/TransportProviderSear
 import { TypedDateField } from '@/components/TypedDateField';
 import { QRCodeImage } from '@/components/ui/QRCodeImage';
 import { colors, spacing } from '@/constants/theme';
-import { NOTIFICATION_PROOF_BUILD_VERSION, isNotificationProofTripId } from '@/data/notificationProofBuild';
-import { getVisaRequirementAssessment } from '@/content/visaRequirements';
-import { getTripDocumentWarningSummary } from '@/services/documentWarnings';
-import { createReminderContent, describeTransportReminderMatrix } from '@/services/notificationPlanner';
 import {
   getAirportSetOffInfo,
   getDestinationLocalTimeInfo,
@@ -48,8 +43,6 @@ import type {
   HotelStayDraft,
   ParticipantRole,
   PdfExportOptions,
-  ReminderKind,
-  ReminderLeadTime,
   ReminderSettingDraft,
   TransportType,
   TravelSegmentDraft,
@@ -57,20 +50,20 @@ import type {
   TravellerDraft,
 } from '@/types/models';
 import { createShareCode } from '@/utils/shareCodes';
-import { compareIsoDates, daysLeft, daysUntil, formatDateTime, formatShortDate } from '@/utils/date';
+import { daysUntil, formatDateTime } from '@/utils/date';
 import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { formatAirportDisplay } from '@/utils/airports';
-import { relationshipLabel, tripDateRange } from '@/utils/format';
-import { getMissingInfoPrompts, getTripBundle, getUpcomingTimeline } from '@/utils/selectors';
+import { tripDateRange } from '@/utils/format';
+import { getTripBundle } from '@/utils/selectors';
 import { isWebCompanionPolicyActive, sensitiveWebSupportMessage } from '@/utils/platformPolicy';
-import { getPrimaryTransportType, getTransportDisplay, isAirTransportType } from '@/utils/transport';
+import { getTransportDisplay, isAirTransportType } from '@/utils/transport';
 import { toUserMessage } from '@/utils/userErrors';
 import { validateEmergencyInfo, validateHotelStay, validateTravelSegment, validateTraveller } from '@/utils/validation';
 import { chooseProfilePhoto } from '@/utils/profilePhotos';
 import { deleteLocalFile } from '@/utils/fileStorage';
 
 type ModalKind = 'traveller' | 'segment' | 'hotel' | 'transfer' | 'emergency' | 'export' | 'invite' | null;
-type TripSection = 'overview' | 'travel' | 'hotel' | 'transfer' | 'packing' | 'itinerary' | 'vibes';
+type TripSection = 'overview' | 'packing' | 'itinerary' | 'settings';
 type TransferDraft = {
   provider: string;
   method: string;
@@ -78,35 +71,6 @@ type TransferDraft = {
   time: string | null;
   airportTravelDurationMinutes: string;
   notes: string;
-};
-
-type VisibleTripReminderKind = Exclude<
-  ReminderKind,
-  'passport_expiry' | 'ghic_expiry' | 'trip_starts_tomorrow' | 'flight_check_in'
->;
-
-const reminderMeta: Record<
-  VisibleTripReminderKind,
-  { label: string; leadTimeDays: ReminderLeadTime; legacyKinds?: ReminderKind[]; subtitle?: string }
-> = {
-  trip_countdown_30_days: { label: '30 days to trip', leadTimeDays: 30 },
-  trip_countdown_7_days: { label: '7 days to trip', leadTimeDays: 7 },
-  packing_incomplete: { label: 'Packing reminder', leadTimeDays: 6 },
-  trip_countdown_3_days: { label: '3 days to trip', leadTimeDays: 3 },
-  trip_countdown_1_day: { label: '1 day to trip', leadTimeDays: 1, legacyKinds: ['trip_starts_tomorrow'] },
-  trip_today: { label: 'Trip day reminder', leadTimeDays: 0 },
-  insurance_missing: { label: 'Missing insurance warning', leadTimeDays: 7 },
-  transport_departure: {
-    label: 'Transport departure alerts',
-    leadTimeDays: 0,
-    legacyKinds: ['flight_check_in'],
-    subtitle: 'Flights, ferries, Eurotunnel: 7d, 3d, 2d, 1d, 2h, 1h, 15m. Trains and taxis: 1h, 15m.',
-  },
-  hotel_check_in: { label: 'Hotel check-in reminder', leadTimeDays: 0 },
-  transfer_reminder: { label: 'Transfer reminder', leadTimeDays: 0 },
-  travel_mode_reminder: { label: 'Travel mode reminder', leadTimeDays: 0 },
-  sos_ready: { label: 'SOS tools reminder', leadTimeDays: 0 },
-  excursion_reminder: { label: 'Excursion reminder', leadTimeDays: 1 },
 };
 
 const defaultExportOptions: PdfExportOptions = {
@@ -256,7 +220,6 @@ export default function TripDetailScreen() {
     saveTravelSegment,
     saveHotelStay,
     saveEmergencyInfo,
-    saveReminderSetting,
     exportTripPdfFile,
     saveTripInvite,
     exportSharedTripFile,
@@ -266,8 +229,6 @@ export default function TripDetailScreen() {
     deleteRecord,
   } = useAppStore();
   const bundle = getTripBundle(data, tripId);
-  const missingPrompts = getMissingInfoPrompts(data, tripId);
-  const timeline = getUpcomingTimeline(data, tripId);
   const trip = bundle.trip;
   const [modalKind, setModalKind] = useState<ModalKind>(null);
   const [travellerDraft, setTravellerDraft] = useState<TravellerDraft | null>(null);
@@ -285,7 +246,6 @@ export default function TripDetailScreen() {
   const [sharedImportContents, setSharedImportContents] = useState<string | null>(null);
   const [sharedImportCode, setSharedImportCode] = useState('');
   const [sharedImportSourceLabel, setSharedImportSourceLabel] = useState('shared trip');
-  const [visaModalVisible, setVisaModalVisible] = useState(false);
   const [travellerPhotoBaselineUri, setTravellerPhotoBaselineUri] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<TripSection>('overview');
   const [destinationTimeInfo, setDestinationTimeInfo] = useState<DestinationLocalTimeInfo | null>(null);
@@ -294,91 +254,50 @@ export default function TripDetailScreen() {
   const [selectedWeatherDate, setSelectedWeatherDate] = useState<string | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const tripScrollRef = useRef<ScrollView | null>(null);
-  const sectionOffsets = useRef<Partial<Record<TripSection, number>>>({});
-  const isNotificationProofTrip = isNotificationProofTripId(tripId);
-  const highlightedSegmentId = typeof segmentId === 'string' ? segmentId : null;
-
-  const summary = useMemo(
-    () => ({
-      documents: bundle.documents.length,
-      travellers: bundle.travellers.length,
-      packing: bundle.packingItems.length,
-      itinerary: bundle.itineraryEvents.length,
-    }),
-    [bundle.documents.length, bundle.itineraryEvents.length, bundle.packingItems.length, bundle.travellers.length]
-  );
-  const documentSummary = useMemo(
-    () => getTripDocumentWarningSummary(bundle.documents, bundle.travellers),
-    [bundle.documents, bundle.travellers]
-  );
-  const orderedTravelSegments = useMemo(
-    () =>
-      [...bundle.travelSegments].sort((left, right) => {
-        const leftOrder = left.travelDirection === 'outbound' ? 0 : left.travelDirection === 'return' ? 1 : 2;
-        const rightOrder = right.travelDirection === 'outbound' ? 0 : right.travelDirection === 'return' ? 1 : 2;
-        if (leftOrder !== rightOrder) {
-          return leftOrder - rightOrder;
-        }
-        return compareIsoDates(left.departureTime, right.departureTime);
-      }),
-    [bundle.travelSegments]
-  );
-  const primaryTransportType = useMemo(() => getPrimaryTransportType(bundle.travelSegments), [bundle.travelSegments]);
-  const primaryPassportCountryCode = useMemo(
-    () => bundle.documents.find((document) => document.documentType === 'passport')?.passportData?.countryCode ?? null,
-    [bundle.documents]
-  );
-  const visaAssessment = useMemo(
-    () => (trip ? getVisaRequirementAssessment(trip.destination, primaryPassportCountryCode) : null),
-    [primaryPassportCountryCode, trip]
-  );
-  const primaryTransportDisplay = useMemo(
-    () => (primaryTransportType ? getTransportDisplay(primaryTransportType) : null),
-    [primaryTransportType]
-  );
-  const plannedTransportReminders = useMemo(
-    () => createReminderContent(data, { now: new Date() }).filter((item) => item.transportSegmentId && item.activeTripId === tripId),
-    [data, tripId]
-  );
-  const transportReminderPreviewBySegment = useMemo(() => {
-    const preview = new Map<string, typeof plannedTransportReminders>();
-    for (const reminder of plannedTransportReminders) {
-      const targetSegmentId = reminder.transportSegmentId;
-      if (!targetSegmentId) {
-        continue;
-      }
-      const entries = preview.get(targetSegmentId) ?? [];
-      entries.push(reminder);
-      preview.set(targetSegmentId, entries);
-    }
-    return preview;
-  }, [plannedTransportReminders]);
-  const notificationProofSchedule = useMemo(
-    () =>
-      orderedTravelSegments.flatMap((segment) =>
-        (transportReminderPreviewBySegment.get(segment.id) ?? []).slice(0, 3).map((reminder) => ({
-          label: reminder.title,
-          at: formatDateTime(reminder.date.toISOString()),
-        }))
-      ),
-    [orderedTravelSegments, transportReminderPreviewBySegment]
-  );
-
+  const handledFocusRef = useRef<string | null>(null);
   useEffect(() => {
-    if (focus === 'travel' || focus === 'hotel' || focus === 'transfer') {
+    if (!trip) {
+      return;
+    }
+
+    const focusKey = typeof focus === 'string' ? `${focus}:${typeof segmentId === 'string' ? segmentId : ''}` : null;
+    if (focusKey && handledFocusRef.current !== focusKey) {
+      handledFocusRef.current = focusKey;
+
+      if (focus === 'travel') {
+        const selectedSegment =
+          typeof segmentId === 'string'
+            ? bundle.travelSegments.find((segment) => segment.id === segmentId)
+            : bundle.travelSegments[0];
+        openSegmentEditor(selectedSegment);
+        setActiveSection('overview');
+        return;
+      }
+
+      if (focus === 'hotel') {
+        openHotelEditor(bundle.hotelStays[0]);
+        setActiveSection('overview');
+        return;
+      }
+
+      if (focus === 'transfer') {
+        openTransferEditor();
+        setActiveSection('overview');
+        return;
+      }
+    }
+
+    if (focus === 'packing' || focus === 'itinerary') {
       setActiveSection(focus);
       return;
     }
-    setActiveSection('overview');
-  }, [focus]);
-
-  useEffect(() => {
-    if (visaAssessment?.tone === 'warning') {
-      setVisaModalVisible(true);
+    if (focus === 'travel' || focus === 'hotel' || focus === 'transfer') {
+      setActiveSection('overview');
+      return;
     }
-  }, [visaAssessment]);
+    setActiveSection('overview');
+  }, [bundle.hotelStays, bundle.travelSegments, focus, segmentId, trip]);
   const departureDays = trip ? daysUntil(trip.startDate) : null;
-  const remainingDays = trip ? daysLeft(trip.endDate) : null;
   const airportSetOffInfo = useMemo(
     () =>
       trip
@@ -464,35 +383,6 @@ export default function TripDetailScreen() {
   const currentTrip = trip;
   const selectedWeatherDay =
     destinationWeather?.days.find((day) => day.date === selectedWeatherDate) ?? destinationWeather?.days[0] ?? null;
-
-  function scrollToSection(section: TripSection, animated = true) {
-    const offset = sectionOffsets.current[section];
-    if (typeof offset !== 'number') {
-      return;
-    }
-
-    tripScrollRef.current?.scrollTo({
-      y: Math.max(offset - spacing.lg, 0),
-      animated,
-    });
-  }
-
-  function handleSectionLayout(section: TripSection) {
-    return (event: LayoutChangeEvent) => {
-      sectionOffsets.current[section] = event.nativeEvent.layout.y;
-
-      if (activeSection === section && (section === 'travel' || section === 'hotel' || section === 'transfer')) {
-        scrollToSection(section, false);
-      }
-    };
-  }
-
-  useEffect(() => {
-    if (activeSection === 'travel' || activeSection === 'hotel' || activeSection === 'transfer') {
-      const frame = requestAnimationFrame(() => scrollToSection(activeSection));
-      return () => cancelAnimationFrame(frame);
-    }
-  }, [activeSection]);
 
   function openTravellerEditor(current?: TravellerDraft) {
     setTravellerPhotoBaselineUri(current?.photoUri ?? null);
@@ -728,44 +618,6 @@ export default function TripDetailScreen() {
       }
       await saveTripInvite(inviteDraft);
       closeModal();
-    }
-  }
-
-  async function toggleReminder(kind: VisibleTripReminderKind) {
-    if (!(kind in reminderMeta)) {
-      return;
-    }
-
-    const base = reminderMeta[kind];
-    const targetKinds = [kind, ...(base.legacyKinds ?? [])];
-    const existing = bundle.reminderSettings.find((setting) => targetKinds.includes(setting.kind) && setting.tripId === tripId);
-    const exactSetting = bundle.reminderSettings.find((setting) => setting.kind === kind && setting.tripId === tripId);
-    const nextEnabled = !(existing?.enabled ?? false);
-
-    await saveReminderSetting(
-      exactSetting
-        ? { ...exactSetting, enabled: nextEnabled }
-        : {
-            tripId,
-            kind,
-            enabled: nextEnabled,
-            leadTimeDays: base.leadTimeDays,
-          }
-    );
-
-    if (base.legacyKinds?.length) {
-      await Promise.all(
-        base.legacyKinds.map((legacyKind) =>
-          saveReminderSetting(
-            bundle.reminderSettings.find((setting) => setting.kind === legacyKind && setting.tripId === tripId) ?? {
-              tripId,
-              kind: legacyKind,
-              enabled: false,
-              leadTimeDays: base.leadTimeDays,
-            }
-          )
-        )
-      );
     }
   }
 
@@ -1101,8 +953,19 @@ export default function TripDetailScreen() {
   return (
     <AppScreen
       scrollRef={tripScrollRef}
+      contentStyle={styles.tripContent}
       footer={
         <View style={styles.tripFooterNav}>
+          <Pressable
+            onPress={() => {
+              setActiveSection('overview');
+              tripScrollRef.current?.scrollTo({ y: 0, animated: true });
+            }}
+            style={[styles.tripFooterButton, activeSection === 'overview' ? styles.tripFooterButtonActive : null]}
+          >
+            <MaterialIcons name="travel-explore" size={22} color={colors.white} />
+            <Text style={styles.tripFooterLabel}>Overview</Text>
+          </Pressable>
           <Pressable
             onPress={() => {
               setActiveTrip(tripId);
@@ -1117,33 +980,23 @@ export default function TripDetailScreen() {
           <Pressable
             onPress={() => {
               setActiveTrip(tripId);
-              setActiveSection('vibes');
-              router.push({ pathname: '/trip/[tripId]/vibes', params: { tripId } });
+              setActiveSection('itinerary');
+              router.push('/itinerary');
             }}
-            style={[styles.tripFooterButton, activeSection === 'vibes' ? styles.tripFooterButtonActive : null]}
+            style={[styles.tripFooterButton, activeSection === 'itinerary' ? styles.tripFooterButtonActive : null]}
           >
-            <MaterialIcons name="explore" size={22} color={colors.white} />
-            <Text style={styles.tripFooterLabel}>Vibes</Text>
+            <MaterialIcons name="route" size={22} color={colors.white} />
+            <Text style={styles.tripFooterLabel}>Itinerary</Text>
           </Pressable>
           <Pressable
             onPress={() => {
-              setActiveSection('travel');
-              scrollToSection('travel');
+              setActiveSection('settings');
+              router.push('/settings');
             }}
-            style={[styles.tripFooterButton, activeSection === 'travel' ? styles.tripFooterButtonActive : null]}
+            style={[styles.tripFooterButton, activeSection === 'settings' ? styles.tripFooterButtonActive : null]}
           >
-            <MaterialIcons name={(primaryTransportDisplay?.cardIcon ?? 'flight') as any} size={22} color={colors.white} />
-            <Text style={styles.tripFooterLabel}>{primaryTransportDisplay?.shortLabel ?? 'Travel'}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setActiveSection('hotel');
-              scrollToSection('hotel');
-            }}
-            style={[styles.tripFooterButton, activeSection === 'hotel' ? styles.tripFooterButtonActive : null]}
-          >
-            <MaterialIcons name="hotel" size={22} color={colors.white} />
-            <Text style={styles.tripFooterLabel}>Hotel</Text>
+            <MaterialIcons name="settings" size={22} color={colors.white} />
+            <Text style={styles.tripFooterLabel}>Settings</Text>
           </Pressable>
         </View>
       }
@@ -1158,6 +1011,20 @@ export default function TripDetailScreen() {
           <Text style={styles.heroDestination}>{trip.destination.toUpperCase()}</Text>
           <Text style={styles.heroTitle}>{trip.name}</Text>
           <Text style={styles.heroDate}>{tripDateRange(trip.startDate, trip.endDate)}</Text>
+          <View style={styles.heroMetaRow}>
+            <View style={styles.heroMetaPill}>
+              <MaterialIcons name="event" size={14} color={colors.white} />
+              <Text style={styles.heroMetaText}>
+                {departureDays === null
+                  ? 'Trip dates unavailable'
+                  : departureDays > 0
+                    ? `${departureDays} day(s) until trip`
+                    : departureDays === 0
+                      ? 'Trip starts today'
+                      : 'Trip in progress'}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -1241,538 +1108,75 @@ export default function TripDetailScreen() {
         </AppCard>
       )}
 
-      <View style={styles.infoCardGrid}>
-        <View style={styles.infoCard}>
-          <View style={styles.infoCardHeader}>
-            <MaterialIcons name="public" size={16} color={colors.white} />
-            <Text style={styles.infoCardLabel}>Quick facts</Text>
+      <AppCard title="Quick info" variant="standard">
+        <View style={styles.quickFactList}>
+          <View style={styles.quickFactRow}>
+            <Text style={styles.quickFactLabel}>Language</Text>
+            <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.languageLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
           </View>
-          <View style={styles.quickFactList}>
-            <View style={styles.quickFactRow}>
-              <Text style={styles.quickFactLabel}>Language</Text>
-              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.languageLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
-            </View>
-            <View style={styles.quickFactRow}>
-              <Text style={styles.quickFactLabel}>Currency</Text>
-              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.currencyLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
-            </View>
-            <View style={styles.quickFactRow}>
-              <Text style={styles.quickFactLabel}>Plug</Text>
-              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.plugLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
-            </View>
-            <View style={styles.quickFactRow}>
-              <Text style={styles.quickFactLabel}>Emergency</Text>
-              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.emergencyLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
-            </View>
+          <View style={styles.quickFactRow}>
+            <Text style={styles.quickFactLabel}>Currency</Text>
+            <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.currencyLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
           </View>
-        </View>
-
-        <View style={styles.infoCard}>
-          <View style={styles.infoCardHeader}>
-            <MaterialIcons name="departure-board" size={16} color={colors.white} />
-            <Text style={styles.infoCardLabel}>Airport set-off time</Text>
+          <View style={styles.quickFactRow}>
+            <Text style={styles.quickFactLabel}>Plug</Text>
+            <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.plugLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
           </View>
-          <Text style={styles.infoCardValue}>{airportSetOffInfo.timeLabel}</Text>
-          <Text style={styles.infoCardMeta}>
-            {airportSetOffInfo.status === 'available' ? airportSetOffInfo.departureLabel : 'Departure details needed'}
-          </Text>
-          <Text style={styles.infoCardHint}>{airportSetOffInfo.helperLabel}</Text>
-        </View>
-      </View>
-
-      <AppCard>
-        <View style={styles.chipRow}>
-          <InfoChip
-            label={
-              trip.status === 'completed'
-                ? 'Completed trip'
-                : departureDays === null
-                  ? 'Departure date unavailable'
-                  : departureDays > 0
-                  ? `${departureDays} day(s) until departure`
-                  : 'Trip in progress'
-            }
-            tone={trip.status === 'completed' ? 'default' : 'blue'}
-          />
-          <InfoChip
-            label={remainingDays === null ? 'Trip dates unavailable' : remainingDays >= 0 ? `${remainingDays} day(s) left` : 'Trip ended'}
-            tone={remainingDays !== null && remainingDays > 0 ? 'gold' : 'default'}
-          />
-        </View>
-        <View style={styles.participantRow}>
-          {bundle.participants.slice(0, 5).map((participant) => (
-            <AvatarBadge key={participant.id} label={participant.displayName} color={participant.avatarColor} size={34} />
-          ))}
-          {bundle.participants.length ? (
-            <Text style={styles.notes}>{bundle.participants.length} participant(s) in this shared trip space</Text>
-          ) : null}
-        </View>
-        <Text style={styles.notes}>
-          {trip.notes || (trip.status === 'completed' ? 'This trip is complete and kept locally for reference.' : 'Add notes, reminders, and local context for the trip.')}
-        </Text>
-      </AppCard>
-
-      {visaAssessment ? (
-        <AppCard title={visaAssessment.tone === 'warning' ? 'Visa warning' : 'Visa check'}>
-          <Text style={styles.notes}>{visaAssessment.body}</Text>
-          <Text style={styles.notes}>Official source: {visaAssessment.officialSourceLabel}</Text>
-          <AppButton
-            label="Open official guidance"
-            tone={visaAssessment.tone === 'warning' ? 'primary' : 'secondary'}
-            onPress={() => {
-              void Linking.openURL(visaAssessment.officialUrl);
-            }}
-          />
-        </AppCard>
-      ) : null}
-
-      <AppCard title="Trip overview">
-        <View style={styles.metrics}>
-          <View style={styles.metric}>
-            <Text style={styles.metricValue}>{summary.travellers}</Text>
-            <Text style={styles.metricLabel}>Travellers</Text>
-          </View>
-          <View style={styles.metric}>
-            <Text style={styles.metricValue}>{summary.documents}</Text>
-            <Text style={styles.metricLabel}>Documents</Text>
-          </View>
-          <View style={styles.metric}>
-            <Text style={styles.metricValue}>{summary.packing}</Text>
-            <Text style={styles.metricLabel}>Packing</Text>
-          </View>
-          <View style={styles.metric}>
-            <Text style={styles.metricValue}>{summary.itinerary}</Text>
-            <Text style={styles.metricLabel}>Timeline</Text>
-          </View>
-        </View>
-      </AppCard>
-
-      {timeline.length ? (
-        <AppCard title="Upcoming timeline" subtitle="What matters next for this trip.">
-          {timeline.map((item) => (
-            <ListRow key={item.id} title={item.title} subtitle={`${formatDateTime(item.dateTime)} • ${item.subtitle}`} />
-          ))}
-        </AppCard>
-      ) : null}
-
-      {missingPrompts.length ? (
-        <AppCard title="Missing info prompts">
-          {missingPrompts.map((prompt) => (
-            <Text key={prompt} style={styles.notes}>
-              • {prompt}
+          <View style={styles.quickFactRow}>
+            <Text style={styles.quickFactLabel}>Timezone</Text>
+            <Text style={styles.quickFactValue}>
+              {destinationTimeInfo
+                ? `${destinationTimeInfo.offsetLabel}${destinationTimeInfo.relativeLabel ? ` • ${destinationTimeInfo.relativeLabel}` : ''}`
+                : insightsLoading
+                  ? 'Checking…'
+                  : 'Unavailable'}
             </Text>
-          ))}
-        </AppCard>
-      ) : null}
-
-      <AppCard title="Travellers" right={<AppButton label="Add" tone="secondary" onPress={() => openTravellerEditor()} />}>
-        {bundle.travellers.length ? (
-          bundle.travellers.map((traveller) => (
-            <View key={traveller.id} style={styles.travellerCard}>
-              <View style={styles.travellerHeader}>
-                <View style={styles.travellerIdentity}>
-                  <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} imageUri={traveller.photoUri} size={42} />
-                  <View style={styles.travellerCopy}>
-                    <Text style={styles.travellerName}>{traveller.fullName}</Text>
-                    <Text style={styles.notes}>
-                      {relationshipLabel(traveller.relationshipType)}
-                      {traveller.passportNationality ? ` • ${traveller.passportNationality}` : ''}
-                      {traveller.dateOfBirth ? ` • ${formatShortDate(traveller.dateOfBirth)}` : ''}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.iconRow}>
-                  <Pressable onPress={() => openTravellerEditor(traveller)}>
-                    <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                  </Pressable>
-                  <Pressable onPress={() => deleteRecord('travellers', traveller.id)}>
-                    <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                  </Pressable>
-                </View>
-              </View>
-              <View style={styles.chipRow}>
-                {traveller.passportNumber ? <InfoChip label={`Passport ${traveller.passportNumber.slice(-4)}`} tone="blue" /> : null}
-                {traveller.ghicNumber ? <InfoChip label={`GHIC ${traveller.ghicNumber.slice(-4)}`} tone="gold" /> : null}
-                {traveller.medicalNote ? <InfoChip label="Medical note" tone="coral" /> : null}
-              </View>
-              {traveller.notes ? <Text style={styles.notes}>{traveller.notes}</Text> : null}
-            </View>
-          ))
-        ) : (
-          <EmptyState
-            title="No travellers yet"
-            description="Add adults, children, infants, and other traveller profiles with badges, passport nationality, DOB, and notes."
-          />
-        )}
-      </AppCard>
-
-      <AppCard title="Documents" subtitle="Secure vault for passports, GHIC, insurance, tickets, and PDFs">
-        <ListRow
-          title={`${bundle.documents.length} document(s)`}
-          subtitle="Sensitive previews stay hidden until the vault is unlocked."
-        />
-        {(documentSummary.expiringCount || documentSummary.expiredCount || documentSummary.missingExpiryCount || documentSummary.missingInsuranceTravellers.length) ? (
-          <>
-            <View style={styles.chipRow}>
-              {documentSummary.expiringCount ? <InfoChip label={`${documentSummary.expiringCount} document(s) expiring soon`} tone="gold" /> : null}
-              {documentSummary.expiredCount ? <InfoChip label={`${documentSummary.expiredCount} expired`} tone="danger" /> : null}
-              {documentSummary.missingExpiryCount ? <InfoChip label={`${documentSummary.missingExpiryCount} need expiry dates`} tone="coral" /> : null}
-            </View>
-            {documentSummary.warningItems.slice(0, 3).map((item) => {
-              const noun = documentTypeLabels[item.document.documentType as keyof typeof documentTypeLabels] ?? 'document';
-              return (
-                <Text key={item.document.id} style={styles.notes}>
-                  {item.ownerLabel} • {noun} • {getDocumentExpiryRelativeLabel(item.document.expiryDate)}
-                </Text>
-              );
-            })}
-            {documentSummary.missingInsuranceTravellers.slice(0, 2).map((traveller) => (
-              <Text key={traveller.id} style={styles.notes}>
-                {traveller.fullName} has no insurance document.
-              </Text>
-            ))}
-          </>
-        ) : null}
-        <AppButton
-          label="Open vault"
-          onPress={() => {
-            setActiveTrip(tripId);
-            router.push('/vault');
-          }}
-        />
-      </AppCard>
-
-      <View onLayout={handleSectionLayout('travel')}>
-      <AppCard
-        title="Travel plans"
-        subtitle="Add flights, trains, driving legs, and taxi hops with the right icon, timing, and booking context."
-        right={<AppButton label="Add" tone="secondary" onPress={() => openSegmentEditor()} />}
-        style={activeSection === 'travel' ? styles.highlightedCard : null}
-      >
-        {orderedTravelSegments.length ? (
-          orderedTravelSegments.map((segment) => {
-            const providerBrand = findTransportProvider(segment.providerCode, segment.transportType);
-            const transportDisplay = getTransportDisplay(segment.transportType);
-            const segmentReminderPreview = transportReminderPreviewBySegment.get(segment.id) ?? [];
-            const isHighlightedSegment = highlightedSegmentId === segment.id;
-            return (
-              <View
-                key={segment.id}
-                style={[styles.transportRow, isHighlightedSegment ? styles.highlightedTransportRow : null]}
-              >
-                <ProviderLogoBadge
-                  name={segment.airline || transportDisplay.shortLabel}
-                  code={segment.providerCode}
-                  logoXml={providerBrand?.logoXml ?? null}
-                  logoUrl={segment.providerLogoUrl}
-                  accentColor={providerBrand?.accentColor ?? null}
-                />
-                <View style={styles.transportCopy}>
-                  <View style={styles.transportHeader}>
-                    <Text style={styles.transportTitle}>
-                      {transportDisplay.label} · {segmentDirectionLabel(segment.travelDirection, segment.transportType)}
-                    </Text>
-                    <InfoChip label={transportDisplay.shortLabel} tone="blue" />
-                  </View>
-                  <Text style={styles.transportMeta}>
-                    {[segment.airline, segment.flightNumber].filter(Boolean).join(' ')}
-                  </Text>
-                  <Text style={styles.transportMeta}>
-                    {formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} →{' '}
-                    {formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}
-                  </Text>
-                  <View style={styles.transportTimingRow}>
-                    <MaterialIcons
-                      name={transportDisplay.departureIcon as any}
-                      size={14}
-                      color={colors.primaryBlueDark}
-                    />
-                    <Text style={styles.transportMeta}>Departure {formatDateTime(segment.departureTime)}</Text>
-                  </View>
-                  <View style={styles.transportTimingRow}>
-                    <MaterialIcons
-                      name={transportDisplay.arrivalIcon as any}
-                      size={14}
-                      color={colors.primaryBlueDark}
-                    />
-                    <Text style={styles.transportMeta}>Arrival {formatDateTime(segment.arrivalTime)}</Text>
-                  </View>
-                  <Text style={styles.transportAlertSummary}>
-                    {segment.notificationSummary || `Lock screen alerts ${describeTransportReminderMatrix(segment.transportType)}`}
-                  </Text>
-                  {segmentReminderPreview.length ? (
-                    <View style={styles.transportReminderList}>
-                      {segmentReminderPreview.slice(0, 3).map((reminder) => (
-                        <Text key={reminder.key} style={styles.transportReminderText}>
-                          Next: {reminder.title} • {formatDateTime(reminder.date.toISOString())}
-                        </Text>
-                      ))}
-                    </View>
-                  ) : (
-                    <Text style={styles.transportReminderText}>No future alerts are scheduled for this segment right now.</Text>
-                  )}
-                </View>
-                <View style={styles.iconRow}>
-                  <Pressable onPress={() => openSegmentEditor(segment)}>
-                    <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                  </Pressable>
-                  <Pressable onPress={() => deleteRecord('travel_segments', segment.id)}>
-                    <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                  </Pressable>
-                </View>
-              </View>
-            );
-          })
-        ) : (
-          <EmptyState
-            title="No transport saved"
-            description="Add the main way you are travelling so Pineapple can show the right icon, timing, and direction across the trip."
-          />
-        )}
-      </AppCard>
-      </View>
-
-      <View onLayout={handleSectionLayout('hotel')}>
-      <AppCard
-        title="Hotel info"
-        subtitle="Search or enter the stay address, then keep the details and image together."
-        right={<AppButton label="Add" tone="secondary" onPress={() => openHotelEditor()} />}
-        style={activeSection === 'hotel' ? styles.highlightedCard : null}
-      >
-        {bundle.hotelStays.length ? (
-          bundle.hotelStays.map((hotel) => (
-            <View key={hotel.id} style={styles.hotelRow}>
-              <View style={styles.hotelThumb}>
-                {hotel.hotelImageLocalPath || hotel.hotelImageRemoteUrl ? (
-                  <ManagedFileImage uri={hotel.hotelImageLocalPath ?? hotel.hotelImageRemoteUrl} style={styles.hotelThumbImage} />
-                ) : null}
-                <View style={styles.hotelThumbOverlay}>
-                  <MaterialIcons name="hotel" size={18} color={colors.white} />
-                </View>
-              </View>
-              <View style={styles.hotelCopy}>
-                <Text style={styles.hotelTitle}>{hotel.hotelName}</Text>
-                <Text style={styles.hotelSubtitle}>{hotel.address}</Text>
-                <Text style={styles.hotelMeta}>
-                  {formatShortDate(hotel.checkIn)} to {formatShortDate(hotel.checkOut)}
-                </Text>
-                {hotel.hotelImageStatus === 'loading' ? <Text style={styles.hotelStatus}>Finding a free hotel image</Text> : null}
-              </View>
-              <View style={styles.iconRow}>
-                <Pressable onPress={() => openHotelEditor(hotel)}>
-                  <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-                </Pressable>
-                <Pressable onPress={() => deleteRecord('hotel_stays', hotel.id)}>
-                  <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                </Pressable>
-              </View>
-            </View>
-          ))
-        ) : (
-          <EmptyState
-            title="No hotel saved"
-            description="Search by hotel name or address, then review and save the stay details."
-          />
-        )}
-      </AppCard>
-      </View>
-
-      <View onLayout={handleSectionLayout('transfer')}>
-      <AppCard
-        title="Transfers and pickup"
-        subtitle="Airport pickup, rail transfer, local ride, or handoff details."
-        right={<AppButton label={trip.transferProvider || trip.transferLocation ? 'Edit' : 'Add'} tone="secondary" onPress={openTransferEditor} />}
-        style={activeSection === 'transfer' ? styles.highlightedCard : null}
-      >
-        {trip.transferProvider || trip.transferLocation || trip.transferNotes ? (
-          <View style={styles.transferCard}>
-            <View style={styles.transferRow}>
-              <InfoChip label={trip.transferMethod || 'Transfer'} tone="blue" />
-              {trip.transferTime ? <InfoChip label={formatDateTime(trip.transferTime)} tone="gold" /> : null}
-            </View>
-            <Text style={styles.transportTitle}>{trip.transferProvider || 'Transfer provider not set'}</Text>
-            <Text style={styles.transportMeta}>{trip.transferLocation || 'Pickup location not set'}</Text>
-            {trip.transferNotes ? <Text style={styles.notes}>{trip.transferNotes}</Text> : null}
-            <View style={styles.transferActions}>
-              <Pressable onPress={openTransferEditor}>
-                <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
-              </Pressable>
-              <Pressable
-                onPress={() =>
-                  void saveTrip({
-                    ...trip,
-                    transferSummary: '',
-                    transferProvider: '',
-                    transferMethod: '',
-                    transferLocation: '',
-                    transferTime: null,
-                    airportTravelDurationMinutes: null,
-                    transferNotes: '',
-                  })
-                }
-              >
-                <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-              </Pressable>
-            </View>
           </View>
-        ) : (
-          <EmptyState
-            title="No transfer details saved"
-            description="Add pickup company, time, location, method, and notes so they are easy to reach from the trip card."
-          />
-        )}
-      </AppCard>
-      </View>
-
-      <AppCard title="Packing" subtitle="Category-based list with traveller assignment, templates, and priority flags." style={activeSection === 'packing' ? styles.highlightedCard : null}>
-        <ListRow title={`${bundle.packingItems.length} item(s)`} subtitle="Track packed vs unpacked and per-traveller progress." />
-        <AppButton
-          label="Open packing"
-          onPress={() => {
-            setActiveTrip(tripId);
-            router.push('/packing');
-          }}
-        />
+        </View>
       </AppCard>
 
-      <AppCard title="Itinerary" subtitle="Chronological timeline for excursions, meals, reminders, and tickets." style={activeSection === 'itinerary' ? styles.highlightedCard : null}>
-        <ListRow title={`${bundle.itineraryEvents.length} itinerary item(s)`} subtitle="Everything in one timeline view." />
-        <AppButton
-          label="Open itinerary"
-          onPress={() => {
-            setActiveTrip(tripId);
-            router.push('/itinerary');
-          }}
-        />
+      <AppCard title="Set-off time" subtitle="Recommended departure timing for the main airport leg." variant="standard">
+        <Text style={styles.standardCardHeadline}>{airportSetOffInfo.timeLabel}</Text>
+        <Text style={styles.standardCardMeta}>
+          {airportSetOffInfo.status === 'available' ? airportSetOffInfo.departureLabel : 'Departure details needed'}
+        </Text>
+        <Text style={styles.notes}>{airportSetOffInfo.helperLabel}</Text>
       </AppCard>
 
-      <AppCard title="Emergency" right={<AppButton label="Edit" tone="secondary" onPress={openEmergencyEditor} />}>
-        {bundle.emergencyInfo ? (
-          <>
-            <Text style={styles.notes}>Insurer: {bundle.emergencyInfo.insurerEmergencyNumber || 'Not set'}</Text>
-            <Text style={styles.notes}>Hotel: {bundle.emergencyInfo.hotelPhone || 'Not set'}</Text>
-            <Text style={styles.notes}>Airline: {bundle.emergencyInfo.airlinePhone || 'Not set'}</Text>
-            <Text style={styles.notes}>{bundle.emergencyInfo.localEmergencyNote || 'Add local emergency note.'}</Text>
-          </>
-        ) : (
-          <EmptyState
-            title="No emergency reference yet"
-            description="Add insurer, hotel and airline phone numbers, medical notes, local emergency advice, and embassy details."
-          />
-        )}
-      </AppCard>
-
-      <AppCard title="Travel Mode" subtitle="Family overview plus traveller-specific details with quick copy actions.">
-        <AppButton label="Open Travel Mode" onPress={() => router.push({ pathname: '/trip/[tripId]/travel-mode', params: { tripId } })} />
-      </AppCard>
-
-      <AppCard title="Travel pack PDF" subtitle="Export a clean branded trip summary without full document images.">
-        <AppButton label="Export trip PDF" onPress={() => setModalKind('export')} />
-      </AppCard>
-
-      {isNotificationProofTrip ? (
-        <AppCard
-          title="Notification proof build"
-          subtitle={`Temporary seeded trip for real Android lock-screen verification in Pineapple ${NOTIFICATION_PROOF_BUILD_VERSION}.`}
-        >
-          <Text style={styles.notes}>
-            Turn on `Enable local reminders`, keep this trip’s reminders enabled, then lock the phone. Pineapple compresses the normal reminder windows
-            into a short local test run so you can verify multiple notifications in minutes on the installed APK.
-          </Text>
-          {notificationProofSchedule.length ? (
-            <View style={styles.proofScheduleList}>
-              {notificationProofSchedule.slice(0, 8).map((entry) => (
-                <Text key={`${entry.label}:${entry.at}`} style={styles.notes}>
-                  • {entry.label} at {entry.at}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-          <Text style={styles.notes}>This seeded trip is temporary and should be removed again after notification proofing is complete.</Text>
-        </AppCard>
-      ) : null}
-
-      <AppCard
-        title="Trip reminders"
-        subtitle="Transport alerts appear on the lock screen when device notifications are allowed. Edit any segment and Pineapple replaces its old alerts with the new schedule."
+      <Pressable
+        onPress={() => {
+          setActiveSection('settings');
+          router.push('/settings');
+        }}
+        style={styles.utilityLauncher}
       >
-        {Object.entries(reminderMeta).map(([kind, meta]) => {
-          const enabled =
-            bundle.reminderSettings.find(
-              (setting) => setting.tripId === tripId && [kind, ...(meta.legacyKinds ?? [])].includes(setting.kind)
-            )?.enabled ?? false;
-          return (
-            <ListRow
-              key={kind}
-              title={meta.label}
-              subtitle={meta.subtitle ?? formatReminderLeadTimeLabel(meta.leadTimeDays)}
-              right={
-                <AppButton
-                  label={enabled ? 'On' : 'Off'}
-                  tone={enabled ? 'primary' : 'secondary'}
-                  onPress={() => toggleReminder(kind as VisibleTripReminderKind)}
-                />
-              }
-            />
-          );
-        })}
-      </AppCard>
+        <AppCard
+          title="Trip reminders"
+          subtitle="Open reminder settings to review countdown timing and device alerts."
+          variant="compact"
+          right={<MaterialIcons name="arrow-forward-ios" size={16} color={colors.primaryBlueDark} />}
+          style={activeSection === 'settings' ? styles.highlightedCard : null}
+        />
+      </Pressable>
 
-      <AppCard title="Sharing and participants" subtitle="Share locally with an encrypted Pineapple QR transfer or encrypted trip file.">
-        <View style={styles.chipRow}>
-          <InfoChip label={`Share code ${bundle.sharedTripState?.shareCode ?? 'Pending'}`} tone="blue" />
-          <InfoChip
-            label={`Sync ${bundle.sharedTripState?.syncStatus.replaceAll('_', ' ') ?? 'local only'}`}
-            tone={bundle.sharedTripState?.syncStatus === 'conflict' ? 'coral' : 'gold'}
-          />
-        </View>
-        <View style={styles.participantList}>
-          {bundle.participants.map((participant) => (
-            <View key={participant.id} style={styles.participantItem}>
-              <View style={styles.travellerIdentity}>
-                <AvatarBadge label={participant.displayName} color={participant.avatarColor} size={38} />
-                <View style={styles.travellerCopy}>
-                  <Text style={styles.travellerName}>{participant.displayName}</Text>
-                  <Text style={styles.notes}>
-                    {participant.role}
-                    {participant.email ? ` • ${participant.email}` : ''}
-                  </Text>
-                </View>
-              </View>
-              {!participant.isLocalProfile ? (
-                <Pressable onPress={() => deleteRecord('trip_participants', participant.id)}>
-                  <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-                </Pressable>
-              ) : null}
-            </View>
-          ))}
-          {bundle.invites.map((invite) => (
-            <View key={invite.id} style={styles.participantItem}>
-              <View style={styles.travellerCopy}>
-                <Text style={styles.travellerName}>{invite.email || 'Pending invite'}</Text>
-                <Text style={styles.notes}>
-                  {invite.role} • {invite.status} • code {invite.inviteCode}
-                </Text>
-              </View>
-              <Pressable onPress={() => deleteRecord('trip_invites', invite.id)}>
-                <MaterialIcons name="delete-outline" size={18} color={colors.danger} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
-        <View style={styles.buttonWrap}>
-          <AppButton label="Invite by email / code" tone="secondary" onPress={openInviteEditor} />
-          <AppButton label="Show encrypted transfer QR" tone="secondary" onPress={() => void openTransferQr()} />
-          <AppButton label="Share encrypted file" onPress={handleExportShare} />
-          <AppButton label="Import update" tone="secondary" onPress={handleImportShare} />
-        </View>
-        <Text style={styles.helperText}>
-          Scan the transfer QR with Pineapple installed on the other device, then enter the transfer code there. If the encrypted trip is too large for QR, use the encrypted file share flow instead.
-        </Text>
-        <Text style={styles.helperText}>
-          Shared-trip transfers are encrypted with a one-time transfer code, integrity-checked before import, and kept local to the devices you choose to use. Pineapple still does not offer cloud sync.
-        </Text>
-        {bundle.conflicts.length ? (
+      <Pressable
+        onPress={() => {
+          setActiveSection('settings');
+          router.push('/settings');
+        }}
+        style={styles.utilityLauncher}
+      >
+        <AppCard
+          title="Transport alerts"
+          subtitle="Manage lock-screen transport alerts from Settings instead of inside this trip page."
+          variant="compact"
+          right={<MaterialIcons name="arrow-forward-ios" size={16} color={colors.primaryBlueDark} />}
+          style={activeSection === 'settings' ? styles.highlightedCard : null}
+        />
+      </Pressable>
+
+      {bundle.conflicts.length ? (
+        <AppCard title="Sync conflicts" subtitle="Review encrypted incoming changes before applying them.">
           <View style={styles.conflictList}>
             {bundle.conflicts
               .filter((conflict) => conflict.status === 'open')
@@ -1795,26 +1199,8 @@ export default function TripDetailScreen() {
                 </View>
               ))}
           </View>
-        ) : null}
-      </AppCard>
-
-      <AppModal
-        visible={visaModalVisible}
-        title={visaAssessment?.title ?? 'Visa check'}
-        onClose={() => setVisaModalVisible(false)}
-      >
-        <Text style={styles.notes}>{visaAssessment?.body}</Text>
-        <Text style={styles.notes}>Official source: {visaAssessment?.officialSourceLabel ?? 'Official immigration guidance'}</Text>
-        <AppButton
-          label="Open official guidance"
-          onPress={() => {
-            if (visaAssessment?.officialUrl) {
-              void Linking.openURL(visaAssessment.officialUrl);
-            }
-          }}
-        />
-        <AppButton label="Close" tone="secondary" onPress={() => setVisaModalVisible(false)} />
-      </AppModal>
+        </AppCard>
+      ) : null}
 
       <AppModal
         visible={modalKind === 'traveller'}
@@ -2250,6 +1636,9 @@ export default function TripDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  tripContent: {
+    gap: 14,
+  },
   tripFooterNav: {
     flexDirection: 'row',
     gap: spacing.xs,
@@ -2314,6 +1703,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  heroMetaRow: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  heroMetaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  heroMetaText: {
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    lineHeight: 16,
+  },
   infoCardGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2358,7 +1768,7 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   quickFactList: {
-    gap: 5,
+    gap: 10,
     marginTop: 2,
   },
   quickFactRow: {
@@ -2368,16 +1778,28 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   quickFactLabel: {
-    color: 'rgba(255,255,255,0.78)',
+    color: colors.textMuted,
     fontFamily: 'Inter_500Medium',
-    fontSize: 11,
+    fontSize: 13,
   },
   quickFactValue: {
     flexShrink: 1,
-    color: colors.white,
+    color: colors.nightNavy,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
+    fontSize: 13,
     textAlign: 'right',
+  },
+  standardCardHeadline: {
+    color: colors.nightNavy,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 24,
+    lineHeight: 30,
+  },
+  standardCardMeta: {
+    color: colors.primaryBlueText,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    lineHeight: 18,
   },
   notes: {
     color: colors.textMuted,
@@ -2418,6 +1840,9 @@ const styles = StyleSheet.create({
   highlightedCard: {
     borderColor: '#9FC6FF',
     shadowColor: 'rgba(13,110,253,0.16)',
+  },
+  utilityLauncher: {
+    width: '100%',
   },
   travellerCard: {
     gap: spacing.sm,
@@ -2508,13 +1933,14 @@ const styles = StyleSheet.create({
   },
   weatherCard: {
     overflow: 'hidden',
-    borderRadius: 25,
+    minHeight: 112,
+    borderRadius: 20,
     backgroundColor: '#D7D3D0',
-    shadowColor: 'rgba(0,0,0,0.15)',
-    shadowOffset: { width: 2, height: 3 },
+    shadowColor: 'rgba(9, 41, 69, 0.14)',
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowRadius: 22,
+    elevation: 3,
   },
   weatherHeroSection: {
     position: 'relative',

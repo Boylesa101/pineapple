@@ -186,45 +186,40 @@ function HomeDashboard({ onNavigate }: { onNavigate: (slug: string) => void }) {
           </div>
         </motion.button>
 
-        <motion.div
-          className={styles.gridTwo}
-          initial="hidden"
-          animate="visible"
-          variants={{
-            hidden: {},
-            visible: { transition: { staggerChildren: 0.06, delayChildren: 0.16 } },
-          }}
+        <motion.button
+          className={styles.sectionCard}
+          style={{ border: 0, color: 'inherit', textAlign: 'left' }}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.32, delay: 0.16 }}
+          onClick={() => onNavigate('weather-detail-page')}
         >
-          <motion.button
-            className={styles.sectionCard}
-            style={{ border: 0, color: 'inherit', textAlign: 'left' }}
-            variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
-            onClick={() => onNavigate('weather-detail-page')}
-          >
-            <div className={styles.cardTitle}>Weather Snapshot</div>
-            <div className={styles.cardMetric}>{trip.weather.temperature}</div>
-            <div>{trip.weather.city}</div>
-            <div className={styles.subtleText}>
-              {trip.weather.condition} · {trip.weather.highLow}
-            </div>
-          </motion.button>
-          <motion.button
-            className={styles.sectionCard}
-            style={{ border: 0, color: 'inherit', textAlign: 'left' }}
-            variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
-            onClick={() => onNavigate('quick-facts-page')}
-          >
-            <div className={styles.cardTitle}>Quick Facts</div>
-            <div className={styles.factsGrid}>
-              {trip.quickFacts.map((fact) => (
-                <div key={fact.label} className={styles.factItem}>
-                  <span className={styles.factLabel}>{fact.label}</span>
-                  <strong>{fact.value}</strong>
-                </div>
-              ))}
-            </div>
-          </motion.button>
-        </motion.div>
+          <div className={styles.cardTitle}>Weather Snapshot</div>
+          <div className={styles.cardMetric}>{trip.weather.temperature}</div>
+          <div>{trip.weather.city}</div>
+          <div className={styles.subtleText}>
+            {trip.weather.condition} · {trip.weather.highLow}
+          </div>
+        </motion.button>
+
+        <motion.button
+          className={styles.sectionCard}
+          style={{ border: 0, color: 'inherit', textAlign: 'left' }}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.32, delay: 0.2 }}
+          onClick={() => onNavigate('quick-facts-page')}
+        >
+          <div className={styles.cardTitle}>Quick Facts</div>
+          <div className={styles.factsGrid}>
+            {trip.quickFacts.map((fact) => (
+              <div key={fact.label} className={styles.factItem}>
+                <span className={styles.factLabel}>{fact.label}</span>
+                <strong>{fact.value}</strong>
+              </div>
+            ))}
+          </div>
+        </motion.button>
 
         <motion.button
           className={styles.sectionCard}
@@ -271,6 +266,96 @@ function HomeDashboard({ onNavigate }: { onNavigate: (slug: string) => void }) {
         </motion.div>
       </div>
       <BottomNav activeSlug="home-dashboard" onNavigate={onNavigate} />
+    </>
+  )
+}
+
+function TripOverviewScreen({ onNavigate }: { onNavigate: (slug: string) => void }) {
+  const trip = mockTrips[0]
+
+  return (
+    <>
+      <StatusBar />
+      <div className={styles.content}>
+        <Header title="Rome Escape" onBack={() => onNavigate('home-dashboard')} actionIcon="settings" onAction={() => onNavigate('settings-home')} />
+
+        <button
+          className={styles.heroCard}
+          onClick={() => onNavigate('trip-summary-card-view')}
+          style={{ border: 0, color: 'inherit', textAlign: 'left' }}
+        >
+          <div className={styles.heroEyebrow}>
+            {icon('travel')}
+            Active trip
+          </div>
+          <h2 className={styles.heroTitle}>{trip.name}</h2>
+          <div className={styles.heroSubtitle}>{trip.destination}</div>
+          <div className={styles.heroMeta}>
+            <div>{trip.travelWindow}</div>
+            <div>{trip.countdown}</div>
+          </div>
+        </button>
+
+        <button
+          className={styles.sectionCard}
+          style={{ border: 0, color: 'inherit', textAlign: 'left' }}
+          onClick={() => onNavigate('weather-detail-page')}
+        >
+          <div className={styles.cardTitle}>Weather Card</div>
+          <div className={styles.cardMetric}>{trip.weather.temperature}</div>
+          <div>{trip.weather.city}</div>
+          <div className={styles.subtleText}>
+            {trip.weather.condition} · {trip.weather.highLow}
+          </div>
+        </button>
+
+        <button
+          className={styles.sectionCard}
+          style={{ border: 0, color: 'inherit', textAlign: 'left' }}
+          onClick={() => onNavigate('quick-facts-page')}
+        >
+          <div className={styles.cardTitle}>Quick Info Card</div>
+          <div className={styles.factsGrid}>
+            {trip.quickFacts.map((fact) => (
+              <div key={fact.label} className={styles.factItem}>
+                <span className={styles.factLabel}>{fact.label}</span>
+                <strong>{fact.value}</strong>
+              </div>
+            ))}
+          </div>
+        </button>
+
+        <button
+          className={styles.sectionCard}
+          style={{ border: 0, color: 'inherit', textAlign: 'left' }}
+          onClick={() => onNavigate('set-off-time-page')}
+        >
+          <div className={styles.cardTitle}>Set-Off Time Card</div>
+          <div className={styles.cardMetric} style={{ fontSize: '1.45rem' }}>
+            Leave for airport at 14:10
+          </div>
+          <div className={styles.subtleText}>Recommended departure in 3h 25m with Heathrow buffer included.</div>
+        </button>
+
+        <button
+          className={styles.compactLauncherCard}
+          style={{ border: 0, color: 'inherit', textAlign: 'left' }}
+          onClick={() => onNavigate('settings-home')}
+        >
+          <div className={styles.cardTitle}>Trip reminders</div>
+          <div className={styles.subtleText}>Compact launcher card to Settings.</div>
+        </button>
+
+        <button
+          className={styles.compactLauncherCard}
+          style={{ border: 0, color: 'inherit', textAlign: 'left' }}
+          onClick={() => onNavigate('notification-settings-page')}
+        >
+          <div className={styles.cardTitle}>Transport alerts</div>
+          <div className={styles.subtleText}>Compact launcher card to Settings.</div>
+        </button>
+      </div>
+      <BottomNav activeSlug="trip-list-page" onNavigate={onNavigate} />
     </>
   )
 }
@@ -494,20 +579,7 @@ export function ScreenRenderer({ page, onNavigate }: Props) {
           </>
         )
       case 'trip-overview':
-        return (
-          <>
-            <StatusBar />
-            <div className={styles.content}>
-              <Header title="Rome Escape" onBack={() => onNavigate('home-dashboard')} actionIcon="share" onAction={() => onNavigate('trip-transfer-page')} />
-              <section className={styles.card}>
-                <div className={styles.cardTitle}>Trip overview</div>
-                <p className={styles.subtleText}>Your central trip hub for timeline, stay, documents, and traveller status.</p>
-              </section>
-              <ActionList actions={actions.trip} onNavigate={onNavigate} />
-            </div>
-            <BottomNav activeSlug="trip-list-page" onNavigate={onNavigate} />
-          </>
-        )
+        return <TripOverviewScreen onNavigate={onNavigate} />
       case 'vault':
         return (
           <>

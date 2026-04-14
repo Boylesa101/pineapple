@@ -18,7 +18,7 @@ export const legalConfig = {
   tagline: 'Your travel essentials in one calm place — even offline.',
   supportEmail: 'studiopixel101@gmail.com',
   privacyEmail: 'studiopixel101@gmail.com',
-  currentVersion: '2.2.8',
+  currentVersion: '2.2.9',
   releaseLabel: 'Repo review pass',
   futurePlayStoreUrl: '#',
   developerName: 'Pineapple App',

@@ -62,7 +62,7 @@ GUI lab version text lives in:
 
 Current GUI review version:
 
-- `v1.0`
+- `v1.1`
 
 Package version is also set in:
 
@@ -111,6 +111,16 @@ Mock screen rendering:
 - `src/components/MockScreens/ScreenRenderer.module.css`
 
 Page 01 Home Dashboard is the most complete screen and should be the reference when refining the broader GUI system.
+
+## Trip card standard
+
+The GUI lab now records Pineapple's default secondary-card rule directly in `src/components/MockScreens/ScreenRenderer.module.css`:
+
+- standard content cards: full width, `min-height: 112px`, `border-radius: 20px`, `padding: 16px 18px`
+- compact launcher cards: full width, `min-height: 88px`, `border-radius: 20px`, `padding: 16px`
+- default vertical rhythm between stacked cards: `14px`
+
+Use the hero card separately for the master trip card. The Trip Overview mock and the flagship Home Dashboard both follow this sizing system.
 
 ## Cloudflare Pages deployment
 
