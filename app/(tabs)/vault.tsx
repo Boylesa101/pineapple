@@ -1530,7 +1530,7 @@ export default function VaultScreen() {
   function openFlightTicketArea() {
     if (selectedTripId) {
       setActiveTrip(selectedTripId);
-      router.push({ pathname: '/trip/[tripId]', params: { tripId: selectedTripId, focus: 'travel' } });
+      router.push({ pathname: '/trip/[tripId]/flights', params: { tripId: selectedTripId } });
       return;
     }
     router.push('/flight-tickets');
@@ -1654,7 +1654,7 @@ export default function VaultScreen() {
             </AppCard>
           ))}
 
-          <AppCard title="Flights" subtitle="Boarding and flight movement details for this trip.">
+          <AppCard title="Flights" subtitle="Airline-branded flight cards and boarding-pass views for this trip.">
             {orderedVaultSections.flights.length ? (
               orderedVaultSections.flights.map((segment) =>
                 renderTravelVaultCard({
@@ -1663,11 +1663,11 @@ export default function VaultScreen() {
                   title: [segment.airline, segment.flightNumber].filter(Boolean).join(' ') || 'Flight',
                   subtitle: `${formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} → ${formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}`,
                   description: formatDateTime(segment.departureTime),
-                  onPress: () => router.push({ pathname: '/trip/[tripId]', params: { tripId: segment.tripId, focus: 'travel' } }),
+                  onPress: () => router.push({ pathname: '/trip/[tripId]/flight/[segmentId]', params: { tripId: segment.tripId, segmentId: segment.id } }),
                 })
               )
             ) : (
-              <EmptyState title="No flights yet" description="Saved outbound and return flights will appear here in a cleaner travel-card style." />
+              <EmptyState title="No flights yet" description="Saved outbound and return flights will appear here once they are added to the trip." />
             )}
           </AppCard>
 
@@ -2227,6 +2227,140 @@ export default function VaultScreen() {
                   }
                   multiline
                 />
+                {draft.documentType === 'boarding_pass' ? (
+                  <>
+                    <AppTextField
+                      label="Passenger"
+                      value={draft.formalDocumentData.travellerName ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, travellerName: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Carrier code"
+                      value={draft.formalDocumentData.carrierCode ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, carrierCode: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Flight number"
+                      value={draft.formalDocumentData.flightNumber ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, flightNumber: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Departure airport code"
+                      value={draft.formalDocumentData.departureAirportCode ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData
+                            ? { ...current, formalDocumentData: { ...current.formalDocumentData, departureAirportCode: value } }
+                            : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Arrival airport code"
+                      value={draft.formalDocumentData.arrivalAirportCode ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData
+                            ? { ...current, formalDocumentData: { ...current.formalDocumentData, arrivalAirportCode: value } }
+                            : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Seat"
+                      value={draft.formalDocumentData.seat ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, seat: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Sequence"
+                      value={draft.formalDocumentData.sequence ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, sequence: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Boarding info"
+                      value={draft.formalDocumentData.boardingInfo ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, boardingInfo: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Gate close time"
+                      value={draft.formalDocumentData.gateCloseTime ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, gateCloseTime: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Fare label"
+                      value={draft.formalDocumentData.fare ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, fare: value } } : current
+                        )
+                      }
+                    />
+                    <View style={styles.field}>
+                      <Text style={styles.label}>Barcode format</Text>
+                      <ChoiceChips<string>
+                        value={draft.formalDocumentData.barcodeFormat ?? 'qr'}
+                        onChange={(value) =>
+                          setDraft((current) =>
+                            current?.formalDocumentData
+                              ? {
+                                  ...current,
+                                  formalDocumentData: {
+                                    ...current.formalDocumentData,
+                                    barcodeFormat: value as NonNullable<typeof current.formalDocumentData.barcodeFormat>,
+                                  },
+                                }
+                              : current
+                          )
+                        }
+                        options={[
+                          { label: 'QR', value: 'qr' },
+                          { label: 'Aztec', value: 'aztec' },
+                          { label: 'PDF417', value: 'pdf417' },
+                          { label: 'Code 128', value: 'code128' },
+                          { label: 'Data Matrix', value: 'data_matrix' },
+                        ]}
+                      />
+                    </View>
+                    <AppTextField
+                      label="Barcode payload"
+                      value={draft.formalDocumentData.barcodePayload ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, barcodePayload: value } } : current
+                        )
+                      }
+                      multiline
+                    />
+                  </>
+                ) : null}
                 {draft.documentType === 'rail_ticket' ? (
                   <>
                     <AppTextField

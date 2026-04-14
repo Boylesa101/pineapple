@@ -108,7 +108,7 @@ export default function HomeScreen() {
             onOpenTrip={(trip) => openTripById(trip.id)}
             onOpenFlights={(trip) => {
               setActiveTrip(trip.id);
-              router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'travel' } });
+              router.push({ pathname: '/trip/[tripId]/flights', params: { tripId: trip.id } });
             }}
             onOpenHotel={(trip) => {
               setActiveTrip(trip.id);

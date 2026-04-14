@@ -7,11 +7,11 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
 - Expo Go is no longer a supported Pineapple test path; use installable APKs for device testing and `.aab` for Play Store release
 - For a dev-only APK that still expects Metro, run `npm run apk:debug`
-- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.2.8-debug.apk`
+- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.4.0-debug.apk`
 - For the fastest direct phone testing on a modern device, run `npm run apk:release:arm64`
-- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.2.8-release-arm64.apk`
+- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.4.0-release-arm64.apk`
 - For direct phone testing without USB or Metro, run `npm run apk:release`
-- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.2.8-release.apk`
+- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.4.0-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
 - Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
 - When you are ready for Google Play, provide these environment variables before building:
@@ -51,6 +51,27 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Travel style and profile photo no longer block PIN setup; profile photo lives in `Account`, and travel style lives in `Account` / `Settings`
 - The chosen first-run language now applies immediately across onboarding, account, warnings, the main trip tools, and the in-app legal/support wrappers
 
+### Flight card system
+
+- Pineapple now uses a generic airline-card template instead of a Ryanair-specific flight-card path
+- Airline identity is resolved from carrier data in `src/services/flights/brandResolver.ts`, including airline name, logo source, and primary brand colour
+- The main trip flight flow now uses three reusable states:
+  - lead flight card
+  - compact lower-stack flight card
+  - full-screen boarding-pass view
+- Airline branding is data-driven, so the same layout adapts across airlines such as British Airways, Ryanair, easyJet, Lufthansa, KLM, Emirates, and any future mapped carrier
+- Passenger-specific boarding data such as passenger name, seat, sequence, fare, booking reference, and barcode payload remains local app/import data; Pineapple does not expect public flight-status APIs to supply that data
+- Boarding-pass barcode payloads are preserved exactly from local/import data. QR payloads render directly; non-QR formats are labelled and stored honestly until a dedicated native renderer is added
+
+### OpenSky flight-data provider
+
+- Pineapple now wraps flight-status lookups behind a provider abstraction in `src/services/flights/`
+- `OpenSkyProvider` is the initial live provider and is selected by `EXPO_PUBLIC_FLIGHT_PROVIDER=opensky`
+- Supply `EXPO_PUBLIC_OPENSKY_CLIENT_ID` and `EXPO_PUBLIC_OPENSKY_CLIENT_SECRET` if you want authenticated OpenSky access in a prototype build
+- If OpenSky is unavailable or no useful match is found, Pineapple falls back gracefully to local trip data and mock/provider-safe status handling
+- Honest limitation: OpenSky exposes public air-traffic data, not airline booking or passenger boarding-pass data
+- Important licensing note: OpenSky states that operational use in a live product/service and for-profit/commercial use requires written permission or a license review. Treat the current OpenSky path as a prototype/development integration unless you have the required approval from OpenSky
+
 ### Core features
 
 - PIN setup and lock flow with a minimum 4-digit PIN, explicit Enter/Cancel actions, and optional biometric unlock
@@ -63,6 +84,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
+- Generic airline boarding-pass stack with airline-specific logo bands, reusable full-screen boarding pass, and provider-backed live status pills where data is available
 - Passport documents now render with a dedicated physical passport cover and identity spread experience instead of a generic document card
 - Passport image scans and passport PDFs can now prefill passport fields with on-device OCR and MRZ parsing in the Android build, while keeping the extracted fields editable before save
 - Driving licences now render with their own UK photocard object and fuller official record view, including front/back scan support and Android OCR from front scans
@@ -110,7 +132,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Sensitive structured record fields are also encrypted before Pineapple writes them into local storage, covering trips, travellers, document metadata, itinerary notes, emergency records, and sync payloads
 - Local reminders and notifications for trip countdown milestones, trip day, passport/GHIC expiry, missing insurance, packing completeness, per-segment transport departures, hotels, transfers, travel mode, SOS readiness, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
-- Version `2.2.8` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel/hire-car segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
+- Version `2.4.0` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel/hire-car segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
 - First-run setup now starts with language choice, persists the selected app language immediately, then continues through name, PIN, biometrics, and optional passport / traveller setup
 - Vault travel records now expose hire-car bookings, airport lounge passes, airline loyalty cards, and a Pineapple-stored UK rail ticket record with local QR generation
 - UK rail ticket records stay explicitly honest: Pineapple stores a reference copy and QR payload for your own trip organisation, but it does not issue a valid National Rail travel ticket

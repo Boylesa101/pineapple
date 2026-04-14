@@ -251,6 +251,8 @@ export default function RootLayout() {
           <Stack.Screen name="trip-transfer" />
           <Stack.Screen name="warnings" />
           <Stack.Screen name="trip/[tripId]" />
+          <Stack.Screen name="trip/[tripId]/flights" />
+          <Stack.Screen name="trip/[tripId]/flight/[segmentId]" />
           <Stack.Screen name="trip/[tripId]/travel-mode" />
         </Stack>
         {privacyOverlayVisible && segments[0] !== '(auth)' ? <View pointerEvents="none" style={styles.overlay} /> : null}

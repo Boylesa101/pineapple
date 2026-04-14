@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Generic airline flight-card system: replaced the old single-airline-style flight treatment with reusable lead-card, compact-card, and full-screen boarding-pass components driven by airline brand data, live-status state, and local boarding-pass data
+- Airline branding resolver: added a central airline brand map for carrier code, display name, logo source, and airline colour so flight cards no longer hardcode Ryanair-specific visuals
+- OpenSky prototype provider: added a provider abstraction plus `OpenSkyProvider` and `MockFlightProvider`, with graceful fallback when live status is unavailable and explicit docs that OpenSky is not passenger-data or production-cleared by default
+- Boarding-pass data support: expanded local boarding-pass metadata with carrier code, flight number, passenger details, sequence, boarding info, gate close time, and preserved barcode payload / format fields
+- Flight route wiring: home, trips, Vault quick access, and the flight-tickets shortcut now open the dedicated flight-card stack and full-screen boarding-pass route instead of sending every path through the older generic travel view
+- Release metadata: bumped the app, docs, and APK artifact line to `2.4.0`
 - Trip overview visual redesign: tightened the page to the hero trip card, weather card, quick info card, and set-off time card only, removed the old reminders/alerts launchers and any competing lower-page blocks, and kept the screen focused on fast trip scanning
 - Hero countdown update: moved the trip countdown fully into the hero card so the master card now carries trip name, destination, date range, and countdown in one premium layout
 - Secondary card standard: applied the Pineapple content-card standard across weather, quick info, and set-off time with a 112px minimum height, 20px radius, 16px by 18px padding, soft shadow, and a strict 14px vertical rhythm

@@ -210,6 +210,15 @@ export interface FormalDocumentData {
   seat?: string;
   travellerName?: string;
   fare?: string;
+  carrierCode?: string;
+  flightNumber?: string;
+  departureAirportCode?: string;
+  arrivalAirportCode?: string;
+  sequence?: string;
+  boardingInfo?: string;
+  gateCloseTime?: string;
+  barcodePayload?: string;
+  barcodeFormat?: 'qr' | 'aztec' | 'pdf417' | 'code128' | 'data_matrix';
 }
 
 export interface PackingItem {

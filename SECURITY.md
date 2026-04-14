@@ -55,6 +55,10 @@ Manual-share trip packets now use a dedicated encrypted envelope with PBKDF2-der
 
 Pineapple web is a companion surface and should not be treated as equivalent to the installed Android app for sensitive vault data, encrypted backups, or manual-share sync.
 
+Flight-status lookups now sit behind a provider abstraction in `src/services/flights/`. The current OpenSky provider can supply prototype live/near-live air-traffic state only; passenger-specific boarding-pass details such as passenger name, seat, sequence, fare, booking reference, and barcode payload remain local import/app data and are not sourced from OpenSky.
+
+OpenSky usage requires legal review before production operational use. OpenSky states that operational use in a live service and for-profit/commercial use requires written permission or a license path, so Pineapple should treat the current OpenSky integration as a prototype/development provider unless that approval has been obtained.
+
 ## Release hardening
 
 - Android release builds use minification and resource shrinking

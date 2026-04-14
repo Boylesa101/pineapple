@@ -126,7 +126,7 @@ export default function TripsScreen() {
                 }}
                 onOpenFlights={() => {
                   setActiveTrip(trip.id);
-                  router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'travel' } });
+                  router.push({ pathname: '/trip/[tripId]/flights', params: { tripId: trip.id } });
                 }}
                 onOpenHotel={() => {
                   setActiveTrip(trip.id);
