@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Trip overview simplification: reduced the main trip page to the hero trip card, weather, quick info, and set-off timing, moved the countdown into the master trip card, removed the old duplicate countdown and non-core trip sections, and sent reminders / transport-alert controls to compact Settings launchers
-- Card sizing standard: documented Pineapple secondary-card defaults at full width with 112px minimum height, 20px radius, 16px by 18px padding, and 14px vertical rhythm, plus an 88px compact launcher-card variant for settings-style actions
+- Trip overview visual redesign: tightened the page to the hero trip card, weather card, quick info card, and set-off time card only, removed the old reminders/alerts launchers and any competing lower-page blocks, and kept the screen focused on fast trip scanning
+- Hero countdown update: moved the trip countdown fully into the hero card so the master card now carries trip name, destination, date range, and countdown in one premium layout
+- Secondary card standard: applied the Pineapple content-card standard across weather, quick info, and set-off time with a 112px minimum height, 20px radius, 16px by 18px padding, soft shadow, and a strict 14px vertical rhythm
 - Encrypted shared-trip transfer: replaced plaintext trip-share JSON with a dedicated `pineapple-shared-trip-secure` envelope using PBKDF2-derived AES encryption plus HMAC integrity, added transfer-code-gated import, and kept QR handoff honest by excluding the decryption secret from the QR payload
 - Conflict hardening: sync conflicts now keep a normalized incoming record instead of depending on a persisted plaintext packet string, and legacy plaintext share files are rejected with a re-export prompt
 - Hire-car verification: confirmed `hire_car` is wired through trip editing, transport summaries, and local notification planning, then added runtime coverage so the proof build and tests exercise it as a real transport path

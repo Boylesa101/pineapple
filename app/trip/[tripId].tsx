@@ -17,8 +17,6 @@ import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
 import { EmptyState } from '@/components/EmptyState';
 import { HotelAddressSearchField } from '@/components/HotelAddressSearchField';
-import { InfoChip } from '@/components/InfoChip';
-import { ListRow } from '@/components/ListRow';
 import { ManagedFileImage } from '@/components/ManagedFileImage';
 import { ProviderLogoBadge } from '@/components/ProviderLogoBadge';
 import { TransportProviderSearchField } from '@/components/TransportProviderSearchField';
@@ -43,7 +41,6 @@ import type {
   HotelStayDraft,
   ParticipantRole,
   PdfExportOptions,
-  ReminderSettingDraft,
   TransportType,
   TravelSegmentDraft,
   TripInviteDraft,
@@ -51,7 +48,6 @@ import type {
 } from '@/types/models';
 import { createShareCode } from '@/utils/shareCodes';
 import { daysUntil, formatDateTime } from '@/utils/date';
-import { getDocumentExpiryRelativeLabel } from '@/utils/documentExpiry';
 import { formatAirportDisplay } from '@/utils/airports';
 import { tripDateRange } from '@/utils/format';
 import { getTripBundle } from '@/utils/selectors';
@@ -63,7 +59,6 @@ import { chooseProfilePhoto } from '@/utils/profilePhotos';
 import { deleteLocalFile } from '@/utils/fileStorage';
 
 type ModalKind = 'traveller' | 'segment' | 'hotel' | 'transfer' | 'emergency' | 'export' | 'invite' | null;
-type TripSection = 'overview' | 'packing' | 'itinerary' | 'settings';
 type TransferDraft = {
   provider: string;
   method: string;
@@ -124,19 +119,6 @@ function weatherIconName(weatherCode: number | null) {
   if ((weatherCode >= 71 && weatherCode <= 77) || weatherCode === 85 || weatherCode === 86) return 'ac-unit';
   if (weatherCode >= 95) return 'bolt';
   return 'cloud';
-}
-
-function formatTemperatureRange(minTemp: number | null, maxTemp: number | null) {
-  if (minTemp === null || maxTemp === null) {
-    return 'Temperature unavailable';
-  }
-
-  return `${Math.round(minTemp)}° / ${Math.round(maxTemp)}°`;
-}
-
-function compactWeatherDayLabel(dayLabel: string) {
-  const token = dayLabel.split(' ')[0]?.trim();
-  return (token || dayLabel).slice(0, 3).toUpperCase();
 }
 
 function quickFactValue(value: string | null | undefined, fallback = 'Unavailable') {
@@ -214,7 +196,6 @@ export default function TripDetailScreen() {
   const { tripId, focus, segmentId } = useLocalSearchParams<{ tripId: string; focus?: string; segmentId?: string }>();
   const {
     data,
-    setActiveTrip,
     saveTrip,
     saveTraveller,
     saveTravelSegment,
@@ -247,7 +228,6 @@ export default function TripDetailScreen() {
   const [sharedImportCode, setSharedImportCode] = useState('');
   const [sharedImportSourceLabel, setSharedImportSourceLabel] = useState('shared trip');
   const [travellerPhotoBaselineUri, setTravellerPhotoBaselineUri] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<TripSection>('overview');
   const [destinationTimeInfo, setDestinationTimeInfo] = useState<DestinationLocalTimeInfo | null>(null);
   const [destinationWeather, setDestinationWeather] = useState<DestinationWeatherForecast | null>(null);
   const [destinationQuickFacts, setDestinationQuickFacts] = useState<DestinationQuickFacts | null>(null);
@@ -270,32 +250,19 @@ export default function TripDetailScreen() {
             ? bundle.travelSegments.find((segment) => segment.id === segmentId)
             : bundle.travelSegments[0];
         openSegmentEditor(selectedSegment);
-        setActiveSection('overview');
         return;
       }
 
       if (focus === 'hotel') {
         openHotelEditor(bundle.hotelStays[0]);
-        setActiveSection('overview');
         return;
       }
 
       if (focus === 'transfer') {
         openTransferEditor();
-        setActiveSection('overview');
         return;
       }
     }
-
-    if (focus === 'packing' || focus === 'itinerary') {
-      setActiveSection(focus);
-      return;
-    }
-    if (focus === 'travel' || focus === 'hotel' || focus === 'transfer') {
-      setActiveSection('overview');
-      return;
-    }
-    setActiveSection('overview');
   }, [bundle.hotelStays, bundle.travelSegments, focus, segmentId, trip]);
   const departureDays = trip ? daysUntil(trip.startDate) : null;
   const airportSetOffInfo = useMemo(
@@ -951,77 +918,31 @@ export default function TripDetailScreen() {
   }
 
   return (
-    <AppScreen
-      scrollRef={tripScrollRef}
-      contentStyle={styles.tripContent}
-      footer={
-        <View style={styles.tripFooterNav}>
-          <Pressable
-            onPress={() => {
-              setActiveSection('overview');
-              tripScrollRef.current?.scrollTo({ y: 0, animated: true });
-            }}
-            style={[styles.tripFooterButton, activeSection === 'overview' ? styles.tripFooterButtonActive : null]}
-          >
-            <MaterialIcons name="travel-explore" size={22} color={colors.white} />
-            <Text style={styles.tripFooterLabel}>Overview</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setActiveTrip(tripId);
-              setActiveSection('packing');
-              router.push('/packing');
-            }}
-            style={[styles.tripFooterButton, activeSection === 'packing' ? styles.tripFooterButtonActive : null]}
-          >
-            <MaterialIcons name="checkroom" size={22} color={colors.white} />
-            <Text style={styles.tripFooterLabel}>Packing</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setActiveTrip(tripId);
-              setActiveSection('itinerary');
-              router.push('/itinerary');
-            }}
-            style={[styles.tripFooterButton, activeSection === 'itinerary' ? styles.tripFooterButtonActive : null]}
-          >
-            <MaterialIcons name="route" size={22} color={colors.white} />
-            <Text style={styles.tripFooterLabel}>Itinerary</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setActiveSection('settings');
-              router.push('/settings');
-            }}
-            style={[styles.tripFooterButton, activeSection === 'settings' ? styles.tripFooterButtonActive : null]}
-          >
-            <MaterialIcons name="settings" size={22} color={colors.white} />
-            <Text style={styles.tripFooterLabel}>Settings</Text>
-          </Pressable>
-        </View>
-      }
-    >
+    <AppScreen scrollRef={tripScrollRef} contentStyle={styles.tripContent}>
       <View style={styles.heroCard}>
         {trip.destinationImageLocalPath ?? trip.coverImageUri ? (
           <ManagedFileImage uri={trip.destinationImageLocalPath ?? trip.coverImageUri} style={styles.cover} />
         ) : null}
         <LinearGradient colors={tripHeroGradient(trip.destinationType)} style={styles.coverFallback} />
-        <LinearGradient colors={['rgba(10, 28, 44, 0.14)', 'rgba(10, 28, 44, 0.74)']} style={styles.coverOverlay} />
+        <LinearGradient colors={['rgba(10, 28, 44, 0.06)', 'rgba(10, 28, 44, 0.38)']} style={styles.coverOverlay} />
         <View style={styles.heroCopy}>
-          <Text style={styles.heroDestination}>{trip.destination.toUpperCase()}</Text>
           <Text style={styles.heroTitle}>{trip.name}</Text>
-          <Text style={styles.heroDate}>{tripDateRange(trip.startDate, trip.endDate)}</Text>
-          <View style={styles.heroMetaRow}>
-            <View style={styles.heroMetaPill}>
-              <MaterialIcons name="event" size={14} color={colors.white} />
-              <Text style={styles.heroMetaText}>
+          <Text style={styles.heroDestination}>{trip.destination}</Text>
+          <View style={styles.heroBottomRow}>
+            <View style={styles.heroDateBlock}>
+              <Text style={styles.heroDateLabel}>Trip dates</Text>
+              <Text style={styles.heroDate}>{tripDateRange(trip.startDate, trip.endDate)}</Text>
+            </View>
+            <View style={styles.heroCountdownBlock}>
+              <Text style={styles.heroCountdownLabel}>Countdown</Text>
+              <Text style={styles.heroCountdownValue}>
                 {departureDays === null
-                  ? 'Trip dates unavailable'
+                  ? 'Dates unavailable'
                   : departureDays > 0
-                    ? `${departureDays} day(s) until trip`
+                    ? `${departureDays} days to go`
                     : departureDays === 0
-                      ? 'Trip starts today'
-                      : 'Trip in progress'}
+                      ? 'Starts today'
+                      : 'In progress'}
               </Text>
             </View>
           </View>
@@ -1029,178 +950,95 @@ export default function TripDetailScreen() {
       </View>
 
       {destinationWeather?.days.length ? (
-        <View style={styles.weatherCard}>
-          <Pressable
-            onPress={() => {
-              if (!selectedWeatherDay) {
-                return;
-              }
+        <Pressable
+          onPress={() => {
+            if (!selectedWeatherDay) {
+              return;
+            }
 
-              router.push({
-                pathname: '/trip/[tripId]/weather',
-                params: { tripId, date: selectedWeatherDay.date },
-              });
-            }}
-            style={styles.weatherHeroSection}
-          >
-            <View style={styles.weatherBackground}>
-              <View style={styles.weatherCircleLarge} />
-              <View style={styles.weatherCircleMedium} />
-              <View style={styles.weatherCircleSmall} />
-            </View>
-            <View style={styles.weatherHeroLeft}>
-              <View style={styles.weatherConditionRow}>
-                <MaterialIcons name={weatherIconName(selectedWeatherDay?.weatherCode ?? null) as any} size={28} color={colors.white} />
-                <Text style={styles.weatherConditionLabel} numberOfLines={1} ellipsizeMode="tail">
-                  {selectedWeatherDay?.conditionLabel ?? 'Weather unavailable'}
-                </Text>
+            router.push({
+              pathname: '/trip/[tripId]/weather',
+              params: { tripId, date: selectedWeatherDay.date },
+            });
+          }}
+          style={({ pressed }) => [styles.secondaryCardPressable, pressed ? styles.cardPressed : null]}
+        >
+          <View style={[styles.secondaryCard, styles.weatherCard]}>
+            <View style={styles.weatherHeaderRow}>
+              <View>
+                <Text style={styles.secondaryCardEyebrow}>{destinationWeather.resolvedLabel ?? trip.destination}</Text>
+                <Text style={styles.weatherConditionLabel}>{selectedWeatherDay?.conditionLabel ?? 'Weather unavailable'}</Text>
               </View>
+              <MaterialIcons name={weatherIconName(selectedWeatherDay?.weatherCode ?? null) as any} size={24} color={colors.white} />
+            </View>
+            <View style={styles.weatherSummaryRow}>
               <Text style={styles.weatherHeadlineTemp}>
                 {selectedWeatherDay?.temperatureMaxC !== null && selectedWeatherDay?.temperatureMaxC !== undefined
-                  ? `${Math.round(selectedWeatherDay.temperatureMaxC)}°`
+                  ? `${Math.round(selectedWeatherDay.temperatureMaxC)}°C`
                   : '--'}
               </Text>
               <Text style={styles.weatherHeadlineRange}>
-                {formatTemperatureRange(selectedWeatherDay?.temperatureMinC ?? null, selectedWeatherDay?.temperatureMaxC ?? null)}
+                {selectedWeatherDay &&
+                selectedWeatherDay.temperatureMaxC !== null &&
+                selectedWeatherDay.temperatureMinC !== null
+                  ? `H ${Math.round(selectedWeatherDay.temperatureMaxC)}° / L ${Math.round(selectedWeatherDay.temperatureMinC)}°`
+                  : 'H/L unavailable'}
               </Text>
             </View>
-            <View style={styles.weatherHeroRight}>
-              <Text style={styles.weatherHeroTime}>{destinationTimeInfo?.localTimeLabel ?? '--:--'}</Text>
-              <Text style={styles.weatherHeroOffset}>
-                {destinationTimeInfo
-                  ? `${destinationTimeInfo.offsetLabel}${destinationTimeInfo.relativeLabel ? ` • ${destinationTimeInfo.relativeLabel}` : ''}`
-                  : insightsLoading
-                    ? 'Checking timezone…'
-                    : 'Timezone unavailable'}
-              </Text>
-              <Text style={styles.weatherHeroPlace}>{destinationWeather.resolvedLabel ?? trip.destination}</Text>
-              <Text style={styles.weatherHeroMeta}>{selectedWeatherDay?.dayLabel ?? 'Today'}</Text>
-            </View>
-          </Pressable>
-          <View style={styles.weatherDaysSection}>
-            {destinationWeather.days.slice(0, 7).map((day) => (
-              <Pressable
-                key={day.date}
-                onPress={() => setSelectedWeatherDate(day.date)}
-                style={[styles.weatherDayButton, selectedWeatherDay?.date === day.date ? styles.weatherDayButtonActive : null]}
-              >
-                <Text style={styles.weatherDayButtonLabel}>{compactWeatherDayLabel(day.dayLabel)}</Text>
-                <MaterialIcons name={weatherIconName(day.weatherCode) as any} size={18} color={colors.white} />
-              </Pressable>
-            ))}
           </View>
-        </View>
+        </Pressable>
       ) : (
-        <AppCard title="7-day weather" subtitle={trip.destination}>
-          <EmptyState
-            title={insightsLoading ? 'Loading destination weather' : 'Weather unavailable'}
-            description={
-              insightsLoading
-                ? 'Checking the next 7 days for this destination.'
-                : 'We could not load a forecast for this destination right now.'
-            }
-          />
-          {destinationTimeInfo ? (
-            <Text style={styles.notes}>
-              Local time {destinationTimeInfo.localTimeLabel} • {destinationTimeInfo.offsetLabel}
-            </Text>
-          ) : null}
-        </AppCard>
+        <View style={[styles.secondaryCard, styles.weatherCard]}>
+          <Text style={styles.secondaryCardEyebrow}>{trip.destination}</Text>
+          <Text style={styles.weatherConditionLabel}>{insightsLoading ? 'Loading weather' : 'Weather unavailable'}</Text>
+          <Text style={styles.weatherHeadlineRange}>
+            {destinationTimeInfo ? `Local time ${destinationTimeInfo.localTimeLabel}` : 'Check the full weather page for more detail.'}
+          </Text>
+        </View>
       )}
 
-      <AppCard title="Quick info" variant="standard">
-        <View style={styles.quickFactList}>
-          <View style={styles.quickFactRow}>
-            <Text style={styles.quickFactLabel}>Language</Text>
-            <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.languageLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
-          </View>
-          <View style={styles.quickFactRow}>
-            <Text style={styles.quickFactLabel}>Currency</Text>
-            <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.currencyLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
-          </View>
-          <View style={styles.quickFactRow}>
-            <Text style={styles.quickFactLabel}>Plug</Text>
-            <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.plugLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
-          </View>
-          <View style={styles.quickFactRow}>
-            <Text style={styles.quickFactLabel}>Timezone</Text>
-            <Text style={styles.quickFactValue}>
-              {destinationTimeInfo
-                ? `${destinationTimeInfo.offsetLabel}${destinationTimeInfo.relativeLabel ? ` • ${destinationTimeInfo.relativeLabel}` : ''}`
-                : insightsLoading
-                  ? 'Checking…'
-                  : 'Unavailable'}
-            </Text>
-          </View>
-        </View>
-      </AppCard>
-
-      <AppCard title="Set-off time" subtitle="Recommended departure timing for the main airport leg." variant="standard">
-        <Text style={styles.standardCardHeadline}>{airportSetOffInfo.timeLabel}</Text>
-        <Text style={styles.standardCardMeta}>
-          {airportSetOffInfo.status === 'available' ? airportSetOffInfo.departureLabel : 'Departure details needed'}
-        </Text>
-        <Text style={styles.notes}>{airportSetOffInfo.helperLabel}</Text>
-      </AppCard>
-
       <Pressable
-        onPress={() => {
-          setActiveSection('settings');
-          router.push('/settings');
-        }}
-        style={styles.utilityLauncher}
+        onPress={() => router.push({ pathname: '/trip/[tripId]/destination-facts', params: { tripId } })}
+        style={({ pressed }) => [styles.secondaryCardPressable, pressed ? styles.cardPressed : null]}
       >
-        <AppCard
-          title="Trip reminders"
-          subtitle="Open reminder settings to review countdown timing and device alerts."
-          variant="compact"
-          right={<MaterialIcons name="arrow-forward-ios" size={16} color={colors.primaryBlueDark} />}
-          style={activeSection === 'settings' ? styles.highlightedCard : null}
-        />
-      </Pressable>
-
-      <Pressable
-        onPress={() => {
-          setActiveSection('settings');
-          router.push('/settings');
-        }}
-        style={styles.utilityLauncher}
-      >
-        <AppCard
-          title="Transport alerts"
-          subtitle="Manage lock-screen transport alerts from Settings instead of inside this trip page."
-          variant="compact"
-          right={<MaterialIcons name="arrow-forward-ios" size={16} color={colors.primaryBlueDark} />}
-          style={activeSection === 'settings' ? styles.highlightedCard : null}
-        />
-      </Pressable>
-
-      {bundle.conflicts.length ? (
-        <AppCard title="Sync conflicts" subtitle="Review encrypted incoming changes before applying them.">
-          <View style={styles.conflictList}>
-            {bundle.conflicts
-              .filter((conflict) => conflict.status === 'open')
-              .map((conflict) => (
-                <View key={conflict.id} style={styles.conflictCard}>
-                  <Text style={styles.travellerName}>{conflict.summary}</Text>
-                  <Text style={styles.notes}>Local: {formatDateTime(conflict.localUpdatedAt)}</Text>
-                  <Text style={styles.notes}>Incoming: {formatDateTime(conflict.incomingUpdatedAt)}</Text>
-                  <View style={styles.buttonWrap}>
-                    <AppButton
-                      label="Keep local"
-                      tone="secondary"
-                      onPress={() => resolveSyncConflictChoice(conflict.id, 'resolved_keep_local')}
-                    />
-                    <AppButton
-                      label="Use incoming"
-                      onPress={() => resolveSyncConflictChoice(conflict.id, 'resolved_use_incoming')}
-                    />
-                  </View>
-                </View>
-              ))}
+        <AppCard title="Quick info" variant="standard" style={styles.secondaryCard}>
+          <View style={styles.quickInfoGrid}>
+            <View style={styles.quickInfoCell}>
+              <Text style={styles.quickFactLabel}>Currency</Text>
+              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.currencyLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
+            </View>
+            <View style={styles.quickInfoCell}>
+              <Text style={styles.quickFactLabel}>Language</Text>
+              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.languageLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
+            </View>
+            <View style={styles.quickInfoCell}>
+              <Text style={styles.quickFactLabel}>Plug</Text>
+              <Text style={styles.quickFactValue}>{quickFactValue(destinationQuickFacts?.plugLabel, insightsLoading ? 'Checking…' : 'Unavailable')}</Text>
+            </View>
+            <View style={styles.quickInfoCell}>
+              <Text style={styles.quickFactLabel}>Timezone</Text>
+              <Text style={styles.quickFactValue}>
+                {destinationTimeInfo?.offsetLabel ?? (insightsLoading ? 'Checking…' : 'Unavailable')}
+              </Text>
+            </View>
           </View>
         </AppCard>
-      ) : null}
+      </Pressable>
+
+      <Pressable
+        onPress={() => router.push({ pathname: '/trip/[tripId]/set-off', params: { tripId } })}
+        style={({ pressed }) => [styles.secondaryCardPressable, pressed ? styles.cardPressed : null]}
+      >
+        <AppCard title="Set-off time" variant="standard" style={styles.secondaryCard}>
+          <Text style={styles.standardCardHeadline}>{airportSetOffInfo.timeLabel}</Text>
+          <Text style={styles.standardCardMeta}>
+            {airportSetOffInfo.status === 'available' ? airportSetOffInfo.departureLabel : 'Recommended departure unavailable'}
+          </Text>
+          <Text style={styles.notes}>
+            {airportSetOffInfo.status === 'available' ? airportSetOffInfo.helperLabel : 'Based on check-in time and travel buffer once outbound details are added.'}
+          </Text>
+        </AppCard>
+      </Pressable>
 
       <AppModal
         visible={modalKind === 'traveller'}
@@ -1639,35 +1477,17 @@ const styles = StyleSheet.create({
   tripContent: {
     gap: 14,
   },
-  tripFooterNav: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    backgroundColor: colors.primaryBlue,
-    borderRadius: 20,
-    padding: spacing.xs,
-  },
-  tripFooterButton: {
-    flex: 1,
-    minHeight: 64,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  tripFooterButtonActive: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
-  tripFooterLabel: {
-    color: colors.white,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-  },
   heroCard: {
-    minHeight: 232,
-    borderRadius: 24,
+    minHeight: 246,
+    borderRadius: 28,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.12)',
+    shadowColor: 'rgba(5, 26, 46, 0.16)',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 1,
+    shadowRadius: 24,
+    elevation: 4,
   },
   cover: {
     ...StyleSheet.absoluteFillObject,
@@ -1679,32 +1499,88 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   heroCopy: {
-    minHeight: 232,
-    justifyContent: 'flex-end',
-    gap: 6,
+    minHeight: 246,
+    justifyContent: 'space-between',
+    gap: 10,
     padding: spacing.lg,
   },
-  heroDestination: {
+  heroTitle: {
     color: colors.white,
     fontFamily: 'Poppins_700Bold',
     fontSize: 28,
     lineHeight: 32,
-    letterSpacing: 1.8,
   },
-  heroTitle: {
-    color: colors.white,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 20,
-    lineHeight: 24,
+  heroDestination: {
+    color: 'rgba(255,255,255,0.9)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 16,
+    lineHeight: 21,
   },
   heroDate: {
-    color: 'rgba(255,255,255,0.96)',
+    color: colors.white,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  heroBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  heroDateBlock: {
+    flex: 1,
+    gap: 4,
+  },
+  heroDateLabel: {
+    color: 'rgba(255,255,255,0.78)',
     fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  heroCountdownBlock: {
+    alignItems: 'flex-end',
+    gap: 4,
+    maxWidth: '42%',
+  },
+  heroCountdownLabel: {
+    color: 'rgba(255,255,255,0.78)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'right',
+  },
+  heroCountdownValue: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 16,
+    lineHeight: 20,
+    textAlign: 'right',
+  },
+  secondaryCardPressable: {
+    width: '100%',
+  },
+  cardPressed: {
+    transform: [{ scale: 0.992 }],
+  },
+  secondaryCard: {
+    minHeight: 112,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    shadowColor: 'rgba(9, 41, 69, 0.12)',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 22,
+    elevation: 3,
+  },
+  secondaryCardEyebrow: {
+    color: 'rgba(255,255,255,0.84)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    lineHeight: 16,
   },
   heroMetaRow: {
-    marginTop: spacing.sm,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
@@ -1792,8 +1668,8 @@ const styles = StyleSheet.create({
   standardCardHeadline: {
     color: colors.nightNavy,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 23,
+    lineHeight: 29,
   },
   standardCardMeta: {
     color: colors.primaryBlueText,
@@ -1836,13 +1712,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
-  },
-  highlightedCard: {
-    borderColor: '#9FC6FF',
-    shadowColor: 'rgba(13,110,253,0.16)',
-  },
-  utilityLauncher: {
-    width: '100%',
   },
   travellerCard: {
     gap: spacing.sm,
@@ -1932,141 +1801,50 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   weatherCard: {
-    overflow: 'hidden',
-    minHeight: 112,
-    borderRadius: 20,
-    backgroundColor: '#D7D3D0',
-    shadowColor: 'rgba(9, 41, 69, 0.14)',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 22,
-    elevation: 3,
+    backgroundColor: '#2E7BD6',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  weatherHeroSection: {
-    position: 'relative',
+  weatherHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 140,
-    paddingHorizontal: 18,
-    paddingVertical: spacing.md,
-    backgroundColor: '#EC7263',
-    overflow: 'hidden',
-  },
-  weatherBackground: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  weatherCircleLarge: {
-    position: 'absolute',
-    top: '-80%',
-    right: '-50%',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    opacity: 0.4,
-    backgroundColor: '#EFC745',
-  },
-  weatherCircleMedium: {
-    position: 'absolute',
-    top: '-70%',
-    right: '-30%',
-    width: 210,
-    height: 210,
-    borderRadius: 105,
-    opacity: 0.4,
-    backgroundColor: '#EFC745',
-  },
-  weatherCircleSmall: {
-    position: 'absolute',
-    top: '-35%',
-    right: '-8%',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#EFC745',
-  },
-  weatherHeroLeft: {
-    flex: 1,
-    gap: spacing.sm,
-    zIndex: 1,
-    paddingRight: spacing.sm,
-  },
-  weatherConditionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.md,
   },
   weatherConditionLabel: {
-    flex: 1,
     color: colors.white,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  weatherSummaryRow: {
+    marginTop: 'auto',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
   weatherHeadlineTemp: {
     color: colors.white,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 36,
-    lineHeight: 40,
+    fontSize: 32,
+    lineHeight: 36,
   },
   weatherHeadlineRange: {
     color: 'rgba(255,255,255,0.88)',
     fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-  },
-  weatherHeroRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-    maxWidth: '42%',
-    zIndex: 1,
-  },
-  weatherHeroTime: {
-    color: colors.white,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 28,
-    lineHeight: 30,
+    fontSize: 14,
+    lineHeight: 18,
     textAlign: 'right',
   },
-  weatherHeroOffset: {
-    color: 'rgba(255,255,255,0.88)',
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    lineHeight: 15,
-    textAlign: 'right',
-  },
-  weatherHeroPlace: {
-    color: colors.white,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 15,
-    textAlign: 'right',
-  },
-  weatherHeroMeta: {
-    color: 'rgba(255,255,255,0.88)',
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    textAlign: 'right',
-  },
-  weatherDaysSection: {
+  quickInfoGrid: {
     flexDirection: 'row',
-    backgroundColor: '#974859',
-    gap: 2,
-    paddingTop: 2,
+    flexWrap: 'wrap',
+    columnGap: 16,
+    rowGap: 14,
   },
-  weatherDayButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    minHeight: 56,
-    backgroundColor: '#A75265',
-    paddingVertical: spacing.sm,
-  },
-  weatherDayButtonActive: {
-    backgroundColor: '#8F4055',
-  },
-  weatherDayButtonLabel: {
-    color: 'rgba(255,255,255,0.75)',
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 10,
+  quickInfoCell: {
+    width: '47%',
+    gap: 4,
   },
   hotelRow: {
     flexDirection: 'row',
