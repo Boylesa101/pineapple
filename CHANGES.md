@@ -2,15 +2,16 @@
 
 ## Unreleased
 
+- Flight provider swap: replaced the shared transport flight adapter path with OpenSky, updated provider diagnostics and environment docs, and removed the transport layer's earlier Aviationstack dependency
 - Transport stack system: replaced the trip screen's old row-style transport area with one shared stacked-card architecture covering airline, rail, bus, taxi, and hotel variants, including `top_of_stack`, `in_stack`, `clicked`, and `open` states
 - Trip screen refinement: restored the previous weather-card treatment, moved the transport stack directly below `Quick info`, improved stack motion/selection behavior, and upgraded the Quick Info card background to a richer Pineapple surface
-- Provider adapter layer: added `src/services/transport/` with normalized transport items, provider capability flags, manual fallback handling, and isolated adapters for Aviationstack, Darwin, and BODS plus a mock provider for development
-- Airline/rail/bus live-data wiring: airline cards now use Aviationstack where configured, rail cards can refresh against Darwin credentials, and bus cards can refresh against BODS configuration without breaking the manual trip experience when live lookups are unavailable
-- Transport documentation: added `docs/TRANSPORT_STACK.md` and updated README guidance for transport card states, provider environment variables, fallback behavior, and Aviationstack free-tier caveats
+- Provider adapter layer: added `src/services/transport/` with normalized transport items, provider capability flags, manual fallback handling, and isolated adapters for OpenSky, Darwin, and BODS plus a mock provider for development
+- Airline/rail/bus live-data wiring: airline cards now use OpenSky where configured, rail cards can refresh against Darwin credentials, and bus cards can refresh against BODS configuration without breaking the manual trip experience when live lookups are unavailable
+- Transport documentation: added `docs/TRANSPORT_STACK.md` and updated README guidance for transport card states, provider environment variables, fallback behavior, and OpenSky caveats
 - Release metadata: bumped the app, docs, and APK artifact line to `2.5.0`
 - Generic airline flight-card system: the earlier single-airline treatment was replaced with reusable lead-card, compact-card, and full-screen boarding-pass patterns that now feed into the wider shared transport stack
 - Airline branding resolver: a central airline brand map now drives carrier code, display name, logo source, and airline colour so flight cards never hardcode Ryanair-specific visuals
-- Flight provider transition: the live airline path has moved from the earlier OpenSky prototype toward the new provider-based transport layer with Aviationstack as the configured flight adapter path
+- Flight provider transition: the live airline path now uses the provider-based transport layer with OpenSky as the configured flight adapter path
 - Boarding-pass data support: expanded local boarding-pass metadata with carrier code, flight number, passenger details, sequence, boarding info, gate close time, and preserved barcode payload / format fields
 - Flight route wiring: home, trips, Vault quick access, and the flight-tickets shortcut now open the dedicated flight-card stack and full-screen boarding-pass route instead of sending every path through the older generic travel view
 - Release metadata: the current working line is now `2.5.0`, replacing the earlier `2.4.0` generic-flight-card pass

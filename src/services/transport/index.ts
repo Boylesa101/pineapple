@@ -1,10 +1,10 @@
 import type { Document, HotelStay, TransportType, TravelSegment, Traveller } from '@/types/models';
 
 import { resolveTransportBrand } from './brandResolver';
-import { AviationstackProvider } from './providers/aviationstack';
 import { BodsProvider } from './providers/bods';
 import { DarwinProvider } from './providers/darwin';
 import { MockTransportProvider } from './providers/mock';
+import { OpenSkyTransportProvider } from './providers/opensky';
 import type {
   TransportBuilderInput,
   TransportDataProvider,
@@ -247,8 +247,8 @@ function buildHotelItem(hotel: HotelStay): TransportItem {
 }
 
 function createProvider(id: TransportProviderId): TransportDataProvider {
-  if (id === 'aviationstack') {
-    return new AviationstackProvider();
+  if (id === 'opensky') {
+    return new OpenSkyTransportProvider();
   }
   if (id === 'darwin') {
     return new DarwinProvider();
@@ -271,7 +271,7 @@ function providerForItem(item: TransportItem) {
   }
 
   const providerId: TransportProviderId =
-    item.type === 'airline' ? 'aviationstack' : item.type === 'rail' ? 'darwin' : item.type === 'bus' ? 'bods' : 'manual';
+    item.type === 'airline' ? 'opensky' : item.type === 'rail' ? 'darwin' : item.type === 'bus' ? 'bods' : 'manual';
 
   if (providerId === 'manual') {
     return null;
@@ -369,12 +369,12 @@ export async function getTransportItemById(input: TransportBuilderInput, itemId:
 }
 
 export function getTransportProviderDiagnostics() {
-  const aviationProvider = createProvider('aviationstack');
+  const flightProvider = createProvider('opensky');
   const darwinProvider = createProvider('darwin');
   const bodsProvider = createProvider('bods');
 
   return {
-    aviationstack: { configured: aviationProvider.isConfigured(), capabilities: aviationProvider.capabilities },
+    opensky: { configured: flightProvider.isConfigured(), capabilities: flightProvider.capabilities },
     darwin: { configured: darwinProvider.isConfigured(), capabilities: darwinProvider.capabilities },
     bods: { configured: bodsProvider.isConfigured(), capabilities: bodsProvider.capabilities },
     mockMode: TRANSPORT_PROVIDER_MODE === 'mock',

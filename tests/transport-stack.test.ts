@@ -4,10 +4,10 @@ import test from 'node:test';
 import type { Document, TravelSegment, Traveller } from '@/types/models';
 import { getTransportItems, getTransportProviderDiagnostics } from '@/services/transport';
 import { resolveTransportBrand } from '@/services/transport/brandResolver';
-import { AviationstackProvider } from '@/services/transport/providers/aviationstack';
 import { BodsProvider } from '@/services/transport/providers/bods';
 import { DarwinProvider } from '@/services/transport/providers/darwin';
 import { MockTransportProvider } from '@/services/transport/providers/mock';
+import { OpenSkyTransportProvider } from '@/services/transport/providers/opensky';
 
 const now = '2026-04-15T08:00:00.000Z';
 
@@ -234,11 +234,11 @@ test('real providers fail gracefully without configuration', async () => {
     })
   )[0]!;
 
-  const aviation = await new AviationstackProvider().refresh(baseItem);
+  const opensky = await new OpenSkyTransportProvider().refresh(baseItem);
   const rail = await new DarwinProvider().refresh({ ...baseItem, type: 'rail', originCode: 'EDB', destinationCode: 'KGX' });
   const bus = await new BodsProvider().refresh({ ...baseItem, type: 'bus', serviceNumber: 'NX591', stopName: 'St Andrew Square' });
 
-  assert.equal(aviation?.liveState, 'manual_only');
+  assert.equal(opensky?.liveState, 'manual_only');
   assert.equal(rail?.liveState, 'manual_only');
   assert.equal(bus?.liveState, 'manual_only');
 });
@@ -246,8 +246,9 @@ test('real providers fail gracefully without configuration', async () => {
 test('provider diagnostics expose live capability flags without breaking local-only mode', () => {
   const diagnostics = getTransportProviderDiagnostics();
 
-  assert.equal(typeof diagnostics.aviationstack.configured, 'boolean');
-  assert.equal(diagnostics.aviationstack.capabilities.supportsRealtime, true);
+  assert.equal(typeof diagnostics.opensky.configured, 'boolean');
+  assert.equal(diagnostics.opensky.capabilities.supportsRealtime, true);
+  assert.equal(diagnostics.opensky.capabilities.supportsCommercialUse, false);
   assert.equal(diagnostics.darwin.capabilities.supportsSchedules, true);
   assert.equal(diagnostics.bods.capabilities.requiresCredentials, true);
 });

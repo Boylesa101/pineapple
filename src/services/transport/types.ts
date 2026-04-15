@@ -1,7 +1,7 @@
 import type { Document, HotelStay, TravelSegment, Traveller } from '@/types/models';
 
 export type TransportCardState = 'top_of_stack' | 'in_stack' | 'clicked' | 'open';
-export type TransportProviderId = 'aviationstack' | 'darwin' | 'bods' | 'manual' | 'mock';
+export type TransportProviderId = 'opensky' | 'darwin' | 'bods' | 'manual' | 'mock';
 export type TransportDisplayType = 'airline' | 'rail' | 'bus' | 'taxi' | 'hotel';
 export type TransportLiveState = 'loading' | 'live' | 'stale' | 'unavailable' | 'manual_only' | 'partial';
 export type TransportLiveStatus = 'on_time' | 'delayed' | 'boarding' | 'gate_change' | 'cancelled' | 'unknown';

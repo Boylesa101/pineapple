@@ -55,9 +55,9 @@ Manual-share trip packets now use a dedicated encrypted envelope with PBKDF2-der
 
 Pineapple web is a companion surface and should not be treated as equivalent to the installed Android app for sensitive vault data, encrypted backups, or manual-share sync.
 
-Transport live-data lookups now sit behind the provider abstraction in `src/services/transport/`. The current provider path is Aviationstack for flights, Darwin for UK rail, and BODS for bus, with manual fallback when credentials or live matches are unavailable. Passenger-specific boarding-pass or ticket data such as passenger name, seat, booking reference, and barcode payload remain local import/app data and are not sourced from those public or operator data feeds.
+Transport live-data lookups now sit behind the provider abstraction in `src/services/transport/`. The current provider path is OpenSky for flights, Darwin for UK rail, and BODS for bus, with manual fallback when credentials or live matches are unavailable. Passenger-specific boarding-pass or ticket data such as passenger name, seat, booking reference, and barcode payload remain local import/app data and are not sourced from those public or operator data feeds.
 
-Aviationstack, Darwin, and BODS all need product/legal review before Pineapple treats them as production-cleared live dependencies. Pineapple now documents provider credentials, capability flags, and fallback behavior explicitly so the app does not silently assume unrestricted operational use.
+OpenSky, Darwin, and BODS all need product/legal review before Pineapple treats them as production-cleared live dependencies. Pineapple now documents provider credentials, capability flags, and fallback behavior explicitly so the app does not silently assume unrestricted operational use.
 
 ## Release hardening
 

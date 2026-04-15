@@ -68,7 +68,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 
 - Pineapple now wraps transport-status lookups behind a provider abstraction in `src/services/transport/`
 - Current provider modules:
-  - `AviationstackProvider` for flights
+  - `OpenSkyTransportProvider` for flights
   - `DarwinProvider` for UK rail
   - `BodsProvider` for bus
   - `MockTransportProvider` for local development
@@ -78,21 +78,23 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 ### Transport provider environment variables
 
 - `EXPO_PUBLIC_TRANSPORT_PROVIDER_MODE=mock`
-- `EXPO_PUBLIC_AVIATIONSTACK_API_KEY`
-- `EXPO_PUBLIC_AVIATIONSTACK_PLAN`
-- `EXPO_PUBLIC_AVIATIONSTACK_BASE_URL`
+- `EXPO_PUBLIC_OPENSKY_CLIENT_ID`
+- `EXPO_PUBLIC_OPENSKY_CLIENT_SECRET`
+- `EXPO_PUBLIC_OPENSKY_BASE_URL`
+- `EXPO_PUBLIC_OPENSKY_AUTH_URL`
 - `EXPO_PUBLIC_DARWIN_TOKEN`
 - `EXPO_PUBLIC_DARWIN_ENDPOINT`
 - `EXPO_PUBLIC_BODS_API_KEY`
 - `EXPO_PUBLIC_BODS_API_BASE_URL`
 - `EXPO_PUBLIC_BODS_ENDPOINT`
 
-### Aviationstack note
+### OpenSky note
 
-- Aviationstack is the current flight-status provider path for Pineapple transport cards
-- Free-tier or lower-tier plans may not expose the same future-flight and realtime coverage as paid plans
-- The card system does not assume premium Aviationstack features are always available
-- Honest limitation: Aviationstack does not provide passenger boarding-pass data such as passenger name, seat, booking reference, or barcode payload
+- OpenSky is now the current flight-status provider path for Pineapple transport cards
+- Pineapple uses OpenSky OAuth client credentials plus the live state-vector API path for current flight-state matching
+- Honest limitation: OpenSky does not provide passenger boarding-pass data such as passenger name, seat, booking reference, or barcode payload
+- Honest limitation: OpenSky airport arrivals/departures use ICAO airport identifiers and are historical or batch-oriented, so Pineapple still preserves stored trip timing and route details locally instead of pretending OpenSky replaces airline booking data
+- OpenSky documents that operational or commercial product use needs license review; do not treat it as silently production-cleared without that approval
 
 ### Core features
 

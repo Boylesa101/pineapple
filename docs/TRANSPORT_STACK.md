@@ -36,7 +36,7 @@ Key fields include:
 
 Provider adapters live under `src/services/transport/providers/`.
 
-- `aviationstack.ts`: airline enrichment for flight-number/status/timing updates
+- `opensky.ts`: airline enrichment for flight-number/live-state updates
 - `darwin.ts`: UK rail live running information via Darwin
 - `bods.ts`: bus metadata / stop-level updates via BODS
 - `mock.ts`: development-only demo provider
@@ -46,9 +46,10 @@ The app builds and runs without any provider credentials. When provider configur
 ## Environment variables
 
 - `EXPO_PUBLIC_TRANSPORT_PROVIDER_MODE=mock`
-- `EXPO_PUBLIC_AVIATIONSTACK_API_KEY`
-- `EXPO_PUBLIC_AVIATIONSTACK_PLAN`
-- `EXPO_PUBLIC_AVIATIONSTACK_BASE_URL`
+- `EXPO_PUBLIC_OPENSKY_CLIENT_ID`
+- `EXPO_PUBLIC_OPENSKY_CLIENT_SECRET`
+- `EXPO_PUBLIC_OPENSKY_BASE_URL`
+- `EXPO_PUBLIC_OPENSKY_AUTH_URL`
 - `EXPO_PUBLIC_DARWIN_TOKEN`
 - `EXPO_PUBLIC_DARWIN_ENDPOINT`
 - `EXPO_PUBLIC_BODS_API_KEY`
@@ -62,11 +63,12 @@ The app builds and runs without any provider credentials. When provider configur
 - Partial provider data: keep saved booking/passenger data, only overlay safe live fields
 - Manual booking details always win for passenger name, seat, booking ref, barcode payload, and other non-public data
 
-## Aviationstack limitations
+## OpenSky limitations
 
-- The configured plan may not support the same realtime/schedule/future-flight coverage on every key
-- Future-flight lookups should not be assumed on the free tier
-- Live passenger boarding data does not come from Aviationstack
+- Pineapple currently uses OpenSky `states/all` for live flight-state matching, not for passenger or booking detail enrichment
+- OpenSky airport arrivals/departures use ICAO airport identifiers and are historical or batch oriented, so Pineapple keeps saved route/time data locally instead of treating OpenSky as a booking source
+- Live passenger boarding data does not come from OpenSky
+- OpenSky documents that operational or commercial live-product use requires license review
 
 ## Darwin limitations
 
