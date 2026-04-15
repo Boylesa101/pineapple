@@ -22,6 +22,7 @@ import { ProviderLogoBadge } from '@/components/ProviderLogoBadge';
 import { TransportProviderSearchField } from '@/components/TransportProviderSearchField';
 import { TypedDateField } from '@/components/TypedDateField';
 import { QRCodeImage } from '@/components/ui/QRCodeImage';
+import { TransportStackSection } from '@/components/transport-stack';
 import { colors, spacing } from '@/constants/theme';
 import {
   getAirportSetOffInfo,
@@ -33,6 +34,7 @@ import {
   type DestinationWeatherForecast,
 } from '@/services/tripInsightsService';
 import { buildTripTransferQrPayload } from '@/services/tripTransfer';
+import { getTransportItems, type TransportItem } from '@/services/transport';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
 import { findTransportProvider } from '@/data/transportProviders';
 import { useAppStore } from '@/store/useAppStore';
@@ -123,6 +125,13 @@ function weatherIconName(weatherCode: number | null) {
 
 function quickFactValue(value: string | null | undefined, fallback = 'Unavailable') {
   return value?.trim() || fallback;
+}
+
+function formatTemperatureRange(minimum: number | null, maximum: number | null) {
+  if (minimum === null || maximum === null || minimum === undefined || maximum === undefined) {
+    return 'High / low unavailable';
+  }
+  return `H ${Math.round(maximum)}° / L ${Math.round(minimum)}°`;
 }
 
 function createTravelSegmentDraft(
@@ -233,6 +242,7 @@ export default function TripDetailScreen() {
   const [destinationQuickFacts, setDestinationQuickFacts] = useState<DestinationQuickFacts | null>(null);
   const [selectedWeatherDate, setSelectedWeatherDate] = useState<string | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [transportItems, setTransportItems] = useState<TransportItem[]>([]);
   const tripScrollRef = useRef<ScrollView | null>(null);
   const handledFocusRef = useRef<string | null>(null);
   useEffect(() => {
@@ -333,6 +343,25 @@ export default function TripDetailScreen() {
       current && destinationWeather.days.some((day) => day.date === current) ? current : destinationWeather.days[0]?.date ?? null
     );
   }, [destinationWeather]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getTransportItems({
+      travelSegments: bundle.travelSegments,
+      hotelStays: bundle.hotelStays,
+      documents: bundle.documents,
+      travellers: bundle.travellers,
+    }).then((nextItems) => {
+      if (!cancelled) {
+        setTransportItems(nextItems.filter((item) => item.type !== 'hotel'));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bundle.documents, bundle.hotelStays, bundle.travelSegments, bundle.travellers]);
 
   if (!trip) {
     return (
@@ -950,50 +979,90 @@ export default function TripDetailScreen() {
       </View>
 
       {destinationWeather?.days.length ? (
-        <Pressable
-          onPress={() => {
-            if (!selectedWeatherDay) {
-              return;
-            }
+        <View style={styles.weatherCard}>
+          <Pressable
+            onPress={() => {
+              if (!selectedWeatherDay) {
+                return;
+              }
 
-            router.push({
-              pathname: '/trip/[tripId]/weather',
-              params: { tripId, date: selectedWeatherDay.date },
-            });
-          }}
-          style={({ pressed }) => [styles.secondaryCardPressable, pressed ? styles.cardPressed : null]}
-        >
-          <View style={[styles.secondaryCard, styles.weatherCard]}>
-            <View style={styles.weatherHeaderRow}>
-              <View>
-                <Text style={styles.secondaryCardEyebrow}>{destinationWeather.resolvedLabel ?? trip.destination}</Text>
-                <Text style={styles.weatherConditionLabel}>{selectedWeatherDay?.conditionLabel ?? 'Weather unavailable'}</Text>
-              </View>
-              <MaterialIcons name={weatherIconName(selectedWeatherDay?.weatherCode ?? null) as any} size={24} color={colors.white} />
+              router.push({
+                pathname: '/trip/[tripId]/weather',
+                params: { tripId, date: selectedWeatherDay.date },
+              });
+            }}
+            style={({ pressed }) => [styles.weatherHeroSection, pressed ? styles.cardPressed : null]}
+          >
+            <View style={styles.weatherBackground}>
+              <View style={styles.weatherCircleLarge} />
+              <View style={styles.weatherCircleMedium} />
+              <View style={styles.weatherCircleSmall} />
             </View>
-            <View style={styles.weatherSummaryRow}>
+            <View style={styles.weatherHeroLeft}>
+              <View style={styles.weatherConditionRow}>
+                <MaterialIcons name={weatherIconName(selectedWeatherDay?.weatherCode ?? null) as any} size={28} color={colors.white} />
+                <Text style={styles.weatherConditionLabel} numberOfLines={1} ellipsizeMode="tail">
+                  {selectedWeatherDay?.conditionLabel ?? 'Weather unavailable'}
+                </Text>
+              </View>
               <Text style={styles.weatherHeadlineTemp}>
                 {selectedWeatherDay?.temperatureMaxC !== null && selectedWeatherDay?.temperatureMaxC !== undefined
-                  ? `${Math.round(selectedWeatherDay.temperatureMaxC)}°C`
+                  ? `${Math.round(selectedWeatherDay.temperatureMaxC)}°`
                   : '--'}
               </Text>
               <Text style={styles.weatherHeadlineRange}>
-                {selectedWeatherDay &&
-                selectedWeatherDay.temperatureMaxC !== null &&
-                selectedWeatherDay.temperatureMinC !== null
-                  ? `H ${Math.round(selectedWeatherDay.temperatureMaxC)}° / L ${Math.round(selectedWeatherDay.temperatureMinC)}°`
-                  : 'H/L unavailable'}
+                {formatTemperatureRange(selectedWeatherDay?.temperatureMinC ?? null, selectedWeatherDay?.temperatureMaxC ?? null)}
               </Text>
             </View>
+            <View style={styles.weatherHeroRight}>
+              <Text style={styles.weatherHeroTime}>{destinationTimeInfo?.localTimeLabel ?? '--:--'}</Text>
+              <Text style={styles.weatherHeroOffset}>
+                {destinationTimeInfo
+                  ? `${destinationTimeInfo.offsetLabel}${destinationTimeInfo.relativeLabel ? ` • ${destinationTimeInfo.relativeLabel}` : ''}`
+                  : insightsLoading
+                    ? 'Checking timezone…'
+                    : 'Timezone unavailable'}
+              </Text>
+              <Text style={styles.weatherHeroPlace}>{destinationWeather.resolvedLabel ?? trip.destination}</Text>
+              <Text style={styles.weatherHeroMeta}>{selectedWeatherDay?.dayLabel ?? 'Today'}</Text>
+            </View>
+          </Pressable>
+          <View style={styles.weatherDaysSection}>
+            {destinationWeather.days.slice(0, 7).map((day) => (
+              <Pressable
+                key={day.date}
+                onPress={() => setSelectedWeatherDate(day.date)}
+                style={[styles.weatherDayButton, day.date === selectedWeatherDate ? styles.weatherDayButtonActive : null]}
+              >
+                <Text style={styles.weatherDayButtonLabel}>{day.dayLabel.slice(0, 3)}</Text>
+                <Text style={styles.weatherDayButtonTemp}>{day.temperatureMaxC !== null ? `${Math.round(day.temperatureMaxC)}°` : '--'}</Text>
+              </Pressable>
+            ))}
           </View>
-        </Pressable>
+        </View>
       ) : (
-        <View style={[styles.secondaryCard, styles.weatherCard]}>
-          <Text style={styles.secondaryCardEyebrow}>{trip.destination}</Text>
-          <Text style={styles.weatherConditionLabel}>{insightsLoading ? 'Loading weather' : 'Weather unavailable'}</Text>
-          <Text style={styles.weatherHeadlineRange}>
-            {destinationTimeInfo ? `Local time ${destinationTimeInfo.localTimeLabel}` : 'Check the full weather page for more detail.'}
-          </Text>
+        <View style={styles.weatherCard}>
+          <View style={styles.weatherHeroSection}>
+            <View style={styles.weatherBackground}>
+              <View style={styles.weatherCircleLarge} />
+              <View style={styles.weatherCircleMedium} />
+              <View style={styles.weatherCircleSmall} />
+            </View>
+            <View style={styles.weatherHeroLeft}>
+              <View style={styles.weatherConditionRow}>
+                <MaterialIcons name="cloud-off" size={28} color={colors.white} />
+                <Text style={styles.weatherConditionLabel}>{insightsLoading ? 'Loading weather' : 'Weather unavailable'}</Text>
+              </View>
+              <Text style={styles.weatherHeadlineTemp}>--</Text>
+              <Text style={styles.weatherHeadlineRange}>Check the full weather page for more detail.</Text>
+            </View>
+            <View style={styles.weatherHeroRight}>
+              <Text style={styles.weatherHeroTime}>{destinationTimeInfo?.localTimeLabel ?? '--:--'}</Text>
+              <Text style={styles.weatherHeroOffset}>{destinationTimeInfo?.offsetLabel ?? 'Timezone unavailable'}</Text>
+              <Text style={styles.weatherHeroPlace}>{trip.destination}</Text>
+              <Text style={styles.weatherHeroMeta}>Today</Text>
+            </View>
+          </View>
         </View>
       )}
 
@@ -1001,7 +1070,7 @@ export default function TripDetailScreen() {
         onPress={() => router.push({ pathname: '/trip/[tripId]/destination-facts', params: { tripId } })}
         style={({ pressed }) => [styles.secondaryCardPressable, pressed ? styles.cardPressed : null]}
       >
-        <AppCard title="Quick info" variant="standard" style={styles.secondaryCard}>
+        <AppCard title="Quick info" variant="standard" style={[styles.secondaryCard, styles.quickInfoCard]}>
           <View style={styles.quickInfoGrid}>
             <View style={styles.quickInfoCell}>
               <Text style={styles.quickFactLabel}>Currency</Text>
@@ -1024,6 +1093,8 @@ export default function TripDetailScreen() {
           </View>
         </AppCard>
       </Pressable>
+
+      <TransportStackSection tripId={tripId} items={transportItems} />
 
       <Pressable
         onPress={() => router.push({ pathname: '/trip/[tripId]/set-off', params: { tripId } })}
@@ -1574,12 +1645,6 @@ const styles = StyleSheet.create({
     shadowRadius: 22,
     elevation: 3,
   },
-  secondaryCardEyebrow: {
-    color: 'rgba(255,255,255,0.84)',
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    lineHeight: 16,
-  },
   heroMetaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1743,98 +1808,151 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     alignItems: 'center',
   },
-  transportRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  highlightedTransportRow: {
-    borderRadius: 18,
-    backgroundColor: '#F5FAFF',
-    paddingHorizontal: spacing.xs,
-  },
-  transportCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  transportHeader: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  transportTitle: {
-    color: colors.nightNavy,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 15,
-  },
-  transportMeta: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  transportAlertSummary: {
-    color: colors.primaryBlueText,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  transportReminderList: {
-    gap: 2,
-  },
-  transportReminderText: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  proofScheduleList: {
-    gap: 4,
-  },
-  transportTimingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
   weatherCard: {
-    backgroundColor: '#2E7BD6',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+    borderRadius: 25,
+    backgroundColor: '#D7D3D0',
+    shadowColor: 'rgba(0,0,0,0.15)',
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  weatherHeaderRow: {
+  weatherHeroSection: {
+    position: 'relative',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.md,
+    minHeight: 140,
+    paddingHorizontal: 18,
+    paddingVertical: spacing.md,
+    backgroundColor: '#EC7263',
+    overflow: 'hidden',
+  },
+  weatherBackground: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  weatherCircleLarge: {
+    position: 'absolute',
+    top: '-80%',
+    right: '-50%',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    opacity: 0.4,
+    backgroundColor: '#EFC745',
+  },
+  weatherCircleMedium: {
+    position: 'absolute',
+    top: '-70%',
+    right: '-30%',
+    width: 210,
+    height: 210,
+    borderRadius: 105,
+    opacity: 0.4,
+    backgroundColor: '#EFC745',
+  },
+  weatherCircleSmall: {
+    position: 'absolute',
+    top: '-35%',
+    right: '-8%',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#EFC745',
+  },
+  weatherHeroLeft: {
+    flex: 1,
+    gap: spacing.sm,
+    zIndex: 1,
+    paddingRight: spacing.sm,
+  },
+  weatherConditionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   weatherConditionLabel: {
+    flex: 1,
     color: colors.white,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  weatherSummaryRow: {
-    marginTop: 'auto',
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: spacing.md,
+    fontSize: 13,
   },
   weatherHeadlineTemp: {
     color: colors.white,
     fontFamily: 'Poppins_600SemiBold',
-    fontSize: 32,
-    lineHeight: 36,
+    fontSize: 36,
+    lineHeight: 40,
   },
   weatherHeadlineRange: {
     color: 'rgba(255,255,255,0.88)',
     fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 13,
+  },
+  weatherHeroRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+    maxWidth: '42%',
+    zIndex: 1,
+  },
+  weatherHeroTime: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 28,
+    lineHeight: 30,
     textAlign: 'right',
+  },
+  weatherHeroOffset: {
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: 'right',
+  },
+  weatherHeroPlace: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 15,
+    textAlign: 'right',
+  },
+  weatherHeroMeta: {
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  weatherDaysSection: {
+    flexDirection: 'row',
+    backgroundColor: '#974859',
+    gap: 2,
+    paddingTop: 2,
+  },
+  weatherDayButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    minHeight: 56,
+    backgroundColor: '#A75265',
+    paddingVertical: spacing.sm,
+  },
+  weatherDayButtonActive: {
+    backgroundColor: '#8F4055',
+  },
+  weatherDayButtonLabel: {
+    color: 'rgba(255,255,255,0.75)',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 10,
+  },
+  weatherDayButtonTemp: {
+    color: colors.white,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 14,
+  },
+  quickInfoCard: {
+    backgroundColor: '#EAF3FF',
+    borderColor: 'rgba(99, 151, 243, 0.26)',
+    shadowColor: 'rgba(6, 26, 52, 0.22)',
   },
   quickInfoGrid: {
     flexDirection: 'row',
@@ -1844,6 +1962,13 @@ const styles = StyleSheet.create({
   },
   quickInfoCell: {
     width: '47%',
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.78)',
+  },
+  proofScheduleList: {
     gap: 4,
   },
   hotelRow: {
