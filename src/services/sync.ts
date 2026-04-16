@@ -71,6 +71,8 @@ const reminderKinds = new Set<ReminderKind>([
   'flight_check_in',
   'hotel_check_in',
   'transfer_reminder',
+  'shared_trip_update',
+  'live_travel_update',
   'travel_mode_reminder',
   'sos_ready',
   'excursion_reminder',

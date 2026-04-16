@@ -4,6 +4,7 @@ import Constants, { AppOwnership, ExecutionEnvironment } from 'expo-constants';
 import type { AppDataSnapshot, TravelSegment, TransportType } from '@/types/models';
 import { updateTravelSegmentNotificationState } from '@/db/repositories';
 import { createReminderContent, getTransportNotificationSummary } from '@/services/notificationPlanner';
+import type { TransportItem } from '@/services/transport';
 
 type NotificationsModule = typeof import('expo-notifications');
 export type NotificationTarget = {
@@ -34,10 +35,18 @@ export type ScheduledNotificationDiagnostic = {
 export type NotificationDiagnostics = {
   runtimeSupported: boolean;
   permissionGranted: boolean;
+  registrationState: 'local_only' | 'runtime_unsupported';
   transportChannel: NotificationChannelStatus | null;
   generalChannel: NotificationChannelStatus | null;
   futureScheduledCount: number;
   scheduledTransportAlerts: ScheduledNotificationDiagnostic[];
+  lastScheduledAt: string | null;
+  lastScheduleError: string | null;
+  lastDeliveredEvent: {
+    title: string;
+    body: string;
+    receivedAt: string;
+  } | null;
 };
 
 const GENERAL_CHANNEL_ID = 'pineapple-reminders';
@@ -48,6 +57,11 @@ let pendingRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingSnapshot: AppDataSnapshot | null = null;
 let pendingRequestPermissions = false;
 let pendingNotificationTarget: NotificationTarget | null = null;
+let foregroundDeliverySubscriptionAttached = false;
+let lastScheduledAt: string | null = null;
+let lastScheduleError: string | null = null;
+let lastDeliveredEvent: NotificationDiagnostics['lastDeliveredEvent'] = null;
+const seenLiveUpdateSignatures = new Set<string>();
 
 function isNativeNotificationsSupported() {
   return Platform.OS === 'android' || Platform.OS === 'ios';
@@ -111,6 +125,14 @@ function normalizeTriggerDate(trigger: unknown) {
   return normalizeScheduledDate(data.date ?? data.value ?? null);
 }
 
+function rememberDeliveredEvent(title: string | null | undefined, body: string | null | undefined) {
+  lastDeliveredEvent = {
+    title: title?.trim() || 'Notification',
+    body: body?.trim() || '',
+    receivedAt: new Date().toISOString(),
+  };
+}
+
 function buildTransportNotificationState(segment: TravelSegment, scheduledNotificationIds: string[]) {
   return {
     departureTimeZone: segment.departureTimeZone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || null),
@@ -143,6 +165,13 @@ async function loadNotificationsModule() {
             shouldShowList: true,
           }),
         });
+
+        if (!foregroundDeliverySubscriptionAttached) {
+          Notifications.addNotificationReceivedListener((notification) => {
+            rememberDeliveredEvent(notification.request.content.title, notification.request.content.body);
+          });
+          foregroundDeliverySubscriptionAttached = true;
+        }
 
         if (Platform.OS === 'android') {
           await Notifications.setNotificationChannelAsync(GENERAL_CHANNEL_ID, {
@@ -216,15 +245,18 @@ export async function rescheduleLocalNotifications(
     return 0;
   }
 
+  lastScheduleError = null;
   await Notifications.cancelAllScheduledNotificationsAsync();
   await persistTransportNotificationStates(snapshot);
 
   if (!snapshot.appPreferences.notificationsEnabled) {
+    lastScheduledAt = new Date().toISOString();
     return 0;
   }
 
   const hasPermissions = options.requestPermissions ? await requestNotificationPermissions() : await hasNotificationPermissions();
   if (!hasPermissions) {
+    lastScheduledAt = new Date().toISOString();
     return 0;
   }
 
@@ -262,6 +294,7 @@ export async function rescheduleLocalNotifications(
   );
 
   await persistTransportNotificationStates(snapshot, idsBySegmentId);
+  lastScheduledAt = new Date().toISOString();
   return content.length;
 }
 
@@ -287,7 +320,9 @@ export function queueNotificationRefresh(
       return;
     }
 
-    rescheduleLocalNotifications(nextSnapshot, { requestPermissions }).catch(() => undefined);
+    rescheduleLocalNotifications(nextSnapshot, { requestPermissions }).catch((error) => {
+      lastScheduleError = error instanceof Error ? error.message : 'Notification scheduling failed.';
+    });
   }, options.delayMs ?? 350);
 }
 
@@ -341,6 +376,7 @@ export async function addNotificationResponseListener(onReceive: (target: Notifi
 
   const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
     const target = parseNotificationTarget(response.notification.request.content.data);
+    rememberDeliveredEvent(response.notification.request.content.title, response.notification.request.content.body);
     rememberNotificationTarget(target);
     if (target) {
       onReceive(target);
@@ -374,10 +410,14 @@ export async function getNotificationDiagnostics() {
     return {
       runtimeSupported: false,
       permissionGranted: false,
+      registrationState: 'runtime_unsupported',
       transportChannel: null,
       generalChannel: null,
       futureScheduledCount: 0,
       scheduledTransportAlerts: [],
+      lastScheduledAt,
+      lastScheduleError,
+      lastDeliveredEvent,
     } satisfies NotificationDiagnostics;
   }
 
@@ -408,9 +448,93 @@ export async function getNotificationDiagnostics() {
   return {
     runtimeSupported: true,
     permissionGranted,
+    registrationState: 'local_only',
     transportChannel: await getChannelStatus(Notifications, TRANSPORT_CHANNEL_ID),
     generalChannel: await getChannelStatus(Notifications, GENERAL_CHANNEL_ID),
     futureScheduledCount: diagnostics.length,
     scheduledTransportAlerts: diagnostics.filter((item) => item.transportSegmentId !== null),
+    lastScheduledAt,
+    lastScheduleError,
+    lastDeliveredEvent,
   } satisfies NotificationDiagnostics;
+}
+
+export async function sendImmediateTravelNotification(input: {
+  title: string;
+  body: string;
+  href?: string | null;
+  activeTripId?: string | null;
+  channelId?: 'pineapple-reminders' | 'pineapple-transport';
+  transportSegmentId?: string | null;
+  transportType?: TransportType | null;
+}) {
+  const Notifications = await loadNotificationsModule();
+  if (!Notifications) {
+    return false;
+  }
+
+  if (!(await hasNotificationPermissions())) {
+    return false;
+  }
+
+  await Notifications.scheduleNotificationAsync({
+    content: ({
+      title: input.title,
+      body: input.body,
+      data: {
+        pineappleHref: input.href ?? null,
+        pineappleActiveTripId: input.activeTripId ?? null,
+        pineappleTransportSegmentId: input.transportSegmentId ?? null,
+        pineappleTransportType: input.transportType ?? null,
+      },
+      channelId: input.channelId ?? (Platform.OS === 'android' ? GENERAL_CHANNEL_ID : undefined),
+      sound: 'default',
+    } as unknown) as Parameters<typeof Notifications.scheduleNotificationAsync>[0]['content'],
+    trigger: null,
+  });
+
+  lastScheduledAt = new Date().toISOString();
+  return true;
+}
+
+export async function notifyLiveTransportUpdates(tripId: string, items: TransportItem[], notificationsEnabled: boolean) {
+  if (!notificationsEnabled) {
+    return;
+  }
+
+  for (const item of items) {
+    if (!item.isLive) {
+      continue;
+    }
+    if (!['delayed', 'cancelled', 'gate_change', 'boarding'].includes(item.liveStatus)) {
+      continue;
+    }
+
+    const signature = [item.id, item.liveStatus, item.lastUpdatedAt ?? item.departureTime ?? 'unknown'].join(':');
+    if (seenLiveUpdateSignatures.has(signature)) {
+      continue;
+    }
+    seenLiveUpdateSignatures.add(signature);
+
+    const serviceLabel = item.flightNumber || item.trainNumber || item.serviceNumber || item.operatorName;
+    const routeLabel = item.routeLabel || [item.originName, item.destinationName].filter(Boolean).join(' to ');
+    const body =
+      item.liveStatus === 'cancelled'
+        ? `${serviceLabel} is now marked cancelled.`
+        : item.liveStatus === 'gate_change'
+          ? `${serviceLabel} has a gate or platform update.`
+          : item.liveStatus === 'boarding'
+            ? `${serviceLabel} is nearing departure.`
+            : `${serviceLabel} is delayed.`;
+
+    await sendImmediateTravelNotification({
+      title: `Live travel update${routeLabel ? ` • ${routeLabel}` : ''}`,
+      body,
+      href: `/trip/${tripId}?focus=travel&segmentId=${item.sourceRecordId}`,
+      activeTripId: tripId,
+      channelId: 'pineapple-transport',
+      transportSegmentId: item.sourceRecordId,
+      transportType: item.travelSegment?.transportType ?? null,
+    });
+  }
 }

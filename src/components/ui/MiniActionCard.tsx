@@ -27,9 +27,18 @@ export function MiniActionCard({ icon, title, description, onPress, style }: Pro
 const styles = StyleSheet.create({
   card: {
     minHeight: 0,
+    backgroundColor: '#F8FBFF',
+    borderColor: 'rgba(13, 110, 253, 0.08)',
+    shadowOpacity: 0.5,
   },
   iconWrap: {
     marginBottom: spacing.xs,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(13, 110, 253, 0.1)',
   },
   title: {
     color: colors.primaryBlueText,

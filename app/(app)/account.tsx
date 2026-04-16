@@ -264,9 +264,9 @@ const styles = StyleSheet.create({
   },
   statBox: {
     flex: 1,
-    backgroundColor: '#F3F8FF',
+    backgroundColor: '#F7FBFF',
     borderWidth: 1,
-    borderColor: '#D9E9FB',
+    borderColor: 'rgba(13, 110, 253, 0.08)',
     borderRadius: 18,
     padding: 14,
     alignItems: 'center',
@@ -289,6 +289,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+    padding: 4,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.55)',
   },
   gridItem: {
     width: '48%',

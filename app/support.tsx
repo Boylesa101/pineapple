@@ -5,6 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { LegalSectionCards } from '@/components/legal/LegalSectionCards';
+import { AccordionSection } from '@/components/ui/AccordionSection';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { legalConfig, supportFaqs, supportIntroSections } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
@@ -32,9 +33,11 @@ export default function SupportScreen() {
 
       <View style={styles.faqWrap}>
         {supportFaqs.map((item) => (
-          <AppCard key={item.question} title={item.question}>
-            <Text style={styles.answer}>{item.answer}</Text>
-          </AppCard>
+          <AccordionSection key={item.question} title={item.question}>
+            <AppCard>
+              <Text style={styles.answer}>{item.answer}</Text>
+            </AppCard>
+          </AccordionSection>
         ))}
       </View>
     </AppScreen>

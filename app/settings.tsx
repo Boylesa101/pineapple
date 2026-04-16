@@ -16,8 +16,8 @@ import { InfoChip } from '@/components/InfoChip';
 import { ListRow } from '@/components/ListRow';
 import { MultiSelectChips } from '@/components/MultiSelectChips';
 import { AppHeader } from '@/components/ui/AppHeader';
+import { AccordionSection } from '@/components/ui/AccordionSection';
 import { HeroCard } from '@/components/ui/HeroCard';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { legalConfig, privacySummaryBullets } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -36,7 +36,7 @@ import {
   isBackupFileName,
 } from '@/services/backup';
 import { useAppStore } from '@/store/useAppStore';
-import type { ConflictStatus, ExpiryReminderLeadTime, PrivacyMaskingMode } from '@/types/models';
+import type { ConflictStatus, ExpiryReminderLeadTime, PrivacyMaskingMode, ReminderKind, ReminderLeadTime } from '@/types/models';
 import { isWebCompanionPolicyActive, sensitiveWebSupportMessage } from '@/utils/platformPolicy';
 import { canUseBiometrics } from '@/utils/security';
 import { toUserMessage } from '@/utils/userErrors';
@@ -81,6 +81,7 @@ export default function SettingsScreen() {
     importBackupFile,
     importSharedTripFile,
     resolveSyncConflictChoice,
+    saveReminderSetting,
   } = useAppStore();
   const [backupVisible, setBackupVisible] = useState(false);
   const [backupAction, setBackupAction] = useState<BackupAction>('export');
@@ -102,6 +103,10 @@ export default function SettingsScreen() {
   const lastBackupLabel = data.appPreferences.lastBackupAt
     ? new Date(data.appPreferences.lastBackupAt).toLocaleString()
     : 'Never';
+  const globalReminderSettings = useMemo(
+    () => new Map(data.reminderSettings.filter((item) => item.tripId === null).map((item) => [item.kind, item])),
+    [data.reminderSettings]
+  );
 
   useEffect(() => {
     hasNotificationPermissions()
@@ -318,7 +323,7 @@ export default function SettingsScreen() {
     if (!isNotificationsRuntimeSupported()) {
       Alert.alert(
         'Notifications unavailable here',
-        'Local reminders are only supported in the installed Pineapple Android build.'
+        'Local reminders are only supported in the installed Pineapple build.'
       );
       return;
     }
@@ -342,6 +347,17 @@ export default function SettingsScreen() {
     await saveAppPreferences({ notificationsEnabled: true });
   }
 
+  async function setReminderPreference(kind: ReminderKind, enabled: boolean, leadTimeDays: ReminderLeadTime) {
+    const existing = globalReminderSettings.get(kind);
+    await saveReminderSetting({
+      id: existing?.id,
+      tripId: null,
+      kind,
+      enabled,
+      leadTimeDays: existing?.leadTimeDays ?? leadTimeDays,
+    });
+  }
+
   return (
     <AppScreen scroll contentStyle={styles.screen}>
       <AppHeader
@@ -360,20 +376,21 @@ export default function SettingsScreen() {
         </AppCard>
       ) : null}
 
-      <AppCard title={t('settings.languageTitle')} subtitle={t('settings.languageDescription')}>
-        <LanguagePicker
-          title={t('settings.languageTitle')}
-          description={t('settings.languageDescription')}
-          value={data.appPreferences.appLanguage}
-          onChange={(appLanguage) => {
-            void saveAppPreferences({ appLanguage });
-          }}
-          showGreetingCycle={false}
-        />
-      </AppCard>
+      <AccordionSection title={t('settings.languageTitle')} subtitle={t('settings.languageDescription')}>
+        <AppCard title={t('settings.languageTitle')} subtitle={t('settings.languageDescription')}>
+          <LanguagePicker
+            title={t('settings.languageTitle')}
+            description={t('settings.languageDescription')}
+            value={data.appPreferences.appLanguage}
+            onChange={(appLanguage) => {
+              void saveAppPreferences({ appLanguage });
+            }}
+            showGreetingCycle={false}
+          />
+        </AppCard>
+      </AccordionSection>
 
-      <View style={styles.section}>
-        <SectionHeader title={t('settings.securitySection')} />
+      <AccordionSection title={t('settings.securitySection')} subtitle="App lock, permissions, and local reminder controls.">
       <AppCard title="Security">
         <Text style={styles.label}>App lock timer</Text>
         <ChoiceChips
@@ -403,6 +420,76 @@ export default function SettingsScreen() {
             tone={data.appPreferences.notificationsEnabled ? 'primary' : 'secondary'}
             onPress={toggleNotificationsEnabled}
           />
+        </View>
+        <View style={styles.preferenceGroup}>
+          <Text style={styles.label}>Trip reminder types</Text>
+          <View style={styles.preferenceList}>
+            <ListRow
+              title="Trip countdown reminders"
+              subtitle="30, 7, 3, and 1 day reminders plus a same-day travel prompt."
+              onPress={() =>
+                void setReminderPreference(
+                  'trip_countdown_30_days',
+                  !(globalReminderSettings.get('trip_countdown_30_days')?.enabled ?? true),
+                  30
+                )
+              }
+              right={<Text style={styles.linkText}>{globalReminderSettings.get('trip_countdown_30_days')?.enabled ?? true ? 'On' : 'Off'}</Text>}
+            />
+            <ListRow
+              title="Packing reminders"
+              subtitle="Includes the 3-day “Have you packed yet?” check before departure."
+              onPress={() =>
+                void setReminderPreference(
+                  'packing_incomplete',
+                  !(globalReminderSettings.get('packing_incomplete')?.enabled ?? true),
+                  3
+                )
+              }
+              right={<Text style={styles.linkText}>{globalReminderSettings.get('packing_incomplete')?.enabled ?? true ? 'On' : 'Off'}</Text>}
+            />
+            <ListRow
+              title="Check-in reminders"
+              subtitle="Airline check-in plus saved transport departure alerts."
+              onPress={() =>
+                void setReminderPreference(
+                  'flight_check_in',
+                  !(globalReminderSettings.get('flight_check_in')?.enabled ?? true),
+                  1
+                )
+              }
+              right={<Text style={styles.linkText}>{globalReminderSettings.get('flight_check_in')?.enabled ?? true ? 'On' : 'Off'}</Text>}
+            />
+            <ListRow
+              title="Live travel updates"
+              subtitle="Delay, cancellation, boarding, and gate/platform update alerts when Pineapple detects live changes."
+              onPress={() =>
+                void setReminderPreference(
+                  'live_travel_update',
+                  !(globalReminderSettings.get('live_travel_update')?.enabled ?? true),
+                  0
+                )
+              }
+              right={<Text style={styles.linkText}>{globalReminderSettings.get('live_travel_update')?.enabled ?? true ? 'On' : 'Off'}</Text>}
+            />
+            <ListRow
+              title="Shared trip updates"
+              subtitle="Alerts when an encrypted shared-trip import updates this device."
+              onPress={() =>
+                void setReminderPreference(
+                  'shared_trip_update',
+                  !(globalReminderSettings.get('shared_trip_update')?.enabled ?? true),
+                  0
+                )
+              }
+              right={<Text style={styles.linkText}>{globalReminderSettings.get('shared_trip_update')?.enabled ?? true ? 'On' : 'Off'}</Text>}
+            />
+            <ListRow
+              title="Marketing notifications"
+              subtitle="Off. Pineapple does not send marketing pushes in this release."
+              right={<Text style={styles.linkText}>Off</Text>}
+            />
+          </View>
         </View>
         <View style={styles.row}>
           <Text style={styles.body}>Enable expiry reminders</Text>
@@ -444,14 +531,15 @@ export default function SettingsScreen() {
         ) : null}
         {!isNotificationsRuntimeSupported() ? (
           <Text style={styles.meta}>
-            This runtime does not support Pineapple reminders. Use the installed Pineapple Android build for notification testing.
+            This runtime does not support Pineapple reminders. Use the installed Pineapple build for notification testing.
           </Text>
         ) : null}
       </AppCard>
 
+      {__DEV__ ? (
       <AppCard
         title="Notification diagnostics"
-        subtitle="Proof view for scheduled transport alerts, channel state, and lock-screen readiness."
+        subtitle="Proof view for permission state, scheduling, and lock-screen readiness."
       >
         <View style={styles.chipRow}>
           <InfoChip
@@ -467,6 +555,17 @@ export default function SettingsScreen() {
             tone="default"
           />
         </View>
+        <Text style={styles.meta}>Registration state: {notificationDiagnostics?.registrationState ?? 'Unknown'}</Text>
+        <Text style={styles.meta}>
+          Last schedule run: {notificationDiagnostics?.lastScheduledAt ? new Date(notificationDiagnostics.lastScheduledAt).toLocaleString() : 'Never'}
+        </Text>
+        <Text style={styles.meta}>Last schedule error: {notificationDiagnostics?.lastScheduleError ?? 'None'}</Text>
+        <Text style={styles.meta}>
+          Last delivered event:{' '}
+          {notificationDiagnostics?.lastDeliveredEvent
+            ? `${notificationDiagnostics.lastDeliveredEvent.title} • ${new Date(notificationDiagnostics.lastDeliveredEvent.receivedAt).toLocaleString()}`
+            : 'None recorded in this session'}
+        </Text>
         <Text style={styles.meta}>
           Transport channel: {notificationDiagnostics?.transportChannel?.exists ? 'ready' : 'missing'} • importance{' '}
           {notificationImportanceLabel(notificationDiagnostics?.transportChannel?.importance ?? null)} • lock screen{' '}
@@ -518,10 +617,10 @@ export default function SettingsScreen() {
           </Text>
         )}
       </AppCard>
-      </View>
+      ) : null}
+      </AccordionSection>
 
-      <View style={styles.section}>
-        <SectionHeader title={t('settings.syncSection')} />
+      <AccordionSection title={t('settings.syncSection')} subtitle="Encrypted trip transfer, privacy masking, and manual-share controls.">
       <AppCard title="Sync" subtitle="Optional manual-share sync. Pineapple still works fully in local-only mode.">
         <View style={styles.chipRow}>
           <InfoChip label={data.appPreferences.syncEnabled ? 'Sync enabled' : 'Local-only mode'} tone={data.appPreferences.syncEnabled ? 'blue' : 'default'} />
@@ -574,10 +673,9 @@ export default function SettingsScreen() {
           Document images, trips, reminders, and emergency notes are designed to stay on this device unless you explicitly export or share them.
         </Text>
       </AppCard>
-      </View>
+      </AccordionSection>
 
-      <View style={styles.section}>
-        <SectionHeader title={t('settings.dataSection')} />
+      <AccordionSection title={t('settings.dataSection')} subtitle="Encrypted backup export and device restore.">
       <AppCard title="Backup & Restore" subtitle="Create encrypted local backup files and restore them later on this device.">
         <Text style={styles.meta}>
           Pineapple exports password-protected {PINEAPPLE_BACKUP_EXTENSION} files with your structured trip data and available local attachments. Store backups securely.
@@ -597,10 +695,9 @@ export default function SettingsScreen() {
           <AppButton label="Restore backup" tone="secondary" onPress={openBackupImport} disabled={isWebCompanionPolicyActive()} />
         </View>
       </AppCard>
-      </View>
+      </AccordionSection>
 
-      <View style={styles.section}>
-        <SectionHeader title={t('settings.conflictSection')} />
+      <AccordionSection title={t('settings.conflictSection')} subtitle="Manual conflict review for shared-trip changes.">
       <AppCard title="Conflict review" subtitle="Pineapple never silently overwrites local trip changes.">
         {openConflicts.length ? (
           <View style={styles.conflictList}>
@@ -630,10 +727,9 @@ export default function SettingsScreen() {
           />
         )}
       </AppCard>
-      </View>
+      </AccordionSection>
 
-      <View style={styles.section}>
-        <SectionHeader title={t('settings.legalSection')} />
+      <AccordionSection title={t('settings.legalSection')} subtitle="Privacy, terms, support, and release references.">
         <AppCard title="Privacy summary" subtitle="Keep the legal wording visible inside the app where travellers actually use it.">
           {privacySummaryBullets.map((item) => (
             <View key={item} style={styles.privacyRow}>
@@ -669,7 +765,7 @@ export default function SettingsScreen() {
             right={<Text style={styles.linkText}>Open</Text>}
           />
         </AppCard>
-      </View>
+      </AccordionSection>
 
       <AppModal
         visible={backupVisible}
@@ -739,6 +835,14 @@ const styles = StyleSheet.create({
   },
   fieldBlock: {
     gap: spacing.xs,
+  },
+  preferenceGroup: {
+    gap: spacing.xs,
+  },
+  preferenceList: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#F8FBFF',
   },
   meta: {
     color: colors.textMuted,

@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/components/AppCard';
+import { AccordionSection } from '@/components/ui/AccordionSection';
 import { colors, spacing } from '@/constants/theme';
 import type { ContentSection } from '@/content/legal';
 
@@ -8,23 +9,25 @@ export function LegalSectionCards({ sections }: { sections: ContentSection[] }) 
   return (
     <View style={styles.wrap}>
       {sections.map((section) => (
-        <AppCard key={section.heading} title={section.heading}>
-          {section.paragraphs.map((paragraph) => (
-            <Text key={paragraph} style={styles.body}>
-              {paragraph}
-            </Text>
-          ))}
-          {section.bullets?.length ? (
-            <View style={styles.list}>
-              {section.bullets.map((bullet) => (
-                <View key={bullet} style={styles.listItem}>
-                  <View style={styles.dot} />
-                  <Text style={styles.body}>{bullet}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </AppCard>
+        <AccordionSection key={section.heading} title={section.heading}>
+          <AppCard>
+            {section.paragraphs.map((paragraph) => (
+              <Text key={paragraph} style={styles.body}>
+                {paragraph}
+              </Text>
+            ))}
+            {section.bullets?.length ? (
+              <View style={styles.list}>
+                {section.bullets.map((bullet) => (
+                  <View key={bullet} style={styles.listItem}>
+                    <View style={styles.dot} />
+                    <Text style={styles.body}>{bullet}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </AppCard>
+        </AccordionSection>
       ))}
     </View>
   );

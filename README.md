@@ -75,6 +75,14 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - If provider credentials are missing, rate limited, or no useful live match is found, Pineapple falls back gracefully to saved trip data and marks the live layer as unavailable instead of breaking the card
 - Development diagnostics are available through `getTransportProviderDiagnostics()` and the transport stack dev note in development builds
 
+### Notifications and reminder diagnostics
+
+- Pineapple reminders are local device notifications driven by `expo-notifications`
+- Countdown, packing, flight check-in, transport departure, and document expiry reminders are scheduled from the local trip snapshot and rescheduled when trip data changes
+- Shared-trip import updates can raise a local notification on-device after a successful encrypted import
+- Live travel updates can raise an on-device alert when Pineapple detects a new delayed, cancelled, boarding, or gate/platform-change state while refreshing transport items in the app
+- Honest limitation: Pineapple still does not have a remote push backend, so background live-disruption delivery is not equivalent to an FCM/APNs production push service
+
 ### Transport provider environment variables
 
 - `EXPO_PUBLIC_TRANSPORT_PROVIDER_MODE=mock`

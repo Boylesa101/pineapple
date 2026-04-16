@@ -273,6 +273,28 @@ test('trip-level reminder settings generate travel, hotel, transfer, travel mode
   assert.equal(reminders.some((item) => item.href === '/sos'), true);
 });
 
+test('flight check-in reminders schedule 24 hours before departure when enabled', () => {
+  const snapshot = createSnapshot();
+  snapshot.travelSegments = [
+    createTransportSegment(
+      snapshot,
+      'segment_flight',
+      'flight',
+      new Date('2026-03-28T12:00:00.000Z').toISOString(),
+      new Date('2026-03-28T15:00:00.000Z').toISOString()
+    ),
+  ];
+  snapshot.reminderSettings = [createReminderSetting(snapshot, 'flight_check_in', 1)];
+
+  const reminders = createReminderContent(snapshot, { now: new Date('2026-03-27T08:00:00.000Z') });
+  const checkInReminder = reminders.find((item) => item.kind === 'flight_check_in');
+
+  assert.equal(Boolean(checkInReminder), true);
+  assert.equal(checkInReminder?.channelId, 'pineapple-transport');
+  assert.equal(checkInReminder?.transportSegmentId, 'segment_flight');
+  assert.match(checkInReminder?.title ?? '', /Check in/);
+});
+
 test('trip countdown reminders cover 30, 7, 3, 1 day, and trip-day scheduling', () => {
   const snapshot = createSnapshot();
   snapshot.trips[0] = {

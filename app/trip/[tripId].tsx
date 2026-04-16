@@ -22,6 +22,7 @@ import { ProviderLogoBadge } from '@/components/ProviderLogoBadge';
 import { TransportProviderSearchField } from '@/components/TransportProviderSearchField';
 import { TypedDateField } from '@/components/TypedDateField';
 import { QRCodeImage } from '@/components/ui/QRCodeImage';
+import { AccordionSection } from '@/components/ui/AccordionSection';
 import { TransportStackSection } from '@/components/transport-stack';
 import { colors, spacing } from '@/constants/theme';
 import {
@@ -35,6 +36,7 @@ import {
 } from '@/services/tripInsightsService';
 import { buildTripTransferQrPayload } from '@/services/tripTransfer';
 import { getTransportItems, type TransportItem } from '@/services/transport';
+import { notifyLiveTransportUpdates } from '@/services/notifications';
 import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
 import { findTransportProvider } from '@/data/transportProviders';
 import { useAppStore } from '@/store/useAppStore';
@@ -245,6 +247,9 @@ export default function TripDetailScreen() {
   const [transportItems, setTransportItems] = useState<TransportItem[]>([]);
   const tripScrollRef = useRef<ScrollView | null>(null);
   const handledFocusRef = useRef<string | null>(null);
+  const liveTravelNotificationsEnabled =
+    data.appPreferences.notificationsEnabled &&
+    (data.reminderSettings.find((item) => item.tripId === null && item.kind === 'live_travel_update')?.enabled ?? true);
   useEffect(() => {
     if (!trip) {
       return;
@@ -354,14 +359,16 @@ export default function TripDetailScreen() {
       travellers: bundle.travellers,
     }).then((nextItems) => {
       if (!cancelled) {
-        setTransportItems(nextItems.filter((item) => item.type !== 'hotel'));
+        const visibleItems = nextItems.filter((item) => item.type !== 'hotel');
+        setTransportItems(visibleItems);
+        void notifyLiveTransportUpdates(tripId, visibleItems, liveTravelNotificationsEnabled);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [bundle.documents, bundle.hotelStays, bundle.travelSegments, bundle.travellers]);
+  }, [bundle.documents, bundle.hotelStays, bundle.travelSegments, bundle.travellers, liveTravelNotificationsEnabled, tripId]);
 
   if (!trip) {
     return (
@@ -1110,6 +1117,53 @@ export default function TripDetailScreen() {
           </Text>
         </AppCard>
       </Pressable>
+
+      <AccordionSection
+        title="Sharing & participants"
+        subtitle="Encrypted trip sharing, QR transfer, and participant access."
+        rightLabel={bundle.participants.length || bundle.invites.length ? `${bundle.participants.length + bundle.invites.length} saved` : undefined}
+      >
+        <AppCard title="Share trip" variant="compact">
+          <Text style={styles.notes}>
+            Use Pineapple’s encrypted share file or QR transfer from the trip itself. The transfer code still needs to be shared separately.
+          </Text>
+          <View style={styles.transferActions}>
+            <AppButton label="Share trip" onPress={() => void handleExportShare()} />
+            <AppButton label="Show QR" tone="secondary" onPress={() => void openTransferQr()} />
+          </View>
+          <View style={styles.transferActions}>
+            <AppButton label="Import trip" tone="ghost" onPress={() => void handleImportShare()} />
+            <AppButton label="Invite participant" tone="ghost" onPress={openInviteEditor} />
+          </View>
+        </AppCard>
+      </AccordionSection>
+
+      <AccordionSection
+        title="Transfers & pickup"
+        subtitle={trip.transferSummary || 'Pickup timing, airport travel time, and meeting-point details.'}
+      >
+        <AppCard title="Transfer details" variant="compact">
+          <View style={styles.transferCard}>
+            <View style={styles.transferRow}>
+              <Text style={styles.quickFactLabel}>Provider</Text>
+              <Text style={styles.quickFactValue}>{trip.transferProvider || 'Not set'}</Text>
+            </View>
+            <View style={styles.transferRow}>
+              <Text style={styles.quickFactLabel}>Method</Text>
+              <Text style={styles.quickFactValue}>{trip.transferMethod || 'Not set'}</Text>
+            </View>
+            <View style={styles.transferRow}>
+              <Text style={styles.quickFactLabel}>Pickup</Text>
+              <Text style={styles.quickFactValue}>{trip.transferLocation || 'Not set'}</Text>
+            </View>
+            <View style={styles.transferRow}>
+              <Text style={styles.quickFactLabel}>Time</Text>
+              <Text style={styles.quickFactValue}>{trip.transferTime ? formatDateTime(trip.transferTime) : 'Not set'}</Text>
+            </View>
+          </View>
+          <AppButton label="Edit transfer" tone="secondary" onPress={openTransferEditor} />
+        </AppCard>
+      </AccordionSection>
 
       <AppModal
         visible={modalKind === 'traveller'}

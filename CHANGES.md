@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Notification pass: seeded default reminder settings, added explicit flight check-in reminders, improved packing reminder copy, added shared-trip import alerts, exposed richer notification diagnostics, and cleaned up notification copy/state in Settings
+- Settings/trip UI cleanup: converted settings and legal sections to accordions, restored Share Trip access inside the trip screen, and softened Account / language-picker surfaces without changing Pineapple’s core visual identity
 - Flight provider swap: replaced the shared transport flight adapter path with OpenSky, updated provider diagnostics and environment docs, and removed the transport layer's earlier Aviationstack dependency
 - Transport stack system: replaced the trip screen's old row-style transport area with one shared stacked-card architecture covering airline, rail, bus, taxi, and hotel variants, including `top_of_stack`, `in_stack`, `clicked`, and `open` states
 - Trip screen refinement: restored the previous weather-card treatment, moved the transport stack directly below `Quick info`, improved stack motion/selection behavior, and upgraded the Quick Info card background to a richer Pineapple surface

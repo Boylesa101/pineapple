@@ -96,7 +96,16 @@ function isTransportDepartureReminderEnabled(snapshot: AppDataSnapshot, tripId: 
     return false;
   }
 
-  const setting = getReminderSettingForKinds(snapshot, tripId, ['transport_departure', 'flight_check_in']);
+  const setting = getReminderSetting(snapshot, tripId, 'transport_departure');
+  return setting ? Boolean(setting.enabled) : true;
+}
+
+function isFlightCheckInReminderEnabled(snapshot: AppDataSnapshot, tripId: string) {
+  if (!snapshot.appPreferences.notificationsEnabled) {
+    return false;
+  }
+
+  const setting = getReminderSetting(snapshot, tripId, 'flight_check_in');
   return setting ? Boolean(setting.enabled) : true;
 }
 
@@ -314,8 +323,11 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
         reminders.push({
           key: `trip:${trip.id}:packing_incomplete`,
           kind: 'packing_incomplete',
-          title: `${trip.name} packing still incomplete`,
-          body: `${bundle.packingItems.filter((item) => !item.isPacked).length} item(s) still need packing.`,
+          title: lead <= 3 ? 'Have you packed yet?' : `${trip.name} packing still incomplete`,
+          body:
+            lead <= 3
+              ? `${bundle.packingItems.filter((item) => !item.isPacked).length} item(s) still need packing before ${trip.name}.`
+              : `${bundle.packingItems.filter((item) => !item.isPacked).length} item(s) still need packing.`,
           date,
           href: '/packing',
           activeTripId: trip.id,
@@ -377,6 +389,36 @@ export function createReminderContent(snapshot: AppDataSnapshot, options: { now?
               transportType: segment.transportType,
             });
           }
+        }
+      }
+    }
+
+    if (isFlightCheckInReminderEnabled(snapshot, trip.id)) {
+      const lead = getLeadTime(snapshot, trip.id, 'flight_check_in', 1);
+      for (const [index, segment] of bundle.travelSegments
+        .filter((item) => item.transportType === 'flight' || item.transportType === 'private_flight')
+        .entries()) {
+        const date = resolveReminderDate({
+          tripId: trip.id,
+          kind: 'flight_check_in',
+          defaultDate: buildReminderDate(segment.departureTime, lead),
+          now,
+          occurrenceIndex: index,
+        });
+        if (isFutureDate(date, now)) {
+          const destinationLabel = getTransportDestinationLabel(segment);
+          reminders.push({
+            key: `transport:${segment.id}:flight_check_in`,
+            kind: 'flight_check_in',
+            title: `Check in for ${segment.flightNumber || segment.airline || 'your flight'}`,
+            body: `${segment.airline || 'Flight'} to ${destinationLabel} opens around now. Confirm boarding details before you leave.`,
+            date,
+            href: `/trip/${trip.id}?focus=travel&segmentId=${segment.id}`,
+            activeTripId: trip.id,
+            channelId: 'pineapple-transport',
+            transportSegmentId: segment.id,
+            transportType: segment.transportType,
+          });
         }
       }
     }
