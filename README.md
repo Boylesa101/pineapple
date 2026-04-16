@@ -5,7 +5,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 ### Android test and release builds
 
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
-- Expo Go is no longer a supported Pineapple test path; use installable APKs for device testing and `.aab` for Play Store release
+- Pineapple is tested through installable APKs on Android devices and `.aab` bundles for Play Store release; Expo Go is not part of the supported Pineapple workflow
 - For a dev-only APK that still expects Metro, run `npm run apk:debug`
 - Pineapple copies the finished debug APK to `build/apk/pineapple-v2.5.0-debug.apk`
 - For the fastest direct phone testing on a modern device, run `npm run apk:release:arm64`
@@ -164,7 +164,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Sensitive structured record fields are also encrypted before Pineapple writes them into local storage, covering trips, travellers, document metadata, itinerary notes, emergency records, and sync payloads
 - Local reminders and notifications for trip countdown milestones, trip day, passport/GHIC expiry, missing insurance, packing completeness, per-segment transport departures, hotels, transfers, travel mode, SOS readiness, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
-- Version `2.5.0` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel/hire-car segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
+- Version `2.5.1` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel/hire-car segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification on an installed Pineapple build
 - First-run setup now starts with language choice, persists the selected app language immediately, then continues through name, PIN, biometrics, and optional passport / traveller setup
 - Vault travel records now expose hire-car bookings, airport lounge passes, airline loyalty cards, and a Pineapple-stored UK rail ticket record with local QR generation
 - UK rail ticket records stay explicitly honest: Pineapple stores a reference copy and QR payload for your own trip organisation, but it does not issue a valid National Rail travel ticket
