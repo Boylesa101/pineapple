@@ -485,8 +485,12 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
       insurerEmergencyNumber: (await decryptField(info.insurerEmergencyNumber)) ?? '',
       hotelPhone: (await decryptField(info.hotelPhone)) ?? '',
       airlinePhone: (await decryptField(info.airlinePhone)) ?? '',
+      policePhone: (await decryptField(info.policePhone)) ?? '',
+      hospitalContact: (await decryptField(info.hospitalContact)) ?? '',
+      pharmacyContact: (await decryptField(info.pharmacyContact)) ?? '',
       localEmergencyNote: (await decryptField(info.localEmergencyNote)) ?? '',
       embassyConsulateNote: (await decryptField(info.embassyConsulateNote)) ?? '',
+      geoLookupStatus: info.geoLookupStatus === 'planned' ? 'planned' : 'idle',
       travellerMedicalNote: (await decryptField(info.travellerMedicalNote)) ?? '',
       emergencyContacts: (await decryptField(info.emergencyContacts)) ?? '',
     }))
@@ -1113,20 +1117,30 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
   const encryptedInsurerEmergencyNumber = (await encryptField(input.insurerEmergencyNumber)) ?? '';
   const encryptedHotelPhone = (await encryptField(input.hotelPhone)) ?? '';
   const encryptedAirlinePhone = (await encryptField(input.airlinePhone)) ?? '';
+  const encryptedPolicePhone = (await encryptField(input.policePhone)) ?? '';
+  const encryptedHospitalContact = (await encryptField(input.hospitalContact)) ?? '';
+  const encryptedPharmacyContact = (await encryptField(input.pharmacyContact)) ?? '';
   const encryptedLocalEmergencyNote = (await encryptField(input.localEmergencyNote)) ?? '';
   const encryptedEmbassyConsulateNote = (await encryptField(input.embassyConsulateNote)) ?? '';
   const encryptedTravellerMedicalNote = (await encryptField(input.travellerMedicalNote)) ?? '';
   const encryptedEmergencyContacts = (await encryptField(input.emergencyContacts)) ?? '';
 
   await db.runAsync(
-    `INSERT INTO emergency_infos (id, tripId, insurerEmergencyNumber, hotelPhone, airlinePhone, localEmergencyNote, embassyConsulateNote, travellerMedicalNote, emergencyContacts, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO emergency_infos (
+      id, tripId, insurerEmergencyNumber, hotelPhone, airlinePhone, policePhone, hospitalContact, pharmacyContact,
+      localEmergencyNote, embassyConsulateNote, geoLookupStatus, travellerMedicalNote, emergencyContacts, createdAt, updatedAt
+    )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(tripId) DO UPDATE SET
        insurerEmergencyNumber = excluded.insurerEmergencyNumber,
        hotelPhone = excluded.hotelPhone,
        airlinePhone = excluded.airlinePhone,
+       policePhone = excluded.policePhone,
+       hospitalContact = excluded.hospitalContact,
+       pharmacyContact = excluded.pharmacyContact,
        localEmergencyNote = excluded.localEmergencyNote,
        embassyConsulateNote = excluded.embassyConsulateNote,
+       geoLookupStatus = excluded.geoLookupStatus,
        travellerMedicalNote = excluded.travellerMedicalNote,
        emergencyContacts = excluded.emergencyContacts,
        updatedAt = excluded.updatedAt`,
@@ -1135,8 +1149,12 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
     encryptedInsurerEmergencyNumber,
     encryptedHotelPhone,
     encryptedAirlinePhone,
+    encryptedPolicePhone,
+    encryptedHospitalContact,
+    encryptedPharmacyContact,
     encryptedLocalEmergencyNote,
     encryptedEmbassyConsulateNote,
+    input.geoLookupStatus === 'planned' ? 'planned' : 'idle',
     encryptedTravellerMedicalNote,
     encryptedEmergencyContacts,
     timestamp,

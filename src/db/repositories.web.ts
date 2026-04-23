@@ -264,8 +264,12 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         insurerEmergencyNumber: (await decryptStructuredValue(info.insurerEmergencyNumber)) ?? '',
         hotelPhone: (await decryptStructuredValue(info.hotelPhone)) ?? '',
         airlinePhone: (await decryptStructuredValue(info.airlinePhone)) ?? '',
+        policePhone: (await decryptStructuredValue(info.policePhone)) ?? '',
+        hospitalContact: (await decryptStructuredValue(info.hospitalContact)) ?? '',
+        pharmacyContact: (await decryptStructuredValue(info.pharmacyContact)) ?? '',
         localEmergencyNote: (await decryptStructuredValue(info.localEmergencyNote)) ?? '',
         embassyConsulateNote: (await decryptStructuredValue(info.embassyConsulateNote)) ?? '',
+        geoLookupStatus: info.geoLookupStatus === 'planned' ? 'planned' : 'idle',
         travellerMedicalNote: (await decryptStructuredValue(info.travellerMedicalNote)) ?? '',
         emergencyContacts: (await decryptStructuredValue(info.emergencyContacts)) ?? '',
       }))
@@ -753,6 +757,7 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
     ...snapshot,
     emergencyInfos: withTripUpsert(snapshot.emergencyInfos, {
       ...input,
+      geoLookupStatus: input.geoLookupStatus === 'planned' ? 'planned' : 'idle',
       id,
       createdAt: snapshot.emergencyInfos.find((item) => item.tripId === input.tripId)?.createdAt ?? timestamp,
       updatedAt: timestamp,

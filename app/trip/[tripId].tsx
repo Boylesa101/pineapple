@@ -504,8 +504,12 @@ export default function TripDetailScreen() {
         insurerEmergencyNumber: '',
         hotelPhone: '',
         airlinePhone: '',
+        policePhone: '',
+        hospitalContact: '',
+        pharmacyContact: '',
         localEmergencyNote: '',
         embassyConsulateNote: '',
+        geoLookupStatus: 'planned',
         travellerMedicalNote: '',
         emergencyContacts: '',
       }
@@ -1469,6 +1473,24 @@ export default function TripDetailScreen() {
               keyboardType="phone-pad"
             />
             <AppTextField
+              label="Police phone"
+              value={emergencyDraft.policePhone}
+              onChangeText={(value) => setEmergencyDraft((current) => (current ? { ...current, policePhone: value } : current))}
+              keyboardType="phone-pad"
+            />
+            <AppTextField
+              label="Hospital / clinic"
+              value={emergencyDraft.hospitalContact}
+              onChangeText={(value) => setEmergencyDraft((current) => (current ? { ...current, hospitalContact: value } : current))}
+              multiline
+            />
+            <AppTextField
+              label="Pharmacy"
+              value={emergencyDraft.pharmacyContact}
+              onChangeText={(value) => setEmergencyDraft((current) => (current ? { ...current, pharmacyContact: value } : current))}
+              multiline
+            />
+            <AppTextField
               label="Local emergency note"
               value={emergencyDraft.localEmergencyNote}
               onChangeText={(value) => setEmergencyDraft((current) => (current ? { ...current, localEmergencyNote: value } : current))}
@@ -1492,6 +1514,17 @@ export default function TripDetailScreen() {
               onChangeText={(value) => setEmergencyDraft((current) => (current ? { ...current, emergencyContacts: value } : current))}
               multiline
             />
+            <View style={styles.field}>
+              <Text style={styles.label}>Future geo lookup hook</Text>
+              <ChoiceChips<'planned' | 'idle'>
+                value={emergencyDraft.geoLookupStatus}
+                onChange={(value) => setEmergencyDraft((current) => (current ? { ...current, geoLookupStatus: value } : current))}
+                options={[
+                  { label: 'Planned', value: 'planned' },
+                  { label: 'Off for now', value: 'idle' },
+                ]}
+              />
+            </View>
             <AppButton label="Save emergency info" onPress={saveCurrentModal} />
           </>
         ) : null}

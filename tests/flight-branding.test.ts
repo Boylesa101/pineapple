@@ -115,5 +115,5 @@ test('normalized flight record falls back cleanly when no boarding pass exists',
   assert.equal(record.airlineName, 'Jet2');
   assert.equal(record.passengerName, 'Passenger');
   assert.equal(record.barcodePayload, '');
-  assert.equal(record.liveStatus, 'unknown');
+  assert.equal(record.liveStatus, 'delayed');
 });

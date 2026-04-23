@@ -1,390 +1,100 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
+import { AppModal } from '@/components/AppModal';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
+import { AvatarBadge } from '@/components/AvatarBadge';
 import { ChoiceChips } from '@/components/ChoiceChips';
-import { TypedDateField } from '@/components/TypedDateField';
-import { DocumentScanFlowModal, type DocumentScanStage } from '@/components/document-support/DocumentScanFlowModal';
 import { colors, radii, spacing } from '@/constants/theme';
 import { PERSONAL_DOCUMENTS_TRIP_ID } from '@/constants/vault';
-import { useTranslation } from '@/hooks/useTranslation';
-import { recognizeDocumentText } from '@/services/documentTextOcr';
-import { isLiveDocumentScannerAvailable, scanDocumentWithLiveEdges } from '@/services/documentScanner';
+import { relationshipOptions, travellerAvatarColors } from '@/data/travellerOptions';
 import { useAppStore } from '@/store/useAppStore';
-import { createEmptyPassportData, ensurePassportDraftData } from '@/utils/passport';
-import { applyPassportOcrToDraft, parsePassportOcrText } from '@/utils/passportOcr';
-import { isWebCompanionPolicyActive, sensitiveWebSupportMessage } from '@/utils/platformPolicy';
-import { validateDocument } from '@/utils/validation';
-import { cleanupImportedSource, copyIntoAppStorage, deleteLocalFile } from '@/utils/fileStorage';
-import { createId } from '@/utils/ids';
+import type { RelationshipType, TravellerDraft } from '@/types/models';
+import { chooseProfilePhoto } from '@/utils/profilePhotos';
+import { validateTraveller } from '@/utils/validation';
 
-type DocumentSetupChoice = 'skip' | 'passport_manual' | 'passport_photo';
-type TravellerDraft = {
-  id: string;
-  fullName: string;
-  addPassport: boolean;
-  passportNumber: string;
-  passportNationality: string;
-  passportCountryCode: string;
-  passportDateOfBirth: string | null;
-  passportExpiryDate: string | null;
+type TravellerEditorState = TravellerDraft & {
+  editorTitle: string;
 };
 
-function createTravellerDraft(): TravellerDraft {
+function buildTravellerDraft(index: number): TravellerEditorState {
   return {
-    id: createId('traveller'),
+    editorTitle: 'Add traveller',
+    tripId: PERSONAL_DOCUMENTS_TRIP_ID,
     fullName: '',
-    addPassport: false,
-    passportNumber: '',
+    photoUri: null,
+    dateOfBirth: null,
     passportNationality: '',
-    passportCountryCode: '',
-    passportDateOfBirth: null,
-    passportExpiryDate: null,
+    passportNumber: '',
+    ghicNumber: '',
+    medicalNote: '',
+    notes: '',
+    avatarColor: travellerAvatarColors[index % travellerAvatarColors.length],
+    relationshipType: 'adult',
   };
 }
 
 export default function TravellerSetupScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
-  const completeOnboarding = useAppStore((state) => state.completeOnboarding);
-  const ensurePersonalDocumentsTrip = useAppStore((state) => state.ensurePersonalDocumentsTrip);
-  const saveTraveller = useAppStore((state) => state.saveTraveller);
-  const saveDocument = useAppStore((state) => state.saveDocument);
-  const appPreferences = useAppStore((state) => state.data.appPreferences);
+  const { data, saveTraveller, ensurePersonalDocumentsTrip, completeOnboarding } = useAppStore();
+  const travellers = useMemo(
+    () => data.travellers.filter((traveller) => traveller.tripId === PERSONAL_DOCUMENTS_TRIP_ID),
+    [data.travellers]
+  );
+  const [editor, setEditor] = useState<TravellerEditorState | null>(travellers[0] ? { ...travellers[0], editorTitle: 'Edit traveller' } : null);
   const [submitting, setSubmitting] = useState(false);
-  const [documentChoice, setDocumentChoice] = useState<DocumentSetupChoice>('skip');
-  const [passportHolderName, setPassportHolderName] = useState(appPreferences.profileName);
-  const [passportNumber, setPassportNumber] = useState('');
-  const [passportNationality, setPassportNationality] = useState('');
-  const [passportCountryCode, setPassportCountryCode] = useState('');
-  const [passportDateOfBirth, setPassportDateOfBirth] = useState<string | null>(null);
-  const [passportExpiryDate, setPassportExpiryDate] = useState<string | null>(null);
-  const [passportLocalFileUri, setPassportLocalFileUri] = useState('');
-  const [passportPreviewUri, setPassportPreviewUri] = useState<string | null>(null);
-  const [passportMimeType, setPassportMimeType] = useState<string | null>(null);
-  const [documentCaptureMessage, setDocumentCaptureMessage] = useState<string | null>(null);
-  const [scanStage, setScanStage] = useState<DocumentScanStage | null>(null);
-  const [scanGuidance, setScanGuidance] = useState<string | undefined>();
-  const [scanDetail, setScanDetail] = useState<string | undefined>();
-  const [scanWarningText, setScanWarningText] = useState<string | null>(null);
-  const [travellers, setTravellers] = useState<TravellerDraft[]>([]);
 
-  function updateTraveller(travellerId: string, updater: (current: TravellerDraft) => TravellerDraft) {
-    setTravellers((current) => current.map((item) => (item.id === travellerId ? updater(item) : item)));
+  async function openAddTraveller() {
+    await ensurePersonalDocumentsTrip();
+    setEditor(buildTravellerDraft(travellers.length));
   }
 
-  async function attachPassportImage(source: 'camera' | 'library') {
-    if (isWebCompanionPolicyActive()) {
-      Alert.alert(t('travellerSetup.photoOcrWebBody'), sensitiveWebSupportMessage);
+  async function chooseTravellerPhotoPress() {
+    if (!editor) {
       return;
     }
 
-    try {
-      setScanGuidance(
-        source === 'camera'
-          ? 'Keep the whole passport inside the frame and reduce glare before capture.'
-          : 'Choose a clear passport image with all corners visible.'
-      );
-      setScanDetail('Pineapple stores the image locally and then tries to extract the passport fields for review.');
-      setScanWarningText(null);
-      setScanStage('capturing');
-
-      let assetUri: string | null = null;
-      let mimeType: string | null = 'image/jpeg';
-
-      if (source === 'camera') {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          setScanStage(null);
-          Alert.alert('Camera permission needed', 'Allow camera access to capture a passport image, or use manual entry.');
-          return;
-        }
-
-        if (isLiveDocumentScannerAvailable()) {
-          try {
-            const result = await scanDocumentWithLiveEdges({ maxNumDocuments: 1 });
-            if (result.status === 'success' && result.scannedImages[0]) {
-              assetUri = result.scannedImages[0];
-            }
-          } catch {
-            // Fall back to plain camera capture.
-          }
-        }
-
-        if (!assetUri) {
-          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
-          if (result.canceled || !result.assets[0]) {
-            setScanStage(null);
-            return;
-          }
-          assetUri = result.assets[0].uri;
-          mimeType = result.assets[0].mimeType ?? 'image/jpeg';
-        }
-      } else {
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-          setScanStage(null);
-          Alert.alert('Photos permission needed', 'Allow photo library access to import a passport image, or use manual entry.');
-          return;
-        }
-
-        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
-        if (result.canceled || !result.assets[0]) {
-          setScanStage(null);
-          return;
-        }
-        assetUri = result.assets[0].uri;
-        mimeType = result.assets[0].mimeType ?? 'image/jpeg';
-      }
-
-      if (!assetUri) {
-        setScanStage(null);
-        return;
-      }
-
-      setScanStage('processing');
-      const localFileUri = await copyIntoAppStorage(assetUri, 'vault', mimeType, { encryptAtRest: true });
-      await cleanupImportedSource(assetUri);
-
-      if (passportLocalFileUri && passportLocalFileUri !== localFileUri) {
-        await deleteLocalFile(passportLocalFileUri);
-      }
-
-      setPassportLocalFileUri(localFileUri);
-      setPassportPreviewUri(localFileUri);
-      setPassportMimeType(mimeType);
-      setDocumentChoice('passport_photo');
-      setDocumentCaptureMessage('Passport image saved. Review the extracted fields before you finish setup.');
-
-      try {
-        const ocr = await recognizeDocumentText(localFileUri, mimeType, 'Passport');
-        const parsed = parsePassportOcrText(ocr.rawText);
-        if (!parsed) {
-          setScanStage('warning');
-          setScanWarningText('Passport image saved, but Pineapple could not extract reliable details from this image.');
-          return;
-        }
-
-        const nextDraft = applyPassportOcrToDraft(
-          ensurePassportDraftData(
-            {
-              tripId: PERSONAL_DOCUMENTS_TRIP_ID,
-              travellerId: null,
-              holderName: passportHolderName.trim() || appPreferences.profileName,
-              documentType: 'passport',
-              documentNumber: passportNumber.trim(),
-              issueDate: null,
-              expiryDate: passportExpiryDate,
-              expiryReminderEnabled: true,
-              expiryReminderSchedule: appPreferences.expiryReminderSchedule,
-              expiredStatus: false,
-              expiringSoonStatus: false,
-              notes: '',
-              localFileUri,
-              previewUri: localFileUri,
-              mimeType,
-              passportData: {
-                ...createEmptyPassportData(),
-                countryCode: passportCountryCode.trim().toUpperCase(),
-                nationality: passportNationality.trim(),
-                dateOfBirth: passportDateOfBirth,
-              },
-              secondaryLocalFileUri: null,
-              secondaryPreviewUri: null,
-              secondaryMimeType: null,
-              drivingLicenceData: null,
-              healthCardData: null,
-              paymentCardData: null,
-              formalDocumentData: null,
-              sensitive: true,
-            },
-            null
-          ),
-          parsed
-        );
-
-        setPassportHolderName(nextDraft.holderName);
-        setPassportNumber(nextDraft.documentNumber);
-        setPassportExpiryDate(nextDraft.expiryDate);
-        setPassportCountryCode(nextDraft.passportData?.countryCode ?? '');
-        setPassportNationality(nextDraft.passportData?.nationality ?? '');
-        setPassportDateOfBirth(nextDraft.passportData?.dateOfBirth ?? null);
-        setScanWarningText(parsed.warnings[0] ?? null);
-        setScanStage(parsed.warnings.length ? 'warning' : 'extracted');
-      } catch {
-        setScanStage('warning');
-        setScanWarningText('Passport image saved. OCR is unavailable for this image, but you can still continue.');
-      }
-    } catch (error) {
-      if (__DEV__) {
-        console.error('Traveller setup passport image failed', error);
-      }
-      setScanStage('error');
-      setScanWarningText('Pineapple could not use that passport image right now. Try again or switch to manual entry.');
+    const nextUri = await chooseProfilePhoto(editor.photoUri ?? null);
+    if (nextUri) {
+      setEditor((current) => (current ? { ...current, photoUri: nextUri } : current));
     }
   }
 
-  async function finishSetup() {
-    if (submitting) {
+  async function saveTravellerDraft() {
+    if (!editor) {
       return;
     }
 
-    const companionsReady = travellers.every((traveller) => {
-      if (!traveller.fullName.trim()) {
-        return false;
-      }
-
-      if (!traveller.addPassport) {
-        return true;
-      }
-
-      return Boolean(traveller.passportNationality.trim() && traveller.passportCountryCode.trim());
-    });
-
-    const documentReady =
-      documentChoice === 'skip' ||
-      (documentChoice === 'passport_manual' &&
-        Boolean((passportHolderName.trim() || appPreferences.profileName.trim()) && passportNationality.trim() && passportCountryCode.trim())) ||
-      (documentChoice === 'passport_photo' && Boolean(passportLocalFileUri));
-
-    if (!documentReady || !companionsReady) {
-      Alert.alert(t('travellerSetup.setupNeedsReviewTitle'), t('travellerSetup.setupNeedsReviewBody'));
+    const errors = validateTraveller(editor);
+    if (errors.length) {
+      Alert.alert('Traveller needs attention', errors.join('\n'));
       return;
     }
 
     setSubmitting(true);
     try {
-      const personalTripId =
-        documentChoice !== 'skip' || travellers.length ? await ensurePersonalDocumentsTrip() : PERSONAL_DOCUMENTS_TRIP_ID;
+      await ensurePersonalDocumentsTrip();
+      await saveTraveller({
+        ...editor,
+        tripId: PERSONAL_DOCUMENTS_TRIP_ID,
+      });
+      setEditor(null);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
-      if (documentChoice === 'passport_manual' || documentChoice === 'passport_photo') {
-        const draft = ensurePassportDraftData(
-          {
-            tripId: personalTripId,
-            travellerId: null,
-            holderName: passportHolderName.trim() || appPreferences.profileName.trim(),
-            documentType: 'passport',
-            documentNumber: passportNumber.trim(),
-            issueDate: null,
-            expiryDate: passportExpiryDate,
-            expiryReminderEnabled: true,
-            expiryReminderSchedule: appPreferences.expiryReminderSchedule,
-            expiredStatus: false,
-            expiringSoonStatus: false,
-            notes: '',
-            localFileUri: passportLocalFileUri,
-            previewUri: passportPreviewUri,
-            mimeType: passportMimeType,
-            passportData: {
-              ...createEmptyPassportData(),
-              countryCode: passportCountryCode.trim().toUpperCase(),
-              nationality: passportNationality.trim(),
-              dateOfBirth: passportDateOfBirth,
-            },
-            secondaryLocalFileUri: null,
-            secondaryPreviewUri: null,
-            secondaryMimeType: null,
-            drivingLicenceData: null,
-            healthCardData: null,
-            paymentCardData: null,
-            formalDocumentData: null,
-            sensitive: true,
-          },
-          null
-        );
-
-        const errors = validateDocument(draft);
-        if (errors.length) {
-          Alert.alert(t('travellerSetup.passportNeedsAttention'), errors.join('\n'));
-          setSubmitting(false);
-          return;
-        }
-
-        await saveDocument(draft);
-      }
-
-      for (const traveller of travellers) {
-        const fullName = traveller.fullName.trim();
-        if (!fullName) {
-          continue;
-        }
-
-        const travellerId = await saveTraveller({
-          tripId: personalTripId,
-          fullName,
-          dateOfBirth: traveller.passportDateOfBirth,
-          passportNationality: traveller.addPassport ? traveller.passportNationality.trim() : '',
-          passportNumber: traveller.addPassport ? traveller.passportNumber.trim() : '',
-          ghicNumber: '',
-          medicalNote: '',
-          notes: '',
-          avatarColor: '#1EAAF0',
-          relationshipType: 'other',
-        });
-
-        if (!traveller.addPassport) {
-          continue;
-        }
-
-        const passportDraft = ensurePassportDraftData(
-          {
-            tripId: personalTripId,
-            travellerId,
-            holderName: fullName,
-            documentType: 'passport',
-            documentNumber: traveller.passportNumber.trim(),
-            issueDate: null,
-            expiryDate: traveller.passportExpiryDate,
-            expiryReminderEnabled: true,
-            expiryReminderSchedule: appPreferences.expiryReminderSchedule,
-            expiredStatus: false,
-            expiringSoonStatus: false,
-            notes: '',
-            localFileUri: '',
-            previewUri: null,
-            mimeType: null,
-            passportData: {
-              ...createEmptyPassportData(),
-              countryCode: traveller.passportCountryCode.trim().toUpperCase(),
-              nationality: traveller.passportNationality.trim(),
-              dateOfBirth: traveller.passportDateOfBirth,
-            },
-            secondaryLocalFileUri: null,
-            secondaryPreviewUri: null,
-            secondaryMimeType: null,
-            drivingLicenceData: null,
-            healthCardData: null,
-            paymentCardData: null,
-            formalDocumentData: null,
-            sensitive: true,
-          },
-          null
-        );
-
-        const errors = validateDocument(passportDraft);
-        if (errors.length) {
-          Alert.alert(t('travellerSetup.travellerPassportNeedsAttention'), `${fullName}: ${errors.join('\n')}`);
-          setSubmitting(false);
-          return;
-        }
-
-        await saveDocument(passportDraft);
-      }
-
+  async function finishSetup() {
+    setSubmitting(true);
+    try {
+      await ensurePersonalDocumentsTrip();
       await completeOnboarding();
       router.replace('/home');
-    } catch (error) {
-      if (__DEV__) {
-        console.error('Traveller setup failed', error);
-      }
-      Alert.alert(t('travellerSetup.setupErrorTitle'), t('travellerSetup.setupErrorBody'));
     } finally {
       setSubmitting(false);
     }
@@ -397,259 +107,210 @@ export default function TravellerSetupScreen() {
       footer={
         <View style={styles.footer}>
           <AppButton
-            label={documentChoice === 'skip' ? t('travellerSetup.finishSetup') : t('travellerSetup.saveAndFinish')}
-            tone="secondary"
-            size="large"
-            style={styles.footerButton}
-            labelStyle={styles.footerButtonLabel}
-            onPress={() => {
-              void finishSetup();
-            }}
+            label={travellers.length ? 'Continue to Pineapple' : 'Finish setup'}
+            onPress={() => void finishSetup()}
             loading={submitting}
           />
-          <AppButton
-            label={t('common.skipForNow')}
-            tone="secondary"
-            size="large"
-            style={styles.footerButton}
-            labelStyle={styles.footerButtonLabel}
-            onPress={() => {
-              setDocumentChoice('skip');
-              void finishSetup();
-            }}
-            disabled={submitting}
-          />
+          <AppButton label="Add traveller" tone="secondary" onPress={() => void openAddTraveller()} disabled={submitting} />
         </View>
       }
     >
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>Almost ready</Text>
+        <Text style={styles.title}>Set up your travellers</Text>
+        <Text style={styles.body}>
+          Save the people you travel with most often. You can edit them later in Account, and trip-specific details can still be added inside each trip.
+        </Text>
+      </View>
+
       <AppCard>
-        <View style={styles.badge}>
-          <MaterialIcons name="badge" size={28} color={colors.primaryBlue} />
-        </View>
-        <Text style={styles.heading}>{t('travellerSetup.title')}</Text>
-        <Text style={styles.body}>{t('travellerSetup.body')}</Text>
-        {isWebCompanionPolicyActive() ? <Text style={styles.helper}>{sensitiveWebSupportMessage}</Text> : null}
-
-        <View style={styles.choiceRow}>
-          <Pressable style={[styles.choiceCard, documentChoice === 'passport_manual' ? styles.choiceCardActive : null]} onPress={() => setDocumentChoice('passport_manual')}>
-            <MaterialIcons name="edit-note" size={22} color={documentChoice === 'passport_manual' ? colors.white : colors.primaryBlue} />
-            <Text style={[styles.choiceTitle, documentChoice === 'passport_manual' ? styles.choiceTitleActive : null]}>{t('travellerSetup.manualPassport')}</Text>
-            <Text style={[styles.choiceBody, documentChoice === 'passport_manual' ? styles.choiceBodyActive : null]}>{t('travellerSetup.manualPassportBody')}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.choiceCard, documentChoice === 'passport_photo' ? styles.choiceCardActive : null]}
-            onPress={() => setDocumentChoice('passport_photo')}
-            disabled={isWebCompanionPolicyActive()}
-          >
-            <MaterialIcons name="photo-camera" size={22} color={documentChoice === 'passport_photo' ? colors.white : colors.primaryBlue} />
-            <Text style={[styles.choiceTitle, documentChoice === 'passport_photo' ? styles.choiceTitleActive : null]}>{t('travellerSetup.photoOcr')}</Text>
-            <Text style={[styles.choiceBody, documentChoice === 'passport_photo' ? styles.choiceBodyActive : null]}>
-              {isWebCompanionPolicyActive() ? t('travellerSetup.photoOcrWebBody') : t('travellerSetup.photoOcrBody')}
-            </Text>
-          </Pressable>
-          <Pressable style={[styles.choiceCard, documentChoice === 'skip' ? styles.choiceCardActive : null]} onPress={() => setDocumentChoice('skip')}>
-            <MaterialIcons name="schedule" size={22} color={documentChoice === 'skip' ? colors.white : colors.primaryBlue} />
-            <Text style={[styles.choiceTitle, documentChoice === 'skip' ? styles.choiceTitleActive : null]}>{t('travellerSetup.skip')}</Text>
-            <Text style={[styles.choiceBody, documentChoice === 'skip' ? styles.choiceBodyActive : null]}>{t('travellerSetup.skipBody')}</Text>
-          </Pressable>
-        </View>
-
-        {documentChoice === 'passport_manual' ? (
-          <View style={styles.form}>
-            <AppTextField label={t('travellerSetup.passportHolder')} value={passportHolderName} onChangeText={setPassportHolderName} placeholder={appPreferences.profileName || t('travellerSetup.travellerName')} />
-            <AppTextField label={t('travellerSetup.passportNumber')} value={passportNumber} onChangeText={setPassportNumber} placeholder="123456789" />
-            <AppTextField label={t('travellerSetup.nationality')} value={passportNationality} onChangeText={setPassportNationality} placeholder="British" />
-            <AppTextField label={t('travellerSetup.issuingCountryCode')} value={passportCountryCode} onChangeText={setPassportCountryCode} placeholder="GBR" />
-            <TypedDateField label={t('travellerSetup.dateOfBirth')} value={passportDateOfBirth} onChange={setPassportDateOfBirth} />
-            <TypedDateField label={t('travellerSetup.expiryDate')} value={passportExpiryDate} onChange={setPassportExpiryDate} />
-          </View>
-        ) : null}
-
-        {documentChoice === 'passport_photo' ? (
-          <View style={styles.form}>
-            <Text style={styles.helper}>Capture or import a passport image now. Pineapple stores it locally and tries OCR on-device when available.</Text>
-            <View style={styles.photoActionRow}>
-              <AppButton label={t('travellerSetup.capturePassport')} tone="outline" onPress={() => void attachPassportImage('camera')} />
-              <AppButton label={t('travellerSetup.chooseImage')} tone="outline" onPress={() => void attachPassportImage('library')} />
-            </View>
-            {passportPreviewUri ? (
-              <View style={styles.passportPreviewWrap}>
-                <Image source={passportPreviewUri} style={styles.passportPreview} contentFit="cover" />
-              </View>
-            ) : null}
-            {documentCaptureMessage ? <Text style={styles.helper}>{documentCaptureMessage}</Text> : null}
-          </View>
-        ) : null}
+        <Text style={styles.sectionTitle}>Privacy first</Text>
+        <Text style={styles.sectionBody}>
+          Your data is stored locally on your device. We do not want or need your personal travel data beyond helping you manage your trips.
+        </Text>
       </AppCard>
 
-      <AppCard title={t('travellerSetup.otherTravellers')} subtitle={t('travellerSetup.otherTravellersBody')}>
-        {travellers.map((traveller, index) => (
-          <View key={traveller.id} style={[styles.travellerCard, index === travellers.length - 1 ? null : styles.travellerCardGap]}>
-            <View style={styles.travellerHeader}>
-              <Text style={styles.travellerTitle}>{traveller.fullName.trim() || t('travellerSetup.newTraveller')}</Text>
-              <Pressable onPress={() => setTravellers((current) => current.filter((item) => item.id !== traveller.id))}>
-                <MaterialIcons name="delete-outline" size={22} color={colors.textMuted} />
-              </Pressable>
-            </View>
+      <AppCard>
+        <View style={styles.cardHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Saved travellers</Text>
+            <Text style={styles.sectionBody}>Optional for now. Add at least one if you want a ready-to-use profile foundation.</Text>
+          </View>
+          <Pressable onPress={() => void openAddTraveller()} style={styles.addIcon}>
+            <MaterialIcons name="add" size={22} color={colors.primaryBlue} />
+          </Pressable>
+        </View>
+
+        {travellers.length ? (
+          travellers.map((traveller, index) => (
+            <Pressable
+              key={traveller.id}
+              onPress={() => setEditor({ ...traveller, editorTitle: 'Edit traveller' })}
+              style={[styles.row, index === travellers.length - 1 ? styles.rowLast : null]}
+            >
+              <AvatarBadge label={traveller.fullName} color={traveller.avatarColor} imageUri={traveller.photoUri} size={40} />
+              <View style={styles.rowCopy}>
+                <Text style={styles.rowTitle}>{traveller.fullName}</Text>
+                <Text style={styles.rowBody}>{traveller.relationshipType} traveller</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={22} color={colors.textMuted} />
+            </Pressable>
+          ))
+        ) : (
+          <Text style={styles.emptyBody}>No travellers saved yet. You can finish setup now and add them later, or add one before continuing.</Text>
+        )}
+      </AppCard>
+
+      <AppCard>
+        <Text style={styles.sectionTitle}>What happens next</Text>
+        <Text style={styles.sectionBody}>Home, Trips, Vault, Account, Settings, and SOS will all be available after this step.</Text>
+      </AppCard>
+
+      <AppModal visible={!!editor} title={editor?.editorTitle || 'Traveller'} onClose={() => setEditor(null)}>
+        {editor ? (
+          <>
+            <Pressable onPress={() => void chooseTravellerPhotoPress()} style={styles.photoPicker}>
+              <AvatarBadge label={editor.fullName || 'T'} color={editor.avatarColor} imageUri={editor.photoUri} size={72} />
+              <Text style={styles.photoPickerLabel}>{editor.photoUri ? 'Change traveller photo' : 'Add traveller photo'}</Text>
+            </Pressable>
             <AppTextField
-              label={t('travellerSetup.travellerName')}
-              value={traveller.fullName}
-              onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, fullName: value }))}
-              placeholder="Alex Pineapple"
+              label="Full name"
+              value={editor.fullName}
+              onChangeText={(value) => setEditor((current) => (current ? { ...current, fullName: value } : current))}
+              placeholder="Traveller name"
             />
-            <View style={styles.field}>
-              <Text style={styles.label}>{t('travellerSetup.addPassportBasics')}</Text>
-              <ChoiceChips<'yes' | 'no'>
-                value={traveller.addPassport ? 'yes' : 'no'}
-                onChange={(value) => updateTraveller(traveller.id, (current) => ({ ...current, addPassport: value === 'yes' }))}
-                options={[
-                  { label: t('common.yes'), value: 'yes' },
-                  { label: t('common.no'), value: 'no' },
-                ]}
+            <View style={styles.fieldBlock}>
+              <Text style={styles.modalLabel}>Relationship</Text>
+              <ChoiceChips<RelationshipType>
+                value={editor.relationshipType}
+                onChange={(value) => setEditor((current) => (current ? { ...current, relationshipType: value } : current))}
+                options={relationshipOptions.map((option) => ({ label: option.label, value: option.value }))}
               />
             </View>
-            {traveller.addPassport ? (
-              <View style={styles.form}>
-                <AppTextField label={t('travellerSetup.passportNumber')} value={traveller.passportNumber} onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportNumber: value }))} />
-                <AppTextField label={t('travellerSetup.nationality')} value={traveller.passportNationality} onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportNationality: value }))} />
-                <AppTextField label={t('travellerSetup.issuingCountryCode')} value={traveller.passportCountryCode} onChangeText={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportCountryCode: value }))} />
-                <TypedDateField label={t('travellerSetup.dateOfBirth')} value={traveller.passportDateOfBirth} onChange={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportDateOfBirth: value }))} />
-                <TypedDateField label={t('travellerSetup.expiryDate')} value={traveller.passportExpiryDate} onChange={(value) => updateTraveller(traveller.id, (current) => ({ ...current, passportExpiryDate: value }))} />
-              </View>
-            ) : null}
-          </View>
-        ))}
-
-        <AppButton label="Add traveller" tone="outline" onPress={() => setTravellers((current) => [...current, createTravellerDraft()])} />
-      </AppCard>
-
-      <DocumentScanFlowModal
-        visible={scanStage !== null}
-        title="Passport setup"
-        documentLabel="Passport"
-        stage={scanStage ?? 'capturing'}
-        guidance={scanGuidance}
-        detail={scanDetail}
-        warningText={scanWarningText}
-        onClose={() => setScanStage(null)}
-      />
+            <View style={styles.fieldBlock}>
+              <Text style={styles.modalLabel}>Avatar colour</Text>
+              <ChoiceChips<string>
+                value={editor.avatarColor}
+                onChange={(value) => setEditor((current) => (current ? { ...current, avatarColor: value } : current))}
+                options={travellerAvatarColors.map((value, index) => ({ label: `Tone ${index + 1}`, value }))}
+              />
+            </View>
+            <AppTextField
+              label="Notes"
+              value={editor.notes}
+              onChangeText={(value) => setEditor((current) => (current ? { ...current, notes: value } : current))}
+              multiline
+              placeholder="Optional traveller note"
+            />
+            <AppButton label="Save traveller" onPress={() => void saveTravellerDraft()} loading={submitting} />
+          </>
+        ) : null}
+      </AppModal>
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  badge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primaryBlueSurface,
-    alignSelf: 'center',
+  hero: {
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
   },
-  heading: {
-    color: colors.nightNavy,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 24,
-    textAlign: 'center',
+  kicker: {
+    color: 'rgba(255,255,255,0.72)',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+  },
+  title: {
+    color: colors.white,
+    fontFamily: 'Poppins_700Bold',
+    fontSize: 30,
   },
   body: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.88)',
     fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  choiceRow: {
-    gap: spacing.sm,
-  },
-  choiceCard: {
-    borderWidth: 1,
-    borderColor: colors.primaryBlueBorder,
-    backgroundColor: colors.white,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  choiceCardActive: {
-    backgroundColor: colors.primaryBlue,
-    borderColor: colors.primaryBlue,
-  },
-  choiceTitle: {
-    color: colors.nightNavy,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 16,
-  },
-  choiceTitleActive: {
-    color: colors.white,
-  },
-  choiceBody: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  choiceBodyActive: {
-    color: 'rgba(255,255,255,0.84)',
-  },
-  form: {
-    gap: spacing.sm,
-  },
-  helper: {
-    color: colors.textMuted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  photoActionRow: {
-    gap: spacing.sm,
-  },
-  passportPreviewWrap: {
-    borderRadius: radii.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.primaryBlueBorder,
-  },
-  passportPreview: {
-    width: '100%',
-    aspectRatio: 1.58,
-  },
-  travellerCard: {
-    gap: spacing.sm,
-  },
-  travellerCardGap: {
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEF3F8',
-    marginBottom: spacing.md,
-  },
-  travellerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  travellerTitle: {
-    color: colors.primaryBlueText,
-    fontFamily: 'Poppins_600SemiBold',
-    fontSize: 17,
-  },
-  field: {
-    gap: spacing.xs,
-  },
-  label: {
-    color: colors.primaryBlueText,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
+    fontSize: 15,
+    lineHeight: 22,
   },
   footer: {
     gap: spacing.sm,
   },
-  footerButton: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderColor: 'rgba(255,255,255,0.24)',
+  sectionTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 20,
   },
-  footerButtonLabel: {
-    color: colors.white,
+  sectionBody: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  addIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F4F8FD',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  rowLast: {
+    borderBottomWidth: 0,
+  },
+  rowCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  rowTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  },
+  rowBody: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+  },
+  emptyBody: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  photoPicker: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+    borderRadius: radii.xl,
+  },
+  photoPickerLabel: {
+    color: colors.primaryBlue,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
+  fieldBlock: {
+    gap: spacing.xs,
+  },
+  modalLabel: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
   },
 });

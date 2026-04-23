@@ -8,9 +8,9 @@ import { AppCard } from '@/components/AppCard';
 import { AppModal } from '@/components/AppModal';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
-import { DestinationSearchField } from '@/components/DestinationSearchField';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
+import { DestinationSearchField } from '@/components/DestinationSearchField';
 import { EmptyState } from '@/components/EmptyState';
 import { TripHeroCard } from '@/components/ui/TripHeroCard';
 import { colors, radii, spacing } from '@/constants/theme';
@@ -59,7 +59,10 @@ export default function TripsScreen() {
   const [templateId, setTemplateId] = useState<PackingTemplateId | 'none'>('none');
   const [saving, setSaving] = useState(false);
 
-  const sortedTrips = useMemo(() => filterVisibleTrips([...data.trips]), [data.trips]);
+  const sortedTrips = useMemo(
+    () => [...filterVisibleTrips(data.trips)].sort((left, right) => left.startDate.localeCompare(right.startDate)),
+    [data.trips]
+  );
 
   function openNewTrip() {
     setDraft(emptyTripDraft);
@@ -91,20 +94,20 @@ export default function TripsScreen() {
       setDraft(emptyTripDraft);
       setTemplateId('none');
     } catch (error) {
-      Alert.alert(
-        t('trips.saveFailed'),
-        toUserMessage(error, 'Pineapple could not save that trip right now. Try again.')
-      );
+      Alert.alert(t('trips.saveFailed'), toUserMessage(error, 'Pineapple could not save that trip right now. Try again.'));
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <AppScreen title={t('trips.title')} subtitle={t('trips.subtitle')}>
+    <AppScreen title={t('trips.title')} subtitle="Create, edit, and organise local trip plans without leaving Pineapple.">
       {!sortedTrips.length ? (
         <AppCard>
-          <EmptyState title={t('trips.noTripsTitle')} description={t('trips.noTripsBody')} />
+          <EmptyState
+            title={t('trips.noTripsTitle')}
+            description="Create your first trip to unlock the full home, vault, and SOS flow."
+          />
           <AppButton label={t('trips.createTrip')} onPress={openNewTrip} />
         </AppCard>
       ) : (
@@ -117,8 +120,14 @@ export default function TripsScreen() {
               <TripHeroCard
                 trip={trip}
                 subtitle={tripDateRange(trip.startDate, trip.endDate)}
-                meta={trip.transferSummary || 'Travel, hotel, and pickup shortcuts stay ready on this card.'}
-                badgeLabel={trip.heroImageStatus === 'ready' ? null : trip.heroImageStatus === 'loading' ? 'Loading image' : 'Fallback background'}
+                meta={trip.transferSummary || 'Trip summary, transport, accommodation, documents, and SOS details stay ready here.'}
+                badgeLabel={
+                  trip.heroImageStatus === 'ready'
+                    ? null
+                    : trip.heroImageStatus === 'loading'
+                      ? 'Preparing cover'
+                      : 'Using local fallback'
+                }
                 transportType={transportType}
                 onPress={() => {
                   setActiveTrip(trip.id);
@@ -146,7 +155,9 @@ export default function TripsScreen() {
                       {
                         text: t('common.delete'),
                         style: 'destructive',
-                        onPress: () => deleteRecord('trips', trip.id),
+                        onPress: () => {
+                          void deleteRecord('trips', trip.id);
+                        },
                       },
                     ])
                   }
@@ -160,7 +171,11 @@ export default function TripsScreen() {
         })
       )}
 
-      <AppButton label={t('trips.addTrip')} onPress={openNewTrip} />
+      <AppButton
+        label={sortedTrips.length ? t('trips.addTrip') : 'Create your first trip'}
+        onPress={openNewTrip}
+        style={styles.addButton}
+      />
 
       <AppModal visible={visible} title={draft.id ? t('trips.editTrip') : t('trips.createTrip')} onClose={() => setVisible(false)}>
         <AppTextField
@@ -182,10 +197,20 @@ export default function TripsScreen() {
             }))
           }
           placeholder="Search town, city, or country"
-          helper="Start typing a town, city, or country to improve image lookup and trip matching."
+          helper="Start typing a destination so Pineapple can organise local trip data and future hooks cleanly."
         />
-        <DateTimeField label={t('trips.startDate')} mode="date" value={draft.startDate} onChange={(value) => setDraft((current) => ({ ...current, startDate: value }))} />
-        <DateTimeField label={t('trips.endDate')} mode="date" value={draft.endDate} onChange={(value) => setDraft((current) => ({ ...current, endDate: value }))} />
+        <DateTimeField
+          label={t('trips.startDate')}
+          mode="date"
+          value={draft.startDate}
+          onChange={(value) => setDraft((current) => ({ ...current, startDate: value }))}
+        />
+        <DateTimeField
+          label={t('trips.endDate')}
+          mode="date"
+          value={draft.endDate}
+          onChange={(value) => setDraft((current) => ({ ...current, endDate: value }))}
+        />
         <View style={styles.statusField}>
           <Text style={styles.label}>{t('trips.status')}</Text>
           <ChoiceChips<TripStatus>
@@ -214,16 +239,22 @@ export default function TripsScreen() {
             />
           </View>
         ) : null}
-        <AppTextField label={t('trips.notes')} value={draft.notes} onChangeText={(value) => setDraft((current) => ({ ...current, notes: value }))} multiline placeholder="Check airport parking, request late checkout..." />
         <AppTextField
-          label={t('trips.transfers')}
+          label={t('trips.notes')}
+          value={draft.notes}
+          onChangeText={(value) => setDraft((current) => ({ ...current, notes: value }))}
+          multiline
+          placeholder="Key reminders, confirmations, or trip context"
+        />
+        <AppTextField
+          label="Set-off / transfer summary"
           value={draft.transferSummary}
           onChangeText={(value) => setDraft((current) => ({ ...current, transferSummary: value }))}
           multiline
-          placeholder="Airport transfer booked with Blue Cars at 14:20, meeting point T2 pickup bay 6."
+          placeholder="Airport transfer booked, pickup bay, taxi note, or drive plan"
         />
         <AppTextField
-          label={t('trips.airportTravel')}
+          label="Travel time to departure point"
           value={draft.airportTravelDurationMinutes !== null ? String(draft.airportTravelDurationMinutes) : ''}
           onChangeText={(value) =>
             setDraft((current) => ({
@@ -233,12 +264,12 @@ export default function TripsScreen() {
           }
           keyboardType="numeric"
           placeholder="Optional, e.g. 45"
-          helper="Used for the airport set-off time calculation on the trip page."
+          helper="Used by the trip detail set-off placeholder so later alert planning has a clean hook."
         />
         <Text style={styles.autoImageNote}>
-          Pineapple picks a destination image automatically from the place you enter and keeps a local cached copy after the first lookup.
+          Cover imagery stays local-first. Pineapple can use a cached destination reference when available and falls back cleanly when it is not.
         </Text>
-        <AppButton label={t('trips.saveTrip')} onPress={handleSave} loading={saving} />
+        <AppButton label={t('trips.saveTrip')} onPress={() => void handleSave()} loading={saving} />
       </AppModal>
     </AppScreen>
   );
@@ -270,5 +301,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     lineHeight: 19,
+  },
+  addButton: {
+    borderRadius: radii.pill,
   },
 });

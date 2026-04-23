@@ -308,8 +308,12 @@ export interface EmergencyInfo {
   insurerEmergencyNumber: string;
   hotelPhone: string;
   airlinePhone: string;
+  policePhone: string;
+  hospitalContact: string;
+  pharmacyContact: string;
   localEmergencyNote: string;
   embassyConsulateNote: string;
+  geoLookupStatus: 'idle' | 'planned';
   travellerMedicalNote: string;
   emergencyContacts: string;
   createdAt: string;

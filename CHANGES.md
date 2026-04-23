@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Phase 1 foundation build: moved `Trips` and `Account` into the production tab shell, rebuilt onboarding to finish cleanly through traveller setup, added local profile/traveller photo management, added trip CRUD-focused shell cleanup, and extended SOS/emergency data with police, hospital, pharmacy, and geo-lookup placeholder fields
+- Release metadata: bumped the app, docs, and APK artifact line to `2.6.0`
 - Notification pass: seeded default reminder settings, added explicit flight check-in reminders, improved packing reminder copy, added shared-trip import alerts, exposed richer notification diagnostics, and cleaned up notification copy/state in Settings
 - Settings/trip UI cleanup: converted settings and legal sections to accordions, restored Share Trip access inside the trip screen, and softened Account / language-picker surfaces without changing Pineapple’s core visual identity
 - Build/test workflow cleanup: Pineapple now treats installed APKs and Play Store `.aab` bundles as the supported test/release path and removes Expo Go from the current testing guidance

@@ -460,6 +460,15 @@ function validateEmergencyInfo(value: unknown, tripId: string): EmergencyInfo | 
     }),
     hotelPhone: expectString(info.hotelPhone ?? '', 'This shared trip file contains an invalid hotel phone.', { allowEmpty: true, maxLength: 120 }),
     airlinePhone: expectString(info.airlinePhone ?? '', 'This shared trip file contains an invalid airline phone.', { allowEmpty: true, maxLength: 120 }),
+    policePhone: expectString(info.policePhone ?? '', 'This shared trip file contains an invalid police phone.', { allowEmpty: true, maxLength: 120 }),
+    hospitalContact: expectString(info.hospitalContact ?? '', 'This shared trip file contains an invalid hospital contact.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
+    pharmacyContact: expectString(info.pharmacyContact ?? '', 'This shared trip file contains an invalid pharmacy contact.', {
+      allowEmpty: true,
+      maxLength: MAX_LONG_TEXT_LENGTH,
+    }),
     localEmergencyNote: expectString(info.localEmergencyNote ?? '', 'This shared trip file contains invalid local emergency notes.', {
       allowEmpty: true,
       maxLength: MAX_LONG_TEXT_LENGTH,
@@ -468,6 +477,7 @@ function validateEmergencyInfo(value: unknown, tripId: string): EmergencyInfo | 
       allowEmpty: true,
       maxLength: MAX_LONG_TEXT_LENGTH,
     }),
+    geoLookupStatus: info.geoLookupStatus === 'planned' ? 'planned' : 'idle',
     travellerMedicalNote: expectString(info.travellerMedicalNote ?? '', 'This shared trip file contains invalid medical notes.', {
       allowEmpty: true,
       maxLength: MAX_LONG_TEXT_LENGTH,

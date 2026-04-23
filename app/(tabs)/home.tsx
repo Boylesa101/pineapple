@@ -81,6 +81,11 @@ export default function HomeScreen() {
       <View style={styles.topBar}>
         <View style={styles.topCopy}>
           <Text style={styles.topGreeting}>{t('home.greeting', { name: greetingName })}</Text>
+          <Text style={styles.topSubcopy}>
+            {tripCards.length
+              ? 'Your next trip, vault, and travel foundations are ready below.'
+              : 'Start with one trip and Pineapple will keep the rest of your travel foundation ready locally.'}
+          </Text>
         </View>
         <View style={styles.topActions}>
           <Pressable onPress={() => router.push('/account')} style={styles.topIconButton} accessibilityLabel="Open account">
@@ -93,9 +98,22 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      <View style={styles.quickGrid}>
+        <Pressable onPress={() => router.push('/vault')} style={styles.quickCard}>
+          <MaterialIcons name="folder-copy" size={22} color={colors.primaryBlue} />
+          <Text style={styles.quickTitle}>Vault</Text>
+          <Text style={styles.quickBody}>Personal and trip-linked documents, stored locally on your device.</Text>
+        </Pressable>
+        <Pressable onPress={goToTrips} style={styles.quickCard}>
+          <MaterialIcons name="luggage" size={22} color={colors.primaryBlue} />
+          <Text style={styles.quickTitle}>Trips</Text>
+          <Text style={styles.quickBody}>Create, edit, and open trip skeletons with transport, stay, and SOS hooks.</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.section}>
         <SectionHeader
-          title={t('home.currentTrip')}
+          title={tripCards.length ? t('home.currentTrip') : 'Upcoming trips'}
           right={
             <Pressable onPress={goToTrips}>
               <Text style={styles.viewAll}>{t('home.viewAll')}</Text>
@@ -123,12 +141,38 @@ export default function HomeScreen() {
           <AppCard>
             <EmptyState
               title={t('home.noTripYet')}
-              description={t('home.noTripDescription')}
+              description="Create your first trip to unlock trip detail placeholders, saved transport, accommodation slots, and SOS planning."
             />
             <AppButton label={t('home.createFirstTrip')} onPress={goToTrips} />
           </AppCard>
         )}
       </View>
+
+      {alertCount ? (
+        <View style={styles.section}>
+          <SectionHeader title="Attention needed" right={`${alertCount} alert${alertCount === 1 ? '' : 's'}`} />
+          <AppCard>
+            {alerts.slice(0, 3).map((alert) => (
+              <View key={`${alert.title}-${alert.subtitle}`} style={styles.alertRow}>
+                <View
+                  style={[
+                    styles.alertDot,
+                    alert.tone === 'danger'
+                      ? styles.alertDanger
+                      : alert.tone === 'coral'
+                        ? styles.alertCoral
+                        : styles.alertGold,
+                  ]}
+                />
+                <View style={styles.alertCopy}>
+                  <Text style={styles.alertTitle}>{alert.title}</Text>
+                  <Text style={styles.alertBody}>{alert.subtitle}</Text>
+                </View>
+              </View>
+            ))}
+          </AppCard>
+        </View>
+      ) : null}
     </AppScreen>
   );
 }
@@ -150,6 +194,13 @@ const styles = StyleSheet.create({
     color: colors.primaryBlueDark,
     fontFamily: 'Poppins_700Bold',
     fontSize: 24,
+  },
+  topSubcopy: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: spacing.xs,
   },
   topActions: {
     flexDirection: 'row',
@@ -176,10 +227,70 @@ const styles = StyleSheet.create({
   section: {
     gap: spacing.sm,
   },
+  quickGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  quickCard: {
+    flex: 1,
+    gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primaryBlueBorder,
+  },
+  quickTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  },
+  quickBody: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 18,
+  },
   viewAll: {
     color: colors.primaryBlue,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
+  },
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  alertDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 5,
+  },
+  alertDanger: {
+    backgroundColor: colors.dangerRed,
+  },
+  alertCoral: {
+    backgroundColor: colors.sunsetCoral,
+  },
+  alertGold: {
+    backgroundColor: colors.pineappleGold,
+  },
+  alertCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  alertTitle: {
+    color: colors.nightNavy,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
+  alertBody: {
+    color: colors.textMuted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    lineHeight: 18,
   },
   fabWrap: {
     alignItems: 'flex-end',

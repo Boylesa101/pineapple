@@ -122,6 +122,9 @@ export async function exportTripPdf(
                   `Insurer: ${escapeHtml(bundle.emergencyInfo?.insurerEmergencyNumber || 'Not set')}`,
                   `Hotel: ${escapeHtml(bundle.emergencyInfo?.hotelPhone || 'Not set')}`,
                   `Airline: ${escapeHtml(bundle.emergencyInfo?.airlinePhone || 'Not set')}`,
+                  `Police: ${escapeHtml(bundle.emergencyInfo?.policePhone || 'Not set')}`,
+                  `Hospital: ${escapeHtml(bundle.emergencyInfo?.hospitalContact || 'Not set')}`,
+                  `Pharmacy: ${escapeHtml(bundle.emergencyInfo?.pharmacyContact || 'Not set')}`,
                   `Contacts: ${escapeHtml(bundle.emergencyInfo?.emergencyContacts || 'Not set')}`,
                   `Notes: ${escapeHtml(bundle.emergencyInfo?.localEmergencyNote || 'Not set')}`,
                 ]

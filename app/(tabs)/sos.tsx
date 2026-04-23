@@ -21,8 +21,18 @@ function emergencyRows(bundle: ReturnType<typeof getTripBundle>) {
     },
     {
       icon: 'local-police',
-      title: 'Local emergency note',
-      description: bundle.emergencyInfo?.localEmergencyNote || 'Save local emergency advice and numbers for this destination.',
+      title: 'Police',
+      description: bundle.emergencyInfo?.policePhone || bundle.emergencyInfo?.localEmergencyNote || 'Save a local police number or emergency note for this trip.',
+    },
+    {
+      icon: 'local-hospital',
+      title: 'Hospital / clinic',
+      description: bundle.emergencyInfo?.hospitalContact || 'Add a hospital, clinic, or urgent care contact for this destination.',
+    },
+    {
+      icon: 'medical-services',
+      title: 'Pharmacy',
+      description: bundle.emergencyInfo?.pharmacyContact || 'Add a nearby pharmacy or medication support note for later offline access.',
     },
     {
       icon: 'medication',
@@ -105,20 +115,13 @@ export default function SosScreen() {
         <SectionHeader title="Nearest services" right="Local-first" />
         <AppCard>
           <View style={styles.emergencyItem}>
-            <MaterialIcons name="local-hospital" size={22} color={colors.primaryBlue} style={styles.itemIcon} />
-            <View style={styles.itemCopy}>
-              <Text style={styles.itemTitle}>Hospital and pharmacy</Text>
-              <Text style={styles.itemDescription}>
-                Save local hospital, clinic, and pharmacy details in your trip emergency note so Pineapple can surface them offline.
-              </Text>
-            </View>
-          </View>
-          <View style={styles.emergencyItem}>
             <MaterialIcons name="local-police" size={22} color={colors.primaryBlue} style={styles.itemIcon} />
             <View style={styles.itemCopy}>
-              <Text style={styles.itemTitle}>Police and local services</Text>
+              <Text style={styles.itemTitle}>Geolocation lookup hook</Text>
               <Text style={styles.itemDescription}>
-                Pineapple keeps your local emergency note, contacts, and trip support numbers available even without signal.
+                {emergency?.geoLookupStatus === 'planned'
+                  ? 'Pineapple is prepared for future location-powered emergency lookup, but live lookup is intentionally deferred until that integration is stable.'
+                  : 'Live geolocation lookup is currently off. Pineapple will rely on the emergency details you save locally.'}
               </Text>
             </View>
           </View>
@@ -141,6 +144,16 @@ export default function SosScreen() {
             <Text style={styles.rowAction}>{emergency?.emergencyContacts ? 'Saved' : 'Add'}</Text>
           </View>
           <Text style={styles.rowDescription}>{emergency?.emergencyContacts || 'Add local contacts or family contacts to your trip emergency card.'}</Text>
+
+          <View style={styles.rowSpacer} />
+
+          <View style={styles.row}>
+            <Text style={styles.rowTitle}>Hospital / pharmacy refs</Text>
+            <Text style={styles.rowAction}>{emergency?.hospitalContact || emergency?.pharmacyContact ? 'Saved' : 'Add'}</Text>
+          </View>
+          <Text style={styles.rowDescription}>
+            {emergency?.hospitalContact || emergency?.pharmacyContact || 'Add hospital, clinic, or pharmacy details in the trip emergency editor.'}
+          </Text>
 
           <View style={styles.actions}>
             <AppButton label="Open trip emergency" tone="outline" onPress={() => (tripId ? router.push({ pathname: '/trip/[tripId]', params: { tripId } }) : router.push('/trips'))} />

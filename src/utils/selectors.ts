@@ -164,7 +164,14 @@ export function getMissingInfoPrompts(snapshot: AppDataSnapshot, tripId: string 
   if (!bundle.documents.some((document) => document.documentType === 'passport')) prompts.push('Passport details are missing.');
   if (!bundle.documents.some((document) => document.documentType === 'insurance')) prompts.push('Insurance documents are missing.');
   if (!bundle.hotelStays.length) prompts.push('No hotel details saved yet.');
-  if (!bundle.emergencyInfo?.emergencyContacts && !bundle.emergencyInfo?.insurerEmergencyNumber) prompts.push('No emergency contact details saved.');
+  if (
+    !bundle.emergencyInfo?.emergencyContacts &&
+    !bundle.emergencyInfo?.insurerEmergencyNumber &&
+    !bundle.emergencyInfo?.policePhone &&
+    !bundle.emergencyInfo?.hospitalContact
+  ) {
+    prompts.push('No emergency contact details saved.');
+  }
   return prompts;
 }
 
@@ -230,7 +237,12 @@ export function getDashboardAlerts(snapshot: AppDataSnapshot, tripId: string | n
     });
   }
 
-  if (!bundle.emergencyInfo?.emergencyContacts && !bundle.emergencyInfo?.insurerEmergencyNumber) {
+  if (
+    !bundle.emergencyInfo?.emergencyContacts &&
+    !bundle.emergencyInfo?.insurerEmergencyNumber &&
+    !bundle.emergencyInfo?.policePhone &&
+    !bundle.emergencyInfo?.hospitalContact
+  ) {
     alerts.push({
       title: 'Emergency contact missing',
       subtitle: 'Add local emergency contacts or insurer support.',
