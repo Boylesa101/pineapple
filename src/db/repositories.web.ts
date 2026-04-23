@@ -22,6 +22,7 @@ import type {
   PackingItemDraft,
   ReminderSettingDraft,
   SavedVibeDraft,
+  SharedTripConflictRecord,
   SharedTripStateDraft,
   SyncConflictDraft,
   TravelSegmentDraft,
@@ -78,6 +79,47 @@ function emptySnapshot(timestamp = now()): AppDataSnapshot {
     sharedTripStates: [],
     syncConflicts: [],
   };
+}
+
+function parseIncomingConflictRecord(value: unknown): SharedTripConflictRecord | null {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (
+      parsed &&
+      typeof parsed.senderLabel === 'string' &&
+      typeof parsed.packetVersion === 'number' &&
+      parsed.data &&
+      typeof parsed.data === 'object'
+    ) {
+      return {
+        senderLabel: parsed.senderLabel,
+        packetVersion: 3,
+        data: parsed.data as SharedTripConflictRecord['data'],
+      };
+    }
+
+    if (
+      parsed &&
+      parsed.format === 'pineapple-shared-trip' &&
+      typeof parsed.senderLabel === 'string' &&
+      parsed.data &&
+      typeof parsed.data === 'object'
+    ) {
+      return {
+        senderLabel: parsed.senderLabel,
+        packetVersion: 3,
+        data: parsed.data as SharedTripConflictRecord['data'],
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function normalizeScheduledNotificationIds(value: unknown) {
@@ -150,6 +192,9 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         transportType:
           segment.transportType === 'private_flight' ||
           segment.transportType === 'train' ||
+          segment.transportType === 'bus' ||
+          segment.transportType === 'underground' ||
+          segment.transportType === 'metro' ||
           segment.transportType === 'ferry' ||
           segment.transportType === 'eurotunnel' ||
           segment.transportType === 'car' ||
@@ -219,8 +264,12 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         insurerEmergencyNumber: (await decryptStructuredValue(info.insurerEmergencyNumber)) ?? '',
         hotelPhone: (await decryptStructuredValue(info.hotelPhone)) ?? '',
         airlinePhone: (await decryptStructuredValue(info.airlinePhone)) ?? '',
+        policePhone: (await decryptStructuredValue(info.policePhone)) ?? '',
+        hospitalContact: (await decryptStructuredValue(info.hospitalContact)) ?? '',
+        pharmacyContact: (await decryptStructuredValue(info.pharmacyContact)) ?? '',
         localEmergencyNote: (await decryptStructuredValue(info.localEmergencyNote)) ?? '',
         embassyConsulateNote: (await decryptStructuredValue(info.embassyConsulateNote)) ?? '',
+        geoLookupStatus: info.geoLookupStatus === 'planned' ? 'planned' : 'idle',
         travellerMedicalNote: (await decryptStructuredValue(info.travellerMedicalNote)) ?? '',
         emergencyContacts: (await decryptStructuredValue(info.emergencyContacts)) ?? '',
       }))
@@ -267,13 +316,20 @@ async function decryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
       }))
     ),
     syncConflicts: await Promise.all(
-      (snapshot.syncConflicts ?? []).map(async (conflict) => ({
-        ...conflict,
-        shareCode: (await decryptStructuredValue(conflict.shareCode)) ?? '',
-        summary: (await decryptStructuredValue(conflict.summary)) ?? '',
-        incomingPayload: (await decryptStructuredValue(conflict.incomingPayload)) ?? '',
-      }))
-    ),
+      (snapshot.syncConflicts ?? []).map(async (conflict) => {
+        const incomingRecord = parseIncomingConflictRecord((await decryptStructuredValue((conflict as any).incomingPayload)) ?? '');
+        if (!incomingRecord) {
+          return null;
+        }
+
+        return {
+          ...conflict,
+          shareCode: (await decryptStructuredValue(conflict.shareCode)) ?? '',
+          summary: (await decryptStructuredValue(conflict.summary)) ?? '',
+          incomingRecord,
+        };
+      })
+    ).then((items) => items.filter((item): item is NonNullable<typeof item> => Boolean(item))),
   } as AppDataSnapshot;
 }
 
@@ -438,7 +494,7 @@ async function encryptSnapshot(snapshot: AppDataSnapshot): Promise<AppDataSnapsh
         ...conflict,
         shareCode: (await encryptStructuredValue(conflict.shareCode)) ?? '',
         summary: (await encryptStructuredValue(conflict.summary)) ?? '',
-        incomingPayload: (await encryptStructuredValue(conflict.incomingPayload)) ?? '',
+        incomingPayload: (await encryptStructuredValue(JSON.stringify(conflict.incomingRecord))) ?? '',
       }))
     ),
   } as AppDataSnapshot;
@@ -701,6 +757,7 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
     ...snapshot,
     emergencyInfos: withTripUpsert(snapshot.emergencyInfos, {
       ...input,
+      geoLookupStatus: input.geoLookupStatus === 'planned' ? 'planned' : 'idle',
       id,
       createdAt: snapshot.emergencyInfos.find((item) => item.tripId === input.tripId)?.createdAt ?? timestamp,
       updatedAt: timestamp,
@@ -905,7 +962,7 @@ export async function deleteById(table: string, id: string) {
       next.syncConflicts = snapshot.syncConflicts.filter((item) => item.id !== id);
       break;
     default:
-      break;
+      throw new Error(`Unsupported delete table: ${table}`);
   }
 
   await writeSnapshot(next);

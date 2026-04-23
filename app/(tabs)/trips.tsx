@@ -8,13 +8,14 @@ import { AppCard } from '@/components/AppCard';
 import { AppModal } from '@/components/AppModal';
 import { AppScreen } from '@/components/AppScreen';
 import { AppTextField } from '@/components/AppTextField';
-import { DestinationSearchField } from '@/components/DestinationSearchField';
 import { ChoiceChips } from '@/components/ChoiceChips';
 import { DateTimeField } from '@/components/DateTimeField';
+import { DestinationSearchField } from '@/components/DestinationSearchField';
 import { EmptyState } from '@/components/EmptyState';
 import { TripHeroCard } from '@/components/ui/TripHeroCard';
 import { colors, radii, spacing } from '@/constants/theme';
 import { packingTemplates, type PackingTemplateId } from '@/data/packingTemplates';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAppStore } from '@/store/useAppStore';
 import type { TripDraft, TripStatus } from '@/types/models';
 import { tripDateRange } from '@/utils/format';
@@ -51,13 +52,17 @@ const emptyTripDraft: TripDraft = {
 
 export default function TripsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data, saveTrip, deleteRecord, setActiveTrip, applyPackingTemplate } = useAppStore();
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState<TripDraft>(emptyTripDraft);
   const [templateId, setTemplateId] = useState<PackingTemplateId | 'none'>('none');
   const [saving, setSaving] = useState(false);
 
-  const sortedTrips = useMemo(() => filterVisibleTrips([...data.trips]), [data.trips]);
+  const sortedTrips = useMemo(
+    () => [...filterVisibleTrips(data.trips)].sort((left, right) => left.startDate.localeCompare(right.startDate)),
+    [data.trips]
+  );
 
   function openNewTrip() {
     setDraft(emptyTripDraft);
@@ -74,7 +79,7 @@ export default function TripsScreen() {
   async function handleSave() {
     const errors = validateTrip(draft);
     if (errors.length) {
-      Alert.alert('Trip needs attention', errors.join('\n'));
+      Alert.alert(t('trips.needsAttention'), errors.join('\n'));
       return;
     }
 
@@ -89,21 +94,21 @@ export default function TripsScreen() {
       setDraft(emptyTripDraft);
       setTemplateId('none');
     } catch (error) {
-      Alert.alert(
-        'Trip could not be saved',
-        toUserMessage(error, 'Pineapple could not save that trip right now. Try again.')
-      );
+      Alert.alert(t('trips.saveFailed'), toUserMessage(error, 'Pineapple could not save that trip right now. Try again.'));
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <AppScreen title="Trips" subtitle="Create, edit, and organise every holiday offline.">
+    <AppScreen title={t('trips.title')} subtitle="Create, edit, and organise local trip plans without leaving Pineapple.">
       {!sortedTrips.length ? (
         <AppCard>
-          <EmptyState title="No trips yet" description="Create your first holiday to unlock packing, itinerary, travel mode, and the secure vault." />
-          <AppButton label="Create trip" onPress={openNewTrip} />
+          <EmptyState
+            title={t('trips.noTripsTitle')}
+            description="Create your first trip to unlock the full home, vault, and SOS flow."
+          />
+          <AppButton label={t('trips.createTrip')} onPress={openNewTrip} />
         </AppCard>
       ) : (
         sortedTrips.map((trip) => {
@@ -115,8 +120,14 @@ export default function TripsScreen() {
               <TripHeroCard
                 trip={trip}
                 subtitle={tripDateRange(trip.startDate, trip.endDate)}
-                meta={trip.transferSummary || 'Travel, hotel, and pickup shortcuts stay ready on this card.'}
-                badgeLabel={trip.heroImageStatus === 'ready' ? null : trip.heroImageStatus === 'loading' ? 'Loading image' : 'Fallback background'}
+                meta={trip.transferSummary || 'Trip summary, transport, accommodation, documents, and SOS details stay ready here.'}
+                badgeLabel={
+                  trip.heroImageStatus === 'ready'
+                    ? null
+                    : trip.heroImageStatus === 'loading'
+                      ? 'Preparing cover'
+                      : 'Using local fallback'
+                }
                 transportType={transportType}
                 onPress={() => {
                   setActiveTrip(trip.id);
@@ -124,7 +135,7 @@ export default function TripsScreen() {
                 }}
                 onOpenFlights={() => {
                   setActiveTrip(trip.id);
-                  router.push({ pathname: '/trip/[tripId]', params: { tripId: trip.id, focus: 'travel' } });
+                  router.push({ pathname: '/trip/[tripId]/flights', params: { tripId: trip.id } });
                 }}
                 onOpenHotel={() => {
                   setActiveTrip(trip.id);
@@ -136,15 +147,17 @@ export default function TripsScreen() {
                 }}
               />
               <View style={styles.actions}>
-                <AppButton label="Edit" tone="secondary" onPress={() => openEditTrip(trip)} />
+                <AppButton label={t('common.edit')} tone="secondary" onPress={() => openEditTrip(trip)} />
                 <Pressable
                   onPress={() =>
-                    Alert.alert('Delete trip?', 'This removes the trip and all related local data.', [
-                      { text: 'Cancel', style: 'cancel' },
+                    Alert.alert(t('trips.deleteTripTitle'), t('trips.deleteTripBody'), [
+                      { text: t('common.cancel'), style: 'cancel' },
                       {
-                        text: 'Delete',
+                        text: t('common.delete'),
                         style: 'destructive',
-                        onPress: () => deleteRecord('trips', trip.id),
+                        onPress: () => {
+                          void deleteRecord('trips', trip.id);
+                        },
                       },
                     ])
                   }
@@ -158,18 +171,22 @@ export default function TripsScreen() {
         })
       )}
 
-      <AppButton label="Add trip" onPress={openNewTrip} />
+      <AppButton
+        label={sortedTrips.length ? t('trips.addTrip') : 'Create your first trip'}
+        onPress={openNewTrip}
+        style={styles.addButton}
+      />
 
-      <AppModal visible={visible} title={draft.id ? 'Edit trip' : 'Create trip'} onClose={() => setVisible(false)}>
+      <AppModal visible={visible} title={draft.id ? t('trips.editTrip') : t('trips.createTrip')} onClose={() => setVisible(false)}>
         <AppTextField
-          label="Trip name"
+          label={t('trips.tripName')}
           value={draft.name}
           onChangeText={(value) => setDraft((current) => ({ ...current, name: value }))}
           placeholder="Optional custom trip name"
           helper="Leave this blank if you want Pineapple to use the destination as the trip title."
         />
         <DestinationSearchField
-          label="Destination"
+          label={t('trips.destination')}
           value={draft.destination}
           onChangeText={(value) => setDraft((current) => ({ ...current, destination: value }))}
           onSelectSuggestion={(suggestion) =>
@@ -180,30 +197,40 @@ export default function TripsScreen() {
             }))
           }
           placeholder="Search town, city, or country"
-          helper="Start typing a town, city, or country to improve image lookup and trip matching."
+          helper="Start typing a destination so Pineapple can organise local trip data and future hooks cleanly."
         />
-        <DateTimeField label="Start date" mode="date" value={draft.startDate} onChange={(value) => setDraft((current) => ({ ...current, startDate: value }))} />
-        <DateTimeField label="End date" mode="date" value={draft.endDate} onChange={(value) => setDraft((current) => ({ ...current, endDate: value }))} />
+        <DateTimeField
+          label={t('trips.startDate')}
+          mode="date"
+          value={draft.startDate}
+          onChange={(value) => setDraft((current) => ({ ...current, startDate: value }))}
+        />
+        <DateTimeField
+          label={t('trips.endDate')}
+          mode="date"
+          value={draft.endDate}
+          onChange={(value) => setDraft((current) => ({ ...current, endDate: value }))}
+        />
         <View style={styles.statusField}>
-          <Text style={styles.label}>Status</Text>
+          <Text style={styles.label}>{t('trips.status')}</Text>
           <ChoiceChips<TripStatus>
             value={draft.status}
             onChange={(value) => setDraft((current) => ({ ...current, status: value }))}
             options={[
-              { label: 'Upcoming', value: 'upcoming' },
-              { label: 'Active', value: 'active' },
-              { label: 'Completed', value: 'completed' },
+              { label: t('trips.upcoming'), value: 'upcoming' },
+              { label: t('trips.active'), value: 'active' },
+              { label: t('trips.completed'), value: 'completed' },
             ]}
           />
         </View>
         {!draft.id ? (
           <View style={styles.statusField}>
-            <Text style={styles.label}>Optional starter template</Text>
+            <Text style={styles.label}>{t('trips.optionalTemplate')}</Text>
             <ChoiceChips<string>
               value={templateId}
               onChange={(value) => setTemplateId(value as PackingTemplateId | 'none')}
               options={[
-                { label: 'None', value: 'none' },
+                { label: t('trips.none'), value: 'none' },
                 ...Object.entries(packingTemplates).map(([value, template]) => ({
                   label: template.label,
                   value,
@@ -212,16 +239,22 @@ export default function TripsScreen() {
             />
           </View>
         ) : null}
-        <AppTextField label="Notes" value={draft.notes} onChangeText={(value) => setDraft((current) => ({ ...current, notes: value }))} multiline placeholder="Check airport parking, request late checkout..." />
         <AppTextField
-          label="Transfers / pickup info"
+          label={t('trips.notes')}
+          value={draft.notes}
+          onChangeText={(value) => setDraft((current) => ({ ...current, notes: value }))}
+          multiline
+          placeholder="Key reminders, confirmations, or trip context"
+        />
+        <AppTextField
+          label="Set-off / transfer summary"
           value={draft.transferSummary}
           onChangeText={(value) => setDraft((current) => ({ ...current, transferSummary: value }))}
           multiline
-          placeholder="Airport transfer booked with Blue Cars at 14:20, meeting point T2 pickup bay 6."
+          placeholder="Airport transfer booked, pickup bay, taxi note, or drive plan"
         />
         <AppTextField
-          label="Travel to departure airport (minutes)"
+          label="Travel time to departure point"
           value={draft.airportTravelDurationMinutes !== null ? String(draft.airportTravelDurationMinutes) : ''}
           onChangeText={(value) =>
             setDraft((current) => ({
@@ -231,12 +264,12 @@ export default function TripsScreen() {
           }
           keyboardType="numeric"
           placeholder="Optional, e.g. 45"
-          helper="Used for the airport set-off time calculation on the trip page."
+          helper="Used by the trip detail set-off placeholder so later alert planning has a clean hook."
         />
         <Text style={styles.autoImageNote}>
-          Pineapple picks a destination image automatically from the place you enter and keeps a local cached copy after the first lookup.
+          Cover imagery stays local-first. Pineapple can use a cached destination reference when available and falls back cleanly when it is not.
         </Text>
-        <AppButton label="Save trip" onPress={handleSave} loading={saving} />
+        <AppButton label={t('trips.saveTrip')} onPress={() => void handleSave()} loading={saving} />
       </AppModal>
     </AppScreen>
   );
@@ -268,5 +301,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     lineHeight: 19,
+  },
+  addButton: {
+    borderRadius: radii.pill,
   },
 });

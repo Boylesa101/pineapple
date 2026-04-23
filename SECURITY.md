@@ -44,10 +44,20 @@ Pineapple is designed for local-first handling of sensitive travel data on Andro
   vault attachments and trip hero images are encrypted at rest in app storage
 - Backups:
   encrypted with PBKDF2-derived AES plus HMAC integrity
+- Vault document boundary:
+  sensitive Vault attachments, previews, scan viewers, and other materialized file opens are intended to stay blocked until the Vault unlock succeeds for the current session
 
 ### Honest limitation
 
 Pineapple does not currently use SQLCipher or full database-engine encryption. It protects sensitive fields before they are written and keeps non-sensitive query/routing fields plaintext where the app needs them for navigation, filtering, reminders, and local queries.
+
+Manual-share trip packets now use a dedicated encrypted envelope with PBKDF2-derived AES and HMAC integrity. Receivers must enter the separately shared transfer code before Pineapple can decrypt and import the trip.
+
+Pineapple web is a companion surface and should not be treated as equivalent to the installed Android app for sensitive vault data, encrypted backups, or manual-share sync.
+
+Transport live-data lookups now sit behind the provider abstraction in `src/services/transport/`. The current provider path is OpenSky for flights, Darwin for UK rail, and BODS for bus, with manual fallback when credentials or live matches are unavailable. Passenger-specific boarding-pass or ticket data such as passenger name, seat, booking reference, and barcode payload remain local import/app data and are not sourced from those public or operator data feeds.
+
+OpenSky, Darwin, and BODS all need product/legal review before Pineapple treats them as production-cleared live dependencies. Pineapple now documents provider credentials, capability flags, and fallback behavior explicitly so the app does not silently assume unrestricted operational use.
 
 ## Release hardening
 

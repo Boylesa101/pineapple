@@ -5,13 +5,13 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 ### Android test and release builds
 
 - Pineapple is back on Expo SDK 55 / React Native 0.83 and the Android project is configured with the required New Architecture setting for that SDK line
-- Expo Go is no longer a supported Pineapple test path; use installable APKs for device testing and `.aab` for Play Store release
+- Pineapple is tested through installable APKs on Android devices and `.aab` bundles for Play Store release; Expo Go is not part of the supported Pineapple workflow
 - For a dev-only APK that still expects Metro, run `npm run apk:debug`
-- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.2.7-debug.apk`
+- Pineapple copies the finished debug APK to `build/apk/pineapple-v2.6.0-debug.apk`
 - For the fastest direct phone testing on a modern device, run `npm run apk:release:arm64`
-- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.2.7-release-arm64.apk`
+- Pineapple copies that arm64-only release APK to `build/apk/pineapple-v2.6.0-release-arm64.apk`
 - For direct phone testing without USB or Metro, run `npm run apk:release`
-- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.2.7-release.apk`
+- Pineapple copies the finished standalone release APK to `build/apk/pineapple-v2.6.0-release.apk`
 - The generated release APK will be at `android/app/build/outputs/apk/release/app-release.apk`
 - Until you add a real upload keystore, release builds fall back to the Android debug key so they remain installable for testing only
 - When you are ready for Google Play, provide these environment variables before building:
@@ -49,6 +49,69 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 
 - First-run setup now follows this exact order: `Language` -> `Name` -> `PIN` -> `Biometrics` -> `Passport / traveller setup`
 - Travel style and profile photo no longer block PIN setup; profile photo lives in `Account`, and travel style lives in `Account` / `Settings`
+- The chosen first-run language now applies immediately across onboarding, account, warnings, the main trip tools, and the in-app legal/support wrappers
+
+### Phase 1 foundation status
+
+- Version `2.6.0` is the Phase 1 foundation build
+- Main app shell now uses a coherent five-tab base: `Home`, `Vault`, `Trips`, `Account`, and `SOS`
+- `Account` now owns the main local profile name/photo plus saved traveller creation, editing, deletion, and per-traveller photos
+- `Trips` now owns the phase-appropriate CRUD flow for creating, editing, deleting, listing, and opening trip skeletons
+- SOS/emergency data now stores insurer, hotel, airline, police, hospital, pharmacy, embassy, contacts, and a future geo-lookup hook locally
+- Deferred to Phase 2: live weather polish, advanced transport-stack completion, deeper document ingestion flows, and fuller transfer/import UX beyond the current honest entry points
+
+### Transport stack card system
+
+- Pineapple now uses one shared transport stack architecture for airline, rail, bus, taxi, and hotel cards
+- The trip screen transport stack supports these states:
+  - `top_of_stack`
+  - `in_stack`
+  - `clicked`
+  - `open`
+- Airline, rail, and bus cards now render from the same normalized transport model in `src/services/transport/`
+- Airline identity remains data-driven, so the same lead/in-stack/open layout adapts across carriers such as British Airways, Ryanair, easyJet, Lufthansa, KLM, Emirates, and any future mapped carrier
+- Passenger-specific booking details such as passenger name, seat, booking reference, fare, and barcode payload remain local app/import data; live transport-status providers do not replace those fields
+- Boarding-pass and ticket barcode payloads are preserved exactly from local/import data. QR payloads render directly; other formats remain stored and labelled honestly until a dedicated renderer is added
+
+### Live transport providers
+
+- Pineapple now wraps transport-status lookups behind a provider abstraction in `src/services/transport/`
+- Current provider modules:
+  - `OpenSkyTransportProvider` for flights
+  - `DarwinProvider` for UK rail
+  - `BodsProvider` for bus
+  - `MockTransportProvider` for local development
+- If provider credentials are missing, rate limited, or no useful live match is found, Pineapple falls back gracefully to saved trip data and marks the live layer as unavailable instead of breaking the card
+- Development diagnostics are available through `getTransportProviderDiagnostics()` and the transport stack dev note in development builds
+
+### Notifications and reminder diagnostics
+
+- Pineapple reminders are local device notifications driven by `expo-notifications`
+- Countdown, packing, flight check-in, transport departure, and document expiry reminders are scheduled from the local trip snapshot and rescheduled when trip data changes
+- Shared-trip import updates can raise a local notification on-device after a successful encrypted import
+- Live travel updates can raise an on-device alert when Pineapple detects a new delayed, cancelled, boarding, or gate/platform-change state while refreshing transport items in the app
+- Honest limitation: Pineapple still does not have a remote push backend, so background live-disruption delivery is not equivalent to an FCM/APNs production push service
+
+### Transport provider environment variables
+
+- `EXPO_PUBLIC_TRANSPORT_PROVIDER_MODE=mock`
+- `EXPO_PUBLIC_OPENSKY_CLIENT_ID`
+- `EXPO_PUBLIC_OPENSKY_CLIENT_SECRET`
+- `EXPO_PUBLIC_OPENSKY_BASE_URL`
+- `EXPO_PUBLIC_OPENSKY_AUTH_URL`
+- `EXPO_PUBLIC_DARWIN_TOKEN`
+- `EXPO_PUBLIC_DARWIN_ENDPOINT`
+- `EXPO_PUBLIC_BODS_API_KEY`
+- `EXPO_PUBLIC_BODS_API_BASE_URL`
+- `EXPO_PUBLIC_BODS_ENDPOINT`
+
+### OpenSky note
+
+- OpenSky is now the current flight-status provider path for Pineapple transport cards
+- Pineapple uses OpenSky OAuth client credentials plus the live state-vector API path for current flight-state matching
+- Honest limitation: OpenSky does not provide passenger boarding-pass data such as passenger name, seat, booking reference, or barcode payload
+- Honest limitation: OpenSky airport arrivals/departures use ICAO airport identifiers and are historical or batch-oriented, so Pineapple still preserves stored trip timing and route details locally instead of pretending OpenSky replaces airline booking data
+- OpenSky documents that operational or commercial product use needs license review; do not treat it as silently production-cleared without that approval
 
 ### Core features
 
@@ -62,6 +125,7 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Multi-traveller trip profiles with DOB, nationality, relationship type, notes, and colour badges
 - Traveller management with passport, GHIC / EHIC, and medical notes
 - Secure vault for passports, insurance, visas, boarding passes, hotel bookings, excursion tickets, and custom docs
+- Shared transport stack with airline, rail, and bus live-data overlays plus taxi/hotel placeholders on the same card architecture
 - Passport documents now render with a dedicated physical passport cover and identity spread experience instead of a generic document card
 - Passport image scans and passport PDFs can now prefill passport fields with on-device OCR and MRZ parsing in the Android build, while keeping the extracted fields editable before save
 - Driving licences now render with their own UK photocard object and fuller official record view, including front/back scan support and Android OCR from front scans
@@ -109,23 +173,24 @@ Pineapple is a local-first holiday planner and secure travel organiser built wit
 - Sensitive structured record fields are also encrypted before Pineapple writes them into local storage, covering trips, travellers, document metadata, itinerary notes, emergency records, and sync payloads
 - Local reminders and notifications for trip countdown milestones, trip day, passport/GHIC expiry, missing insurance, packing completeness, per-segment transport departures, hotels, transfers, travel mode, SOS readiness, and excursions
 - Optional local expiry reminders for passports, GHIC / EHIC cards, insurance, visas, and supported custom documents
-- Version `2.2.7` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification rather than Expo Go
+- Version `2.6.0` keeps the dedicated transport-notification proof build: it seeds one temporary `Transport Notification Proof Trip` on device, adds one flight/train/taxi/ferry/Eurotunnel/hire-car segment, compresses those lock-screen alert timings into a short 2-26 minute local test window, and is intended for real APK verification on an installed Pineapple build
 - First-run setup now starts with language choice, persists the selected app language immediately, then continues through name, PIN, biometrics, and optional passport / traveller setup
 - Vault travel records now expose hire-car bookings, airport lounge passes, airline loyalty cards, and a Pineapple-stored UK rail ticket record with local QR generation
 - UK rail ticket records stay explicitly honest: Pineapple stores a reference copy and QR payload for your own trip organisation, but it does not issue a valid National Rail travel ticket
 - Trip detail can now surface a visa-check warning or softer official-check prompt using destination-specific official immigration links when Pineapple can match the saved trip destination safely
-- Trip sharing now surfaces Android Nearby / Quick Share through the existing local exported trip file flow instead of sounding like a backend sync feature
+- Trip sharing now uses Pineapple-owned encrypted trip files and encrypted QR handoff for smaller transfers instead of plaintext packets or backend sync wording
 - Weather detail returns to the cleaner selected-day layout: scenic top card first, then the selected day’s hourly time, icon, and temperature rows directly underneath
 - The temporary `Transport Notification Proof Trip` is build-scoped and should be removed again after transport lock-screen verification is complete
 - Bootstrap correction: build-scoped proof-trip seeding now uses a safe in-place snapshot persist instead of a destructive full data replacement, so existing local data is not cleared during startup
-- Android icon correction: the adaptive monochrome icon now uses a proper transparent monochrome glyph asset for themed launcher icons
+- Android icon correction: the adaptive monochrome icon now uses a proper transparent monochrome glyph asset for themed launcher icons, and the checked-in launcher XML keeps the monochrome layer wired in
 - Dedicated expiry warnings screen with filters for all, expiring soon, expired, and notifications off
-- Optional manual-share trip sync with participant roles, invite records, conflict review, and trip-share export/import
+- Optional manual-share trip sync with participant roles, invite records, conflict review, encrypted trip-share export/import, transfer-code-gated QR handoff, and record-level packet validation after decryption
 - Expanded settings surface for security, reminders, sync, backup/restore, and privacy masking
 - Trip sharing now supports Pineapple-owned shared files plus a trip-level Pineapple QR handoff route for smaller transfers
 - Account and traveller profiles can each keep an optional local profile photo stored in Pineapple-managed device storage
-- Five-screen first-launch onboarding with PIN setup, first-trip creation, and a setup checklist
+- Explicit first-launch onboarding in this exact order: language, name, PIN, biometrics, then passport / traveller setup
 - Blue first-run welcome/auth flow with setup-aware greeting copy and centered PIN pad layout
+- Pineapple web is treated as a companion surface; sensitive vault editing, encrypted backups, and manual-share sync stay disabled there and are intended for the installed Android app
 - Retryable startup recovery if local bootstrap fails unexpectedly
 - Lighter startup path with lazy file-directory creation for faster cold launch
 - Development-only demo data reset for QA
@@ -184,7 +249,7 @@ src/components/     Shared UI building blocks
 src/constants/      Theme tokens
 src/data/           Demo seed helpers
 src/db/             SQLite schema and repositories
-src/services/       Backup, PDF, notification, and manual-share sync services
+src/services/       Backup, PDF, notification, manual-share sync, and transport provider services
 src/store/          App state and mutations
 src/types/          Domain models
 src/utils/          Formatting, security, file storage, selectors
@@ -298,6 +363,8 @@ npx expo export --platform web
 - Biometric unlock is optional and device-dependent
 - Backup export/import uses password-protected AES encryption in the local backup layer
 - Shared trip sync is optional and manual-share only in phase 3
+- Shared-trip packets now export as encrypted `.pineappleshare` files using a dedicated Pineapple secure envelope; the receiving device must enter the separately shared transfer code before import
+- Shared-trip QR transfer carries only the encrypted envelope for smaller trips; the decryption code is not embedded in the QR and must be shared out-of-band
 - Conflict review is explicit; Pineapple does not silently overwrite local trip changes
 - Pineapple is currently shipped and tested as an installable mobile app, with the Android build remaining the main secure home for sensitive vault images
 - Notification text stays privacy-aware and does not include document numbers, images, or full document contents
@@ -349,7 +416,7 @@ npx expo export --platform web
 ### Current phase 3 additions
 
 - Local on-device notification scheduling with global enable/disable plus trip-level reminder toggles
-- Optional shared-trip packet export/import and manual-share sync state
+- Optional encrypted shared-trip export/import and manual-share sync state
 - Participant avatars, invite records, and conflict review UI
 - Settings hub for security, reminders, sync, backup, and privacy preferences
 - Improved Travel Mode with a next-action card and today timeline
@@ -367,7 +434,7 @@ npx expo export --platform web
 - Google Play draft copy and screenshot guidance: [docs/GOOGLE_PLAY_DRAFT.md](docs/GOOGLE_PLAY_DRAFT.md)
 - Internal release-readiness notes: [docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md)
 - Legal and compliance release checklist:
-  - Replace placeholder support and privacy emails in `src/content/legal.ts`
+  - Confirm support and privacy emails in `src/content/legal.ts` still point at the live support inbox
   - Confirm final support and policy URLs in `src/content/legal.ts`
   - Verify whether analytics or crash reporting are enabled before Play submission
   - Recheck what data leaves the device for third-party lookups and keep legal wording aligned

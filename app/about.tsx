@@ -8,26 +8,35 @@ import { AppScreen } from '@/components/AppScreen';
 import { LegalSectionCards } from '@/components/legal/LegalSectionCards';
 import { ListRow } from '@/components/ListRow';
 import { AppHeader } from '@/components/ui/AppHeader';
-import { aboutSections, legalConfig, privacySummaryBullets } from '@/content/legal';
+import { aboutSections, legalConfig } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 
-const versionLabel = Constants.expoConfig?.version ?? legalConfig.versionPlaceholder;
+const versionLabel = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? legalConfig.currentVersion;
 
 export default function AboutScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
+  const translatedBullets = [
+    t('legal.bullet.deviceOnly'),
+    t('legal.bullet.noAccount'),
+    t('legal.bullet.localNotifications'),
+    t('legal.bullet.noLocationTracking'),
+    t('legal.bullet.webCompanion'),
+  ];
 
   return (
     <AppScreen scroll contentStyle={styles.screen}>
-      <AppHeader badgeLabel="P" title="About Pineapple" subtitle={legalConfig.tagline} />
+      <AppHeader badgeLabel="P" title={t('legal.aboutTitle')} subtitle={t('legal.aboutSubtitle')} />
 
       <AppCard title="Pineapple" subtitle="A privacy-aware travel companion for documents, trips, reminders, and SOS access.">
-        <Text style={styles.version}>App version: {versionLabel}</Text>
+        <Text style={styles.version}>{t('legal.version', { version: versionLabel })}</Text>
         <Text style={styles.smallPrint}>{legalConfig.smallPrint}</Text>
       </AppCard>
 
-      <AppCard title="Privacy summary" right={<MaterialIcons name="shield" size={22} color={colors.primaryBlue} />}>
+      <AppCard title={t('legal.privacySummary')} right={<MaterialIcons name="shield" size={22} color={colors.primaryBlue} />}>
         <View style={styles.summaryList}>
-          {privacySummaryBullets.map((item) => (
+          {translatedBullets.map((item) => (
             <View key={item} style={styles.summaryItem}>
               <MaterialIcons name="check-circle" size={18} color={colors.primaryBlue} />
               <Text style={styles.summaryText}>{item}</Text>
@@ -38,22 +47,22 @@ export default function AboutScreen() {
 
       <LegalSectionCards sections={aboutSections} />
 
-      <AppCard title="Legal and support links">
+      <AppCard title={t('legal.links')}>
         <ListRow
-          title="Privacy Policy"
-          subtitle="Read Pineapple's in-app privacy policy."
+          title={t('legal.privacyLinkTitle')}
+          subtitle={t('legal.privacyLinkBody')}
           onPress={() => router.push('/privacy')}
           right={<MaterialIcons name="chevron-right" size={20} color={colors.primaryBlue} />}
         />
         <ListRow
-          title="Terms of Use"
-          subtitle="Understand Pineapple's usage terms and disclaimers."
+          title={t('legal.termsLinkTitle')}
+          subtitle={t('legal.termsLinkBody')}
           onPress={() => router.push('/terms')}
           right={<MaterialIcons name="chevron-right" size={20} color={colors.primaryBlue} />}
         />
         <ListRow
-          title="Support"
-          subtitle="Open help content, FAQs, and support details."
+          title={t('legal.supportLinkTitle')}
+          subtitle={t('legal.supportLinkBody')}
           onPress={() => router.push('/support')}
           right={<MaterialIcons name="chevron-right" size={20} color={colors.primaryBlue} />}
         />

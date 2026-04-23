@@ -2,7 +2,18 @@ export type TripStatus = 'upcoming' | 'active' | 'completed';
 export type DestinationType = 'country' | 'place' | 'unknown';
 export type HeroImageStatus = 'idle' | 'loading' | 'ready' | 'failed';
 export type DestinationImageSource = 'curated' | 'pexels' | 'wikimedia' | 'fallback';
-export type TransportType = 'flight' | 'private_flight' | 'train' | 'car' | 'hire_car' | 'taxi' | 'ferry' | 'eurotunnel';
+export type TransportType =
+  | 'flight'
+  | 'private_flight'
+  | 'train'
+  | 'bus'
+  | 'underground'
+  | 'metro'
+  | 'car'
+  | 'hire_car'
+  | 'taxi'
+  | 'ferry'
+  | 'eurotunnel';
 export type TravelDirection = 'outbound' | 'return' | 'other';
 export type VibeCategory = 'eat' | 'drink' | 'visit' | 'do';
 export type DocumentType =
@@ -52,6 +63,8 @@ export type ReminderKind =
   | 'flight_check_in'
   | 'hotel_check_in'
   | 'transfer_reminder'
+  | 'shared_trip_update'
+  | 'live_travel_update'
   | 'travel_mode_reminder'
   | 'sos_ready'
   | 'excursion_reminder';
@@ -199,6 +212,15 @@ export interface FormalDocumentData {
   seat?: string;
   travellerName?: string;
   fare?: string;
+  carrierCode?: string;
+  flightNumber?: string;
+  departureAirportCode?: string;
+  arrivalAirportCode?: string;
+  sequence?: string;
+  boardingInfo?: string;
+  gateCloseTime?: string;
+  barcodePayload?: string;
+  barcodeFormat?: 'qr' | 'aztec' | 'pdf417' | 'code128' | 'data_matrix';
 }
 
 export interface PackingItem {
@@ -286,8 +308,12 @@ export interface EmergencyInfo {
   insurerEmergencyNumber: string;
   hotelPhone: string;
   airlinePhone: string;
+  policePhone: string;
+  hospitalContact: string;
+  pharmacyContact: string;
   localEmergencyNote: string;
   embassyConsulateNote: string;
+  geoLookupStatus: 'idle' | 'planned';
   travellerMedicalNote: string;
   emergencyContacts: string;
   createdAt: string;
@@ -402,7 +428,7 @@ export interface SyncConflict {
   summary: string;
   localUpdatedAt: string;
   incomingUpdatedAt: string;
-  incomingPayload: string;
+  incomingRecord: SharedTripConflictRecord;
   status: ConflictStatus;
   createdAt: string;
   updatedAt: string;
@@ -502,11 +528,35 @@ export interface SharedTripPacketData {
 
 export interface SharedTripPacket {
   format: 'pineapple-shared-trip';
-  version: 1;
+  version: 3;
   shareCode: string;
   generatedAt: string;
   senderLabel: string;
   data: SharedTripPacketData;
+}
+
+export interface SharedTripConflictRecord {
+  senderLabel: string;
+  packetVersion: SharedTripPacket['version'];
+  data: SharedTripPacketData;
+}
+
+export interface SharedTripSecureEnvelope {
+  format: 'pineapple-shared-trip-secure';
+  version: 1;
+  encryption: 'aes-256-cbc+hmac-sha256';
+  kdf: 'pbkdf2';
+  iterations: number;
+  salt: string;
+  iv: string;
+  mac: string;
+  ciphertext: string;
+}
+
+export interface SharedTripExportResult {
+  uri: string;
+  transferCode: string;
+  envelope: SharedTripSecureEnvelope;
 }
 
 export type TripDraft = Omit<Trip, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };

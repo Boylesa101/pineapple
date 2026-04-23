@@ -124,12 +124,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F8FBFF',
-    borderWidth: 1,
-    borderColor: colors.primaryBlueBorder,
+    overflow: 'hidden',
   },
   flagWrapActive: {
     backgroundColor: '#DDEBFF',
-    borderColor: colors.primaryBlue,
   },
   flag: {
     fontSize: 28,

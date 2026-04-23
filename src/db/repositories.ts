@@ -33,6 +33,7 @@ import type {
   ReminderSettingDraft,
   SavedVibeDraft,
   SharedTripStateDraft,
+  SharedTripConflictRecord,
   SyncConflictDraft,
   TravelSegmentDraft,
   TravellerDraft,
@@ -125,6 +126,48 @@ function parseFormalDocumentData(value: unknown) {
   } catch {
     return null;
   }
+}
+
+function parseIncomingConflictRecord(value: unknown): SharedTripConflictRecord | null {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (
+      parsed &&
+      typeof parsed.senderLabel === 'string' &&
+      typeof parsed.packetVersion === 'number' &&
+      parsed.data &&
+      typeof parsed.data === 'object'
+    ) {
+      return {
+        senderLabel: parsed.senderLabel,
+        packetVersion: parsed.packetVersion === 3 ? 3 : 3,
+        data: parsed.data as SharedTripConflictRecord['data'],
+      };
+    }
+
+    if (
+      parsed &&
+      parsed.format === 'pineapple-shared-trip' &&
+      typeof parsed.senderLabel === 'string' &&
+      typeof parsed.version === 'number' &&
+      parsed.data &&
+      typeof parsed.data === 'object'
+    ) {
+      return {
+        senderLabel: parsed.senderLabel,
+        packetVersion: 3,
+        data: parsed.data as SharedTripConflictRecord['data'],
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 async function cleanupDocumentFiles(
@@ -375,6 +418,9 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
       transportType:
         segment.transportType === 'private_flight' ||
         segment.transportType === 'train' ||
+        segment.transportType === 'bus' ||
+        segment.transportType === 'underground' ||
+        segment.transportType === 'metro' ||
         segment.transportType === 'ferry' ||
         segment.transportType === 'eurotunnel' ||
         segment.transportType === 'car' ||
@@ -439,8 +485,12 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
       insurerEmergencyNumber: (await decryptField(info.insurerEmergencyNumber)) ?? '',
       hotelPhone: (await decryptField(info.hotelPhone)) ?? '',
       airlinePhone: (await decryptField(info.airlinePhone)) ?? '',
+      policePhone: (await decryptField(info.policePhone)) ?? '',
+      hospitalContact: (await decryptField(info.hospitalContact)) ?? '',
+      pharmacyContact: (await decryptField(info.pharmacyContact)) ?? '',
       localEmergencyNote: (await decryptField(info.localEmergencyNote)) ?? '',
       embassyConsulateNote: (await decryptField(info.embassyConsulateNote)) ?? '',
+      geoLookupStatus: info.geoLookupStatus === 'planned' ? 'planned' : 'idle',
       travellerMedicalNote: (await decryptField(info.travellerMedicalNote)) ?? '',
       emergencyContacts: (await decryptField(info.emergencyContacts)) ?? '',
     }))
@@ -496,14 +546,21 @@ export async function loadSnapshot(): Promise<AppDataSnapshot> {
     }))
   );
 
-  const decryptedSyncConflicts = await Promise.all(
+  const decryptedSyncConflicts = (await Promise.all(
     syncConflicts.map(async (conflict) => ({
-      ...conflict,
+      conflict,
       shareCode: (await decryptField(conflict.shareCode)) ?? '',
       summary: (await decryptField(conflict.summary)) ?? '',
-      incomingPayload: (await decryptField(conflict.incomingPayload)) ?? '',
+      incomingRecord: parseIncomingConflictRecord((await decryptField(conflict.incomingPayload)) ?? ''),
     }))
-  );
+  ))
+    .filter((item) => item.incomingRecord)
+    .map((item) => ({
+      ...item.conflict,
+      shareCode: item.shareCode,
+      summary: item.summary,
+      incomingRecord: item.incomingRecord!,
+    }));
 
   return {
     trips: decryptedTrips,
@@ -1060,20 +1117,30 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
   const encryptedInsurerEmergencyNumber = (await encryptField(input.insurerEmergencyNumber)) ?? '';
   const encryptedHotelPhone = (await encryptField(input.hotelPhone)) ?? '';
   const encryptedAirlinePhone = (await encryptField(input.airlinePhone)) ?? '';
+  const encryptedPolicePhone = (await encryptField(input.policePhone)) ?? '';
+  const encryptedHospitalContact = (await encryptField(input.hospitalContact)) ?? '';
+  const encryptedPharmacyContact = (await encryptField(input.pharmacyContact)) ?? '';
   const encryptedLocalEmergencyNote = (await encryptField(input.localEmergencyNote)) ?? '';
   const encryptedEmbassyConsulateNote = (await encryptField(input.embassyConsulateNote)) ?? '';
   const encryptedTravellerMedicalNote = (await encryptField(input.travellerMedicalNote)) ?? '';
   const encryptedEmergencyContacts = (await encryptField(input.emergencyContacts)) ?? '';
 
   await db.runAsync(
-    `INSERT INTO emergency_infos (id, tripId, insurerEmergencyNumber, hotelPhone, airlinePhone, localEmergencyNote, embassyConsulateNote, travellerMedicalNote, emergencyContacts, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO emergency_infos (
+      id, tripId, insurerEmergencyNumber, hotelPhone, airlinePhone, policePhone, hospitalContact, pharmacyContact,
+      localEmergencyNote, embassyConsulateNote, geoLookupStatus, travellerMedicalNote, emergencyContacts, createdAt, updatedAt
+    )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(tripId) DO UPDATE SET
        insurerEmergencyNumber = excluded.insurerEmergencyNumber,
        hotelPhone = excluded.hotelPhone,
        airlinePhone = excluded.airlinePhone,
+       policePhone = excluded.policePhone,
+       hospitalContact = excluded.hospitalContact,
+       pharmacyContact = excluded.pharmacyContact,
        localEmergencyNote = excluded.localEmergencyNote,
        embassyConsulateNote = excluded.embassyConsulateNote,
+       geoLookupStatus = excluded.geoLookupStatus,
        travellerMedicalNote = excluded.travellerMedicalNote,
        emergencyContacts = excluded.emergencyContacts,
        updatedAt = excluded.updatedAt`,
@@ -1082,8 +1149,12 @@ export async function upsertEmergencyInfo(input: EmergencyInfoDraft) {
     encryptedInsurerEmergencyNumber,
     encryptedHotelPhone,
     encryptedAirlinePhone,
+    encryptedPolicePhone,
+    encryptedHospitalContact,
+    encryptedPharmacyContact,
     encryptedLocalEmergencyNote,
     encryptedEmbassyConsulateNote,
+    input.geoLookupStatus === 'planned' ? 'planned' : 'idle',
     encryptedTravellerMedicalNote,
     encryptedEmergencyContacts,
     timestamp,
@@ -1369,7 +1440,7 @@ export async function upsertSyncConflict(input: SyncConflictDraft) {
   const id = input.id ?? createId('conflict');
   const encryptedShareCode = (await encryptField(input.shareCode)) ?? '';
   const encryptedSummary = (await encryptField(input.summary)) ?? '';
-  const encryptedIncomingPayload = (await encryptField(input.incomingPayload)) ?? '';
+  const encryptedIncomingPayload = (await encryptField(JSON.stringify(input.incomingRecord))) ?? '';
 
   await db.runAsync(
     `INSERT INTO sync_conflicts (
@@ -1401,6 +1472,27 @@ export async function upsertSyncConflict(input: SyncConflictDraft) {
 
 export async function deleteById(table: string, id: string) {
   const db = await getDatabase();
+  const deleteSqlByTable: Record<string, string> = {
+    documents: 'DELETE FROM documents WHERE id = ?',
+    trips: 'DELETE FROM trips WHERE id = ?',
+    hotel_stays: 'DELETE FROM hotel_stays WHERE id = ?',
+    travellers: 'DELETE FROM travellers WHERE id = ?',
+    packing_items: 'DELETE FROM packing_items WHERE id = ?',
+    travel_segments: 'DELETE FROM travel_segments WHERE id = ?',
+    itinerary_events: 'DELETE FROM itinerary_events WHERE id = ?',
+    emergency_infos: 'DELETE FROM emergency_infos WHERE id = ?',
+    reminder_settings: 'DELETE FROM reminder_settings WHERE id = ?',
+    saved_vibes: 'DELETE FROM saved_vibes WHERE id = ?',
+    vibe_cache_entries: 'DELETE FROM vibe_cache_entries WHERE id = ?',
+    trip_participants: 'DELETE FROM trip_participants WHERE id = ?',
+    trip_invites: 'DELETE FROM trip_invites WHERE id = ?',
+    sync_conflicts: 'DELETE FROM sync_conflicts WHERE id = ?',
+  };
+  const deleteSql = deleteSqlByTable[table];
+  if (!deleteSql) {
+    throw new Error(`Unsupported delete table: ${table}`);
+  }
+
   if (table === 'documents') {
     const document = await db.getFirstAsync<{
       localFileUri: string;
@@ -1438,7 +1530,7 @@ export async function deleteById(table: string, id: string) {
     }
   }
 
-  await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, id);
+  await db.runAsync(deleteSql, id);
 }
 
 export async function clearAllData() {

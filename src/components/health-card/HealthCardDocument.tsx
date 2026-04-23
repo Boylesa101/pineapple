@@ -20,6 +20,7 @@ type Props = {
   onPress?: () => void;
   interactive?: boolean;
   compact?: boolean;
+  allowPreview?: boolean;
 };
 
 export function HealthCardDocument({
@@ -29,6 +30,7 @@ export function HealthCardDocument({
   onPress,
   interactive = false,
   compact = false,
+  allowPreview = true,
 }: Props) {
   const [isOpen, setIsOpen] = useState(open);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
@@ -84,8 +86,8 @@ export function HealthCardDocument({
         </View>
         <View style={styles.cardBody}>
           <View style={[styles.photoFrame, compact ? styles.photoFrameCompact : null]}>
-            {document.previewUri ? (
-              <ManagedFileImage uri={document.previewUri} mimeType={document.mimeType} style={styles.photo} contentFit="cover" />
+            {document.previewUri && allowPreview ? (
+              <ManagedFileImage uri={document.previewUri} mimeType={document.mimeType} style={styles.photo} contentFit="cover" enabled={allowPreview} />
             ) : (
               <View style={[styles.photo, styles.photoPlaceholder]}>
                 <MaterialIcons name="health-and-safety" size={compact ? 24 : 28} color="#BCEBFF" />

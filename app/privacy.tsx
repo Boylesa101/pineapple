@@ -5,25 +5,35 @@ import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
 import { LegalSectionCards } from '@/components/legal/LegalSectionCards';
 import { AppHeader } from '@/components/ui/AppHeader';
-import { privacySections, privacySummaryBullets } from '@/content/legal';
+import { privacySections } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function PrivacyScreen() {
+  const { t } = useTranslation();
+  const translatedBullets = [
+    t('legal.bullet.deviceOnly'),
+    t('legal.bullet.noAccount'),
+    t('legal.bullet.localNotifications'),
+    t('legal.bullet.noLocationTracking'),
+    t('legal.bullet.webCompanion'),
+  ];
+
   return (
     <AppScreen scroll contentStyle={styles.screen}>
       <AppHeader
         badgeLabel="P"
-        title="Privacy Policy"
-        subtitle="Plain-English privacy details for Pineapple"
+        title={t('legal.privacyTitle')}
+        subtitle={t('legal.privacySubtitle')}
       />
 
       <AppCard
-        title="Quick privacy summary"
-        subtitle="Pineapple is designed to keep core travel information close at hand without unnecessary sign-up friction."
+        title={t('legal.quickPrivacySummary')}
+        subtitle={t('legal.quickPrivacyBody')}
         right={<MaterialIcons name="shield" size={22} color={colors.primaryBlue} />}
       >
         <View style={styles.summaryList}>
-          {privacySummaryBullets.map((item) => (
+          {translatedBullets.map((item) => (
             <View key={item} style={styles.summaryItem}>
               <MaterialIcons name="check-circle" size={18} color={colors.primaryBlue} />
               <Text style={styles.summaryText}>{item}</Text>

@@ -67,8 +67,9 @@ export default function SetupPinScreen() {
     }
 
     setPin('');
+    void setOnboardingStep('name');
     router.replace('/onboarding');
-  }, [currentValue.length, router, saving, step]);
+  }, [currentValue.length, router, saving, setOnboardingStep, step]);
 
   const handleEnter = useCallback(async () => {
     if (saving || !canEnter) {

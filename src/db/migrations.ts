@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { createShareCode } from '@/utils/shareCodes';
 
-const DATABASE_VERSION = 24;
+const DATABASE_VERSION = 25;
 
 const createLatestTablesSql = `
 PRAGMA foreign_keys = ON;
@@ -170,8 +170,12 @@ CREATE TABLE IF NOT EXISTS emergency_infos (
   insurerEmergencyNumber TEXT NOT NULL DEFAULT '',
   hotelPhone TEXT NOT NULL DEFAULT '',
   airlinePhone TEXT NOT NULL DEFAULT '',
+  policePhone TEXT NOT NULL DEFAULT '',
+  hospitalContact TEXT NOT NULL DEFAULT '',
+  pharmacyContact TEXT NOT NULL DEFAULT '',
   localEmergencyNote TEXT NOT NULL DEFAULT '',
   embassyConsulateNote TEXT NOT NULL DEFAULT '',
+  geoLookupStatus TEXT NOT NULL DEFAULT 'idle',
   travellerMedicalNote TEXT NOT NULL DEFAULT '',
   emergencyContacts TEXT NOT NULL DEFAULT '',
   createdAt TEXT NOT NULL,
@@ -520,6 +524,13 @@ async function runPhaseTwentyTwoMigration(db: SQLiteDatabase) {
   await ensureColumn(db, 'app_preferences', 'appLanguage', "TEXT NOT NULL DEFAULT 'en-GB'");
 }
 
+async function runPhaseTwentyThreeMigration(db: SQLiteDatabase) {
+  await ensureColumn(db, 'emergency_infos', 'policePhone', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'emergency_infos', 'hospitalContact', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'emergency_infos', 'pharmacyContact', "TEXT NOT NULL DEFAULT ''");
+  await ensureColumn(db, 'emergency_infos', 'geoLookupStatus', "TEXT NOT NULL DEFAULT 'idle'");
+}
+
 async function runPhaseThreeMigration(db: SQLiteDatabase) {
   await db.execAsync(`
     INSERT OR IGNORE INTO app_preferences (
@@ -671,6 +682,10 @@ export async function runMigrations(db: SQLiteDatabase) {
 
   if (version < 24) {
     await runPhaseTwentyTwoMigration(db);
+  }
+
+  if (version < 25) {
+    await runPhaseTwentyThreeMigration(db);
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

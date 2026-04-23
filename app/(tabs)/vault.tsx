@@ -87,9 +87,11 @@ import {
   manualTravelDocumentTypes,
 } from '@/utils/documentTypes';
 import { getDocumentVaultSetupState } from '@/utils/documentVaultSetup';
+import { isWebCompanionPolicyActive, sensitiveWebSupportMessage } from '@/utils/platformPolicy';
 import { getDocumentExpiryWarnings, getTripBundle } from '@/utils/selectors';
 import { toUserMessage } from '@/utils/userErrors';
 import { validateDocument } from '@/utils/validation';
+import { canAccessVaultAttachmentContent } from '@/utils/vaultSecurity';
 
 const scheduleOptions: Array<{ label: string; value: ExpiryReminderLeadTime }> = [
   { label: '180d', value: 180 },
@@ -111,6 +113,7 @@ type ScanViewerState = {
   previewUri?: string | null;
   mimeType?: string | null;
   emptyText?: string;
+  allowManagedAccess?: boolean;
 };
 type EditorNotice = {
   tone: 'info' | 'warning' | 'danger' | 'success';
@@ -176,6 +179,7 @@ export default function VaultScreen() {
   const [formalDocumentOcrLoading, setFormalDocumentOcrLoading] = useState(false);
   const [addDocumentType, setAddDocumentType] = useState<DocumentType>('passport');
   const openedEditIdRef = useRef<string | null>(null);
+  const pendingVaultActionRef = useRef<(() => void) | null>(null);
   const hasPersonalDocuments = data.documents.some((document) => document.tripId === PERSONAL_DOCUMENTS_TRIP_ID);
   const selectedTripId = activeTripId ?? data.trips[0]?.id ?? (hasPersonalDocuments ? PERSONAL_DOCUMENTS_TRIP_ID : null);
   const bundle = getTripBundle(data, selectedTripId);
@@ -206,17 +210,7 @@ export default function VaultScreen() {
     if (document.tripId !== selectedTripId) {
       setActiveTrip(document.tripId);
     }
-    const traveller = data.travellers.find((item) => item.id === document.travellerId) ?? null;
-    setDraft(
-      ensurePaymentCardDraftData(
-        ensureFormalDocumentDraftData(
-          ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(document, traveller), traveller), traveller),
-          traveller
-        ),
-        traveller
-      )
-    );
-    setEditorVisible(true);
+    openExistingDocumentEditor(document);
   }, [data.documents, params.editDocumentId, selectedTripId, setActiveTrip]);
 
   useEffect(() => {
@@ -252,19 +246,58 @@ export default function VaultScreen() {
     setScanViewer(viewer);
   }
 
+  function requestVaultUnlockFor(action: () => void) {
+    pendingVaultActionRef.current = action;
+    setPinPromptVisible(true);
+  }
+
+  function withVaultAttachmentAccess(document: { sensitive: boolean }, action: () => void) {
+    if (!canAccessVaultAttachmentContent(document, isVaultUnlocked)) {
+      requestVaultUnlockFor(action);
+      return false;
+    }
+
+    action();
+    return true;
+  }
+
+  function buildEditableDraft(sourceDocument: DocumentDraft) {
+    const traveller = bundle.travellers.find((item) => item.id === sourceDocument.travellerId) ?? null;
+    return ensurePaymentCardDraftData(
+      ensureFormalDocumentDraftData(
+        ensureHealthCardDraftData(ensureDrivingLicenceDraftData(ensurePassportDraftData(sourceDocument, traveller), traveller), traveller),
+        traveller
+      ),
+      traveller
+    );
+  }
+
+  function openExistingDocumentEditor(sourceDocument: DocumentDraft) {
+    withVaultAttachmentAccess(sourceDocument, () => {
+      setEditorNotice(null);
+      setDraft(buildEditableDraft(sourceDocument));
+      setDetailVisible(false);
+      setEditorVisible(true);
+    });
+  }
+
   function openPrimarySource(document: {
     localFileUri: string;
     previewUri: string | null;
     mimeType: string | null;
     documentType: DocumentType;
+    sensitive: boolean;
   }) {
-    openScanViewer({
-      title: isDocumentPdfSource(document.mimeType, document.localFileUri)
-        ? `${documentLabels[document.documentType]} PDF`
-        : `${documentLabels[document.documentType]} scan`,
-      localFileUri: document.localFileUri,
-      previewUri: document.previewUri,
-      mimeType: document.mimeType,
+    withVaultAttachmentAccess(document, () => {
+      openScanViewer({
+        title: isDocumentPdfSource(document.mimeType, document.localFileUri)
+          ? `${documentLabels[document.documentType]} PDF`
+          : `${documentLabels[document.documentType]} scan`,
+        localFileUri: document.localFileUri,
+        previewUri: document.previewUri,
+        mimeType: document.mimeType,
+        allowManagedAccess: true,
+      });
     });
   }
 
@@ -272,21 +305,22 @@ export default function VaultScreen() {
     secondaryLocalFileUri?: string | null;
     secondaryPreviewUri?: string | null;
     secondaryMimeType?: string | null;
+    sensitive: boolean;
   }) {
-    openScanViewer({
-      title: isDocumentPdfSource(document.secondaryMimeType, document.secondaryLocalFileUri) ? 'Back PDF' : 'Back scan',
-      localFileUri: document.secondaryLocalFileUri ?? null,
-      previewUri: document.secondaryPreviewUri ?? null,
-      mimeType: document.secondaryMimeType ?? null,
-      emptyText: 'No back scan attached yet.',
+    withVaultAttachmentAccess(document, () => {
+      openScanViewer({
+        title: isDocumentPdfSource(document.secondaryMimeType, document.secondaryLocalFileUri) ? 'Back PDF' : 'Back scan',
+        localFileUri: document.secondaryLocalFileUri ?? null,
+        previewUri: document.secondaryPreviewUri ?? null,
+        mimeType: document.secondaryMimeType ?? null,
+        emptyText: 'No back scan attached yet.',
+        allowManagedAccess: true,
+      });
     });
   }
 
   function openExtractedFieldEditor(sourceDocument: DocumentDraft) {
-    setEditorNotice(null);
-    setDraft(withSpecializedDocumentData(sourceDocument));
-    setDetailVisible(false);
-    setEditorVisible(true);
+    openExistingDocumentEditor(sourceDocument);
   }
 
   function resolveFormalDocumentType(type: DocumentType) {
@@ -574,6 +608,11 @@ export default function VaultScreen() {
   }
 
   async function startDocumentFlow(action: 'scan' | 'ocr_import' | 'manual', documentType: DocumentType) {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Vault editing stays disabled on web', sensitiveWebSupportMessage);
+      return;
+    }
+
     if (action === 'manual') {
       setAddSheetVisible(false);
       openManualDocument(documentType);
@@ -767,12 +806,26 @@ export default function VaultScreen() {
   }
 
   async function handleVaultUnlock() {
+    if (isWebCompanionPolicyActive()) {
+      Alert.alert('Vault unlock stays disabled on web', sensitiveWebSupportMessage);
+      return;
+    }
+
     const valid = await unlockVaultWithPin(pin);
     if (!valid) {
       Alert.alert('Incorrect PIN', 'Try again.');
       setPin('');
       return;
     }
+    setPinPromptVisible(false);
+    setPin('');
+    const pendingAction = pendingVaultActionRef.current;
+    pendingVaultActionRef.current = null;
+    pendingAction?.();
+  }
+
+  function closeVaultPrompt() {
+    pendingVaultActionRef.current = null;
     setPinPromptVisible(false);
     setPin('');
   }
@@ -1197,10 +1250,7 @@ export default function VaultScreen() {
                 </Pressable>
               ) : null}
               <Pressable
-                onPress={() => {
-                  setDraft(withSpecializedDocumentData(document));
-                  setEditorVisible(true);
-                }}
+                onPress={() => openExistingDocumentEditor(document)}
                 style={styles.documentActionLink}
               >
                 <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
@@ -1222,6 +1272,7 @@ export default function VaultScreen() {
           <DrivingLicenceDocument
             document={document}
             traveller={traveller}
+            allowPreview={previewUnlocked}
             onPress={() => {
               setSelectedId(document.id);
               setDrivingLicenceOpen(false);
@@ -1257,10 +1308,7 @@ export default function VaultScreen() {
                 </Pressable>
               ) : null}
               <Pressable
-                onPress={() => {
-                  setDraft(withSpecializedDocumentData(document));
-                  setEditorVisible(true);
-                }}
+                onPress={() => openExistingDocumentEditor(document)}
                 style={styles.documentActionLink}
               >
                 <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
@@ -1282,6 +1330,7 @@ export default function VaultScreen() {
           <HealthCardDocument
             document={document}
             traveller={traveller}
+            allowPreview={previewUnlocked}
             onPress={() => {
               setSelectedId(document.id);
               setHealthCardOpen(false);
@@ -1309,10 +1358,7 @@ export default function VaultScreen() {
                 </Pressable>
               ) : null}
               <Pressable
-                onPress={() => {
-                  setDraft(withSpecializedDocumentData(document));
-                  setEditorVisible(true);
-                }}
+                onPress={() => openExistingDocumentEditor(document)}
                 style={styles.documentActionLink}
               >
                 <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
@@ -1358,10 +1404,7 @@ export default function VaultScreen() {
                 </Pressable>
               ) : null}
               <Pressable
-                onPress={() => {
-                  setDraft(withSpecializedDocumentData(document));
-                  setEditorVisible(true);
-                }}
+                onPress={() => openExistingDocumentEditor(document)}
                 style={styles.documentActionLink}
               >
                 <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
@@ -1414,10 +1457,7 @@ export default function VaultScreen() {
                 </Pressable>
               ) : null}
               <Pressable
-                onPress={() => {
-                  setDraft(withSpecializedDocumentData(document));
-                  setEditorVisible(true);
-                }}
+                onPress={() => openExistingDocumentEditor(document)}
                 style={styles.documentActionLink}
               >
                 <MaterialIcons name="edit" size={16} color={colors.primaryBlue} />
@@ -1474,10 +1514,7 @@ export default function VaultScreen() {
         </View>
         <View style={styles.iconColumn}>
           <Pressable
-            onPress={() => {
-              setDraft(withSpecializedDocumentData(document));
-              setEditorVisible(true);
-            }}
+            onPress={() => openExistingDocumentEditor(document)}
             style={styles.iconButton}
           >
             <MaterialIcons name="edit" size={18} color={colors.nightNavy} />
@@ -1493,7 +1530,7 @@ export default function VaultScreen() {
   function openFlightTicketArea() {
     if (selectedTripId) {
       setActiveTrip(selectedTripId);
-      router.push({ pathname: '/trip/[tripId]', params: { tripId: selectedTripId, focus: 'travel' } });
+      router.push({ pathname: '/trip/[tripId]/flights', params: { tripId: selectedTripId } });
       return;
     }
     router.push('/flight-tickets');
@@ -1521,7 +1558,17 @@ export default function VaultScreen() {
 
   return (
     <AppScreen
-      footer={<DocumentFloatingActionButton onPress={() => setAddSheetVisible(true)} />}
+      footer={
+        <DocumentFloatingActionButton
+          onPress={() => {
+            if (isWebCompanionPolicyActive()) {
+              Alert.alert('Vault editing stays disabled on web', sensitiveWebSupportMessage);
+              return;
+            }
+            setAddSheetVisible(true);
+          }}
+        />
+      }
       contentStyle={styles.screenContent}
     >
       <View style={styles.vaultHeader}>
@@ -1529,8 +1576,18 @@ export default function VaultScreen() {
           <Text style={styles.vaultEyebrow}>Pineapple</Text>
           <Text style={styles.vaultTitle}>Document Vault</Text>
           <Text style={styles.vaultSubtitle}>Travel-ready identity records, cards, passes, and supporting paperwork stored locally on this device.</Text>
+          {isWebCompanionPolicyActive() ? <Text style={styles.meta}>{sensitiveWebSupportMessage}</Text> : null}
         </View>
-        <Pressable onPress={() => setPinPromptVisible(true)} style={styles.vaultLockButton}>
+        <Pressable
+          onPress={() => {
+            if (isWebCompanionPolicyActive()) {
+              Alert.alert('Vault unlock stays disabled on web', sensitiveWebSupportMessage);
+              return;
+            }
+            setPinPromptVisible(true);
+          }}
+          style={styles.vaultLockButton}
+        >
           <MaterialIcons name={isVaultUnlocked ? 'verified-user' : 'lock-outline'} size={20} color={colors.primaryBlue} />
         </Pressable>
       </View>
@@ -1597,7 +1654,7 @@ export default function VaultScreen() {
             </AppCard>
           ))}
 
-          <AppCard title="Flights" subtitle="Boarding and flight movement details for this trip.">
+          <AppCard title="Flights" subtitle="Airline-branded flight cards and boarding-pass views for this trip.">
             {orderedVaultSections.flights.length ? (
               orderedVaultSections.flights.map((segment) =>
                 renderTravelVaultCard({
@@ -1606,11 +1663,11 @@ export default function VaultScreen() {
                   title: [segment.airline, segment.flightNumber].filter(Boolean).join(' ') || 'Flight',
                   subtitle: `${formatAirportDisplay(segment.departureAirport, segment.departureAirportCode)} → ${formatAirportDisplay(segment.arrivalAirport, segment.arrivalAirportCode)}`,
                   description: formatDateTime(segment.departureTime),
-                  onPress: () => router.push({ pathname: '/trip/[tripId]', params: { tripId: segment.tripId, focus: 'travel' } }),
+                  onPress: () => router.push({ pathname: '/trip/[tripId]/flight/[segmentId]', params: { tripId: segment.tripId, segmentId: segment.id } }),
                 })
               )
             ) : (
-              <EmptyState title="No flights yet" description="Saved outbound and return flights will appear here in a cleaner travel-card style." />
+              <EmptyState title="No flights yet" description="Saved outbound and return flights will appear here once they are added to the trip." />
             )}
           </AppCard>
 
@@ -1708,14 +1765,7 @@ export default function VaultScreen() {
                   <AppButton
                     label={getDocumentSourceCtaLabel(isDocumentPdfSource(draft.mimeType, draft.localFileUri))}
                     tone="secondary"
-                    onPress={() =>
-                      openScanViewer({
-                        title: `${documentLabels[draft.documentType]} source`,
-                        localFileUri: draft.localFileUri,
-                        previewUri: draft.previewUri,
-                        mimeType: draft.mimeType,
-                      })
-                    }
+                    onPress={() => openPrimarySource(draft)}
                   />
                 ) : null}
               </AppCard>
@@ -2177,6 +2227,140 @@ export default function VaultScreen() {
                   }
                   multiline
                 />
+                {draft.documentType === 'boarding_pass' ? (
+                  <>
+                    <AppTextField
+                      label="Passenger"
+                      value={draft.formalDocumentData.travellerName ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, travellerName: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Carrier code"
+                      value={draft.formalDocumentData.carrierCode ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, carrierCode: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Flight number"
+                      value={draft.formalDocumentData.flightNumber ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, flightNumber: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Departure airport code"
+                      value={draft.formalDocumentData.departureAirportCode ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData
+                            ? { ...current, formalDocumentData: { ...current.formalDocumentData, departureAirportCode: value } }
+                            : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Arrival airport code"
+                      value={draft.formalDocumentData.arrivalAirportCode ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData
+                            ? { ...current, formalDocumentData: { ...current.formalDocumentData, arrivalAirportCode: value } }
+                            : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Seat"
+                      value={draft.formalDocumentData.seat ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, seat: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Sequence"
+                      value={draft.formalDocumentData.sequence ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, sequence: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Boarding info"
+                      value={draft.formalDocumentData.boardingInfo ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, boardingInfo: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Gate close time"
+                      value={draft.formalDocumentData.gateCloseTime ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, gateCloseTime: value } } : current
+                        )
+                      }
+                    />
+                    <AppTextField
+                      label="Fare label"
+                      value={draft.formalDocumentData.fare ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, fare: value } } : current
+                        )
+                      }
+                    />
+                    <View style={styles.field}>
+                      <Text style={styles.label}>Barcode format</Text>
+                      <ChoiceChips<string>
+                        value={draft.formalDocumentData.barcodeFormat ?? 'qr'}
+                        onChange={(value) =>
+                          setDraft((current) =>
+                            current?.formalDocumentData
+                              ? {
+                                  ...current,
+                                  formalDocumentData: {
+                                    ...current.formalDocumentData,
+                                    barcodeFormat: value as NonNullable<typeof current.formalDocumentData.barcodeFormat>,
+                                  },
+                                }
+                              : current
+                          )
+                        }
+                        options={[
+                          { label: 'QR', value: 'qr' },
+                          { label: 'Aztec', value: 'aztec' },
+                          { label: 'PDF417', value: 'pdf417' },
+                          { label: 'Code 128', value: 'code128' },
+                          { label: 'Data Matrix', value: 'data_matrix' },
+                        ]}
+                      />
+                    </View>
+                    <AppTextField
+                      label="Barcode payload"
+                      value={draft.formalDocumentData.barcodePayload ?? ''}
+                      onChangeText={(value) =>
+                        setDraft((current) =>
+                          current?.formalDocumentData ? { ...current, formalDocumentData: { ...current.formalDocumentData, barcodePayload: value } } : current
+                        )
+                      }
+                      multiline
+                    />
+                  </>
+                ) : null}
                 {draft.documentType === 'rail_ticket' ? (
                   <>
                     <AppTextField
@@ -2370,7 +2554,7 @@ export default function VaultScreen() {
         ) : null}
       </AppModal>
 
-      <AppModal visible={pinPromptVisible} title="Unlock vault" onClose={() => setPinPromptVisible(false)}>
+      <AppModal visible={pinPromptVisible} title="Unlock vault" onClose={closeVaultPrompt}>
         <Text style={styles.meta}>Enter your PIN to reveal sensitive previews for this session.</Text>
         <PinPad value={pin} pinLength={security.pinLength} onChange={setPin} />
         <AppButton label="Unlock with PIN" onPress={handleVaultUnlock} />
@@ -2383,6 +2567,9 @@ export default function VaultScreen() {
               if (unlocked) {
                 setPinPromptVisible(false);
                 setPin('');
+                const pendingAction = pendingVaultActionRef.current;
+                pendingVaultActionRef.current = null;
+                pendingAction?.();
               }
             }}
           />
@@ -2670,6 +2857,7 @@ export default function VaultScreen() {
         previewUri={scanViewer?.previewUri ?? null}
         mimeType={scanViewer?.mimeType ?? null}
         emptyText={scanViewer?.emptyText}
+        allowManagedAccess={scanViewer?.allowManagedAccess ?? true}
       />
 
       <DocumentAddSheet

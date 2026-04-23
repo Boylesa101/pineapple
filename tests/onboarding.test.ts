@@ -40,6 +40,26 @@ test('legacy users only auto-complete when they have established profile data as
   assert.equal(
     deriveOnboardingStep(null, null, {
       pinConfigured: true,
+      profileName: 'Andrew',
+      travellerCount: 0,
+      documentCount: 0,
+      tripCount: 0,
+    }),
+    'biometrics',
+  );
+  assert.equal(
+    deriveOnboardingStep(null, null, {
+      pinConfigured: true,
+      profileName: '',
+      travellerCount: 0,
+      documentCount: 0,
+      tripCount: 0,
+    }),
+    'name',
+  );
+  assert.equal(
+    deriveOnboardingStep(null, null, {
+      pinConfigured: false,
       profileName: '',
       travellerCount: 0,
       documentCount: 0,

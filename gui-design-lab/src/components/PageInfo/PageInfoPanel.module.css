@@ -1,0 +1,99 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 32px;
+  min-height: 100%;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(7, 25, 48, 0.82), rgba(7, 25, 48, 0.48));
+  border: 1px solid var(--page-border);
+  backdrop-filter: blur(18px);
+}
+
+.eyebrow {
+  font-size: 0.84rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--page-text-soft);
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.8rem, 2vw, 2.7rem);
+  line-height: 1.04;
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.description {
+  margin: 0;
+  color: var(--page-text-soft);
+  line-height: 1.7;
+  max-width: 58ch;
+}
+
+.metaGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.metaCard {
+  padding: 18px 18px 16px;
+  border-radius: 20px;
+  background: var(--page-card);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.metaLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--page-text-soft);
+}
+
+.metaValue {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.button,
+.buttonSecondary {
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 18px;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.button {
+  background: white;
+  color: #072444;
+  font-weight: 700;
+}
+
+.buttonSecondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.button:hover,
+.buttonSecondary:hover {
+  transform: translateY(-1px);
+}
+
+.version {
+  margin-top: auto;
+  font-size: 0.82rem;
+  color: var(--page-text-soft);
+}

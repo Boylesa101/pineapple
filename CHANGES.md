@@ -2,7 +2,34 @@
 
 ## Unreleased
 
-- Completion pass: bumped release metadata to `2.2.7`, rebuilt the auth setup flow to `Language -> Name -> PIN -> Biometrics -> Passport / traveller setup`, and removed the old onboarding completion shortcut that incorrectly inferred completion from only a PIN or trip count
+- Phase 1 foundation build: moved `Trips` and `Account` into the production tab shell, rebuilt onboarding to finish cleanly through traveller setup, added local profile/traveller photo management, added trip CRUD-focused shell cleanup, and extended SOS/emergency data with police, hospital, pharmacy, and geo-lookup placeholder fields
+- Release metadata: bumped the app, docs, and APK artifact line to `2.6.0`
+- Notification pass: seeded default reminder settings, added explicit flight check-in reminders, improved packing reminder copy, added shared-trip import alerts, exposed richer notification diagnostics, and cleaned up notification copy/state in Settings
+- Settings/trip UI cleanup: converted settings and legal sections to accordions, restored Share Trip access inside the trip screen, and softened Account / language-picker surfaces without changing Pineapple’s core visual identity
+- Build/test workflow cleanup: Pineapple now treats installed APKs and Play Store `.aab` bundles as the supported test/release path and removes Expo Go from the current testing guidance
+- Flight provider swap: replaced the shared transport flight adapter path with OpenSky, updated provider diagnostics and environment docs, and removed the transport layer's earlier Aviationstack dependency
+- Transport stack system: replaced the trip screen's old row-style transport area with one shared stacked-card architecture covering airline, rail, bus, taxi, and hotel variants, including `top_of_stack`, `in_stack`, `clicked`, and `open` states
+- Trip screen refinement: restored the previous weather-card treatment, moved the transport stack directly below `Quick info`, improved stack motion/selection behavior, and upgraded the Quick Info card background to a richer Pineapple surface
+- Provider adapter layer: added `src/services/transport/` with normalized transport items, provider capability flags, manual fallback handling, and isolated adapters for OpenSky, Darwin, and BODS plus a mock provider for development
+- Airline/rail/bus live-data wiring: airline cards now use OpenSky where configured, rail cards can refresh against Darwin credentials, and bus cards can refresh against BODS configuration without breaking the manual trip experience when live lookups are unavailable
+- Transport documentation: added `docs/TRANSPORT_STACK.md` and updated README guidance for transport card states, provider environment variables, fallback behavior, and OpenSky caveats
+- Release metadata: bumped the app, docs, and APK artifact line to `2.5.1`
+- Generic airline flight-card system: the earlier single-airline treatment was replaced with reusable lead-card, compact-card, and full-screen boarding-pass patterns that now feed into the wider shared transport stack
+- Airline branding resolver: a central airline brand map now drives carrier code, display name, logo source, and airline colour so flight cards never hardcode Ryanair-specific visuals
+- Flight provider transition: the live airline path now uses the provider-based transport layer with OpenSky as the configured flight adapter path
+- Boarding-pass data support: expanded local boarding-pass metadata with carrier code, flight number, passenger details, sequence, boarding info, gate close time, and preserved barcode payload / format fields
+- Flight route wiring: home, trips, Vault quick access, and the flight-tickets shortcut now open the dedicated flight-card stack and full-screen boarding-pass route instead of sending every path through the older generic travel view
+- Release metadata: the current working line is now `2.5.0`, replacing the earlier `2.4.0` generic-flight-card pass
+- Trip overview visual redesign: tightened the page to the hero trip card, weather card, quick info card, and set-off time card only, removed the old reminders/alerts launchers and any competing lower-page blocks, and kept the screen focused on fast trip scanning
+- Hero countdown update: moved the trip countdown fully into the hero card so the master card now carries trip name, destination, date range, and countdown in one premium layout
+- Secondary card standard: applied the Pineapple content-card standard across weather, quick info, and set-off time with a 112px minimum height, 20px radius, 16px by 18px padding, soft shadow, and a strict 14px vertical rhythm
+- Encrypted shared-trip transfer: replaced plaintext trip-share JSON with a dedicated `pineapple-shared-trip-secure` envelope using PBKDF2-derived AES encryption plus HMAC integrity, added transfer-code-gated import, and kept QR handoff honest by excluding the decryption secret from the QR payload
+- Conflict hardening: sync conflicts now keep a normalized incoming record instead of depending on a persisted plaintext packet string, and legacy plaintext share files are rejected with a re-export prompt
+- Hire-car verification: confirmed `hire_car` is wired through trip editing, transport summaries, and local notification planning, then added runtime coverage so the proof build and tests exercise it as a real transport path
+- Release metadata: bumped the app, docs, and APK artifact version line to `2.2.8`
+- Repo review pass: re-audited the pushed branch instead of rebuilding features, confirmed hire-car bookings, lounge passes, loyalty presets, and rail-ticket QR support were already wired in the real Vault flow, and focused the new changes on the remaining onboarding, localization, legal, and web-policy gaps
+- Localization follow-through: first-run traveller setup, account, trips, packing, itinerary, warnings, and legal/support wrappers now respect the selected app language instead of falling back to obvious hard-coded English on those high-visibility routes
+- Completion pass: bumped release metadata to `2.2.8`, rebuilt the auth setup flow to `Language -> Name -> PIN -> Biometrics -> Passport / traveller setup`, and removed the old onboarding completion shortcut that incorrectly inferred completion from only a PIN or trip count
 - Android launcher fix: kept the adaptive icon monochrome path wired end-to-end, documented Pixel themed-icon verification, and prepared the native launcher resources for a fresh regenerated build
 - Account/setup cleanup: moved travel-style preference and profile-photo setup out of first-run so they no longer block reaching PIN
 - Transport/document completion: added a distinct `Hire car` transport mode, kept `Hire car booking` and `Airport lounge pass` in the real Vault add/edit flow, and expanded the rail ticket fields and renderer
@@ -16,9 +43,9 @@
 - Vibes honesty cleanup: missing venue photos now fall back with a clearer “Official photo unavailable” state instead of implying the image is still loading
 - Transport reminder audit and rebuild: replaced the old generic `flight_check_in` path with a per-segment `transport_departure` scheduler that now covers flights, ferries, Eurotunnel, trains, and taxis with the required reminder matrix and trip/segment deep links
 - Notification diagnostics: Settings now exposes runtime support, permission state, Android channel visibility and importance, future scheduled count, and the next scheduled transport alerts so lock-screen behavior can be checked from inside the app
-- Transport proof trip: version `2.2.7` seeds a temporary `Transport Notification Proof Trip` with one flight, train, taxi, ferry, and Eurotunnel segment, then compresses the reminder cadence into a short on-device verification window
+- Transport proof trip: version `2.2.8` seeds a temporary `Transport Notification Proof Trip` with one flight, train, taxi, ferry, Eurotunnel, and hire-car segment, then compresses the reminder cadence into a short on-device verification window
 - Transport trip UX: each saved segment now shows its lock-screen alert summary plus the next few scheduled reminders directly inside the trip travel section
-- Build metadata: bumped the app and APK artifact line to `2.2.7`, added Android notification permissions for testing, and kept the proof build removable after verification
+- Build metadata: bumped the app and APK artifact line to `2.2.8`, added Android notification permissions for testing, and kept the proof build removable after verification
 - Onboarding copy cleanup: the first setup slides no longer push reminder wording too early, keeping notification setup in Settings instead of the welcome flow
 - Weather cleanup: restored the cleaner hourly outlook row design while keeping the newer scenic destination card and 7-day forecast
 - Vibes image fallback: when Tripadvisor has no usable venue photo, the worker now tries the venue website's Open Graph or Twitter preview image instead of leaving more cards without a real place photo

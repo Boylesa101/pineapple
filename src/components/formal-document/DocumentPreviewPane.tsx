@@ -11,11 +11,14 @@ type Props = {
   localFileUri: string;
   mimeType: string | null;
   onOpen: () => void;
+  allowManagedAccess?: boolean;
 };
 
-export function DocumentPreviewPane({ previewUri, localFileUri, mimeType, onOpen }: Props) {
+export function DocumentPreviewPane({ previewUri, localFileUri, mimeType, onOpen, allowManagedAccess = true }: Props) {
   const isPdf = isDocumentPdfSource(mimeType, localFileUri);
-  const imageUri = useManagedFileUri(getDocumentSourcePreviewUri(previewUri, localFileUri, mimeType), mimeType);
+  const imageUri = useManagedFileUri(getDocumentSourcePreviewUri(previewUri, localFileUri, mimeType), mimeType, {
+    enabled: allowManagedAccess,
+  });
 
   return (
     <View style={styles.panel}>

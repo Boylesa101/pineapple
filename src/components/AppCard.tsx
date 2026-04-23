@@ -7,12 +7,13 @@ type Props = PropsWithChildren<{
   title?: string;
   subtitle?: string;
   right?: ReactNode;
+  variant?: 'standard' | 'compact';
   style?: StyleProp<ViewStyle>;
 }>;
 
-export function AppCard({ title, subtitle, right, children, style }: Props) {
+export function AppCard({ title, subtitle, right, children, variant = 'standard', style }: Props) {
   return (
-    <View style={[styles.card, style]}>
+    <View style={[styles.card, variant === 'compact' ? styles.compactCard : styles.standardCard, style]}>
       {(title || subtitle || right) && (
         <View style={styles.header}>
           <View style={styles.headerCopy}>
@@ -33,9 +34,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.primaryBlueBorder,
-    padding: spacing.md,
-    gap: spacing.sm,
+    gap: 14,
     ...shadows.card,
+  },
+  // Pineapple secondary-card standard:
+  // - standard: full width, min height 112, radius 20, 16/18 padding
+  // - compact launcher: full width, min height 88, radius 20, 16 padding
+  standardCard: {
+    minHeight: 112,
+    paddingVertical: spacing.md,
+    paddingHorizontal: 18,
+  },
+  compactCard: {
+    minHeight: 88,
+    padding: spacing.md,
   },
   header: {
     flexDirection: 'row',

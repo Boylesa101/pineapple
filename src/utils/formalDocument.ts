@@ -21,6 +21,15 @@ export function createEmptyFormalDocumentData(): FormalDocumentData {
     seat: '',
     travellerName: '',
     fare: '',
+    carrierCode: '',
+    flightNumber: '',
+    departureAirportCode: '',
+    arrivalAirportCode: '',
+    sequence: '',
+    boardingInfo: '',
+    gateCloseTime: '',
+    barcodePayload: '',
+    barcodeFormat: 'qr',
   };
 }
 
@@ -127,6 +136,15 @@ export function buildFormalDocumentCopyPayload(
     `Seat: ${data.seat || 'Not set'}`,
     `Traveller: ${data.travellerName || document.holderName || traveller?.fullName || 'Not set'}`,
     `Fare: ${data.fare || 'Not set'}`,
+    `Carrier code: ${data.carrierCode || 'Not set'}`,
+    `Flight number: ${data.flightNumber || 'Not set'}`,
+    `Departure code: ${data.departureAirportCode || 'Not set'}`,
+    `Arrival code: ${data.arrivalAirportCode || 'Not set'}`,
+    `Sequence: ${data.sequence || 'Not set'}`,
+    `Boarding info: ${data.boardingInfo || 'Not set'}`,
+    `Gate closes: ${data.gateCloseTime || 'Not set'}`,
+    `Barcode format: ${data.barcodeFormat || 'Not set'}`,
+    `Barcode payload: ${data.barcodePayload || 'Not set'}`,
     `Summary: ${data.summary || document.notes || 'Not set'}`,
   ].join('\n');
 }

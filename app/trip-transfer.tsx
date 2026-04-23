@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppButton } from '@/components/AppButton';
 import { AppCard } from '@/components/AppCard';
 import { AppScreen } from '@/components/AppScreen';
+import { AppTextField } from '@/components/AppTextField';
 import { EmptyState } from '@/components/EmptyState';
 import { colors, spacing } from '@/constants/theme';
 import { consumePendingTripTransferTarget, decodeTripTransferPayload } from '@/services/tripTransfer';
@@ -17,9 +18,11 @@ export default function TripTransferScreen() {
   const { payload } = useLocalSearchParams<{ payload?: string }>();
   const importSharedTripFile = useAppStore((state) => state.importSharedTripFile);
   const setActiveTrip = useAppStore((state) => state.setActiveTrip);
-  const [state, setState] = useState<'loading' | 'success' | 'error'>('loading');
+  const [state, setState] = useState<'loading' | 'ready' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Opening trip transfer…');
   const [importedTripId, setImportedTripId] = useState<string | null>(null);
+  const [encryptedContents, setEncryptedContents] = useState<string | null>(null);
+  const [transferCode, setTransferCode] = useState('');
   const hasStarted = useRef(false);
 
   useEffect(() => {
@@ -39,20 +42,40 @@ export default function TripTransferScreen() {
       try {
         consumePendingTripTransferTarget();
         const contents = decodeTripTransferPayload(payload);
-        const result = await importSharedTripFile(contents);
-        setImportedTripId(result.tripId ?? null);
-        setState('success');
-        setMessage(
-          result.mode === 'conflict'
-            ? 'Pineapple stored the incoming trip as a conflict for review.'
-            : 'Trip transfer imported into Pineapple.'
-        );
+        setEncryptedContents(contents);
+        setState('ready');
+        setMessage('Enter the transfer code from the sending device to decrypt this trip.');
       } catch (error) {
         setState('error');
         setMessage(toUserMessage(error, 'Pineapple could not import that transfer QR right now.'));
       }
     })();
-  }, [importSharedTripFile, payload]);
+  }, [payload]);
+
+  async function confirmImport() {
+    if (!encryptedContents) {
+      return;
+    }
+
+    if (!transferCode.trim()) {
+      setMessage('Enter the transfer code to decrypt this trip transfer.');
+      return;
+    }
+
+    try {
+      const result = await importSharedTripFile(encryptedContents, transferCode);
+      setImportedTripId(result.tripId ?? null);
+      setState('success');
+      setMessage(
+        result.mode === 'conflict'
+          ? 'Pineapple stored the incoming trip as a conflict for review.'
+          : 'Encrypted trip transfer imported into Pineapple.'
+      );
+    } catch (error) {
+      setMessage(toUserMessage(error, 'Pineapple could not decrypt or import that transfer QR right now.'));
+      setState('ready');
+    }
+  }
 
   return (
     <AppScreen scroll={false} contentStyle={styles.screen}>
@@ -63,6 +86,17 @@ export default function TripTransferScreen() {
       >
         {state === 'loading' ? (
           <Text style={styles.body}>{message}</Text>
+        ) : state === 'ready' ? (
+          <View style={styles.content}>
+            <Text style={styles.body}>{message}</Text>
+            <AppTextField
+              label="Transfer code"
+              value={transferCode}
+              onChangeText={setTransferCode}
+              placeholder="PINE-ABCD-EFGH"
+            />
+            <AppButton label="Decrypt and import" onPress={() => void confirmImport()} />
+          </View>
         ) : state === 'success' ? (
           <View style={styles.content}>
             <Text style={styles.body}>{message}</Text>

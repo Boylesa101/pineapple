@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { SectionHeader } from '@/components/SectionHeader';
 import { TripPicker } from '@/components/TripPicker';
 import { colors, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAppStore } from '@/store/useAppStore';
 import type { ItineraryEventDraft, ItineraryType } from '@/types/models';
 import { formatDateTime, formatTimelineDate } from '@/utils/date';
@@ -39,6 +40,7 @@ const emptyDraft = (tripId: string): ItineraryEventDraft => ({
 });
 
 export default function ItineraryScreen() {
+  const { t } = useTranslation();
   const { data, activeTripId, setActiveTrip, saveItineraryEvent, deleteRecord } = useAppStore();
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState<ItineraryEventDraft | null>(null);
@@ -56,9 +58,9 @@ export default function ItineraryScreen() {
 
   if (!visibleTrips.length) {
     return (
-      <AppScreen title="Itinerary">
+      <AppScreen title={t('itinerary.title')}>
         <AppCard>
-          <EmptyState title="No trip selected" description="Create a trip first, then build a timeline for excursions, meals, tickets, reminders, and custom events." />
+          <EmptyState title={t('itinerary.noTripTitle')} description={t('itinerary.noTripBody')} />
         </AppCard>
       </AppScreen>
     );
@@ -68,7 +70,7 @@ export default function ItineraryScreen() {
     if (!draft) return;
     const errors = validateItineraryEvent(draft);
     if (errors.length) {
-      Alert.alert('Event needs attention', errors.join('\n'));
+      Alert.alert(t('itinerary.eventNeedsAttention'), errors.join('\n'));
       return;
     }
     await saveItineraryEvent(draft);
@@ -76,7 +78,7 @@ export default function ItineraryScreen() {
   }
 
   return (
-    <AppScreen title="Itinerary" subtitle="A chronological timeline for excursions, meals, tickets, and reminders.">
+    <AppScreen title={t('itinerary.title')} subtitle={t('itinerary.subtitle')}>
       <TripPicker trips={visibleTrips} value={selectedTripId} onChange={setActiveTrip} />
       {Object.keys(grouped).length ? (
         Object.entries(grouped).map(([dateLabel, events]) => (
@@ -102,28 +104,28 @@ export default function ItineraryScreen() {
         ))
       ) : (
         <AppCard>
-          <EmptyState title="No itinerary items yet" description="Add day plans, excursions, meals, reminders, and tickets so everything is in one timeline." />
+          <EmptyState title={t('itinerary.emptyTitle')} description={t('itinerary.emptyBody')} />
         </AppCard>
       )}
-      <AppButton label="Add itinerary item" onPress={() => { if (selectedTripId) { setDraft(emptyDraft(selectedTripId)); setVisible(true); } }} />
+      <AppButton label={t('itinerary.addItem')} onPress={() => { if (selectedTripId) { setDraft(emptyDraft(selectedTripId)); setVisible(true); } }} />
 
-      <AppModal visible={visible} title={draft?.id ? 'Edit itinerary item' : 'Add itinerary item'} onClose={() => setVisible(false)}>
+      <AppModal visible={visible} title={draft?.id ? t('itinerary.editItem') : t('itinerary.addItem')} onClose={() => setVisible(false)}>
         {draft ? (
           <>
-            <AppTextField label="Title" value={draft.title} onChangeText={(value) => setDraft((current) => current ? { ...current, title: value } : current)} />
+            <AppTextField label={t('itinerary.titleLabel')} value={draft.title} onChangeText={(value) => setDraft((current) => current ? { ...current, title: value } : current)} />
             <View style={styles.field}>
-              <Text style={styles.label}>Type</Text>
+              <Text style={styles.label}>{t('itinerary.type')}</Text>
               <ChoiceChips<ItineraryType>
                 value={draft.type}
                 onChange={(value) => setDraft((current) => current ? { ...current, type: value } : current)}
                 options={Object.entries(eventLabels).map(([value, label]) => ({ value: value as ItineraryType, label }))}
               />
             </View>
-            <DateTimeField label="Date and time" mode="datetime" value={draft.dateTime} onChange={(value) => setDraft((current) => current ? { ...current, dateTime: value } : current)} />
-            <AppTextField label="Location" value={draft.location} onChangeText={(value) => setDraft((current) => current ? { ...current, location: value } : current)} />
-            <AppTextField label="Confirmation number" value={draft.confirmationNumber} onChangeText={(value) => setDraft((current) => current ? { ...current, confirmationNumber: value } : current)} />
-            <AppTextField label="Notes" value={draft.notes} onChangeText={(value) => setDraft((current) => current ? { ...current, notes: value } : current)} multiline />
-            <AppButton label="Save item" onPress={handleSave} />
+            <DateTimeField label={t('itinerary.dateTime')} mode="datetime" value={draft.dateTime} onChange={(value) => setDraft((current) => current ? { ...current, dateTime: value } : current)} />
+            <AppTextField label={t('itinerary.location')} value={draft.location} onChangeText={(value) => setDraft((current) => current ? { ...current, location: value } : current)} />
+            <AppTextField label={t('itinerary.confirmationNumber')} value={draft.confirmationNumber} onChangeText={(value) => setDraft((current) => current ? { ...current, confirmationNumber: value } : current)} />
+            <AppTextField label={t('itinerary.notes')} value={draft.notes} onChangeText={(value) => setDraft((current) => current ? { ...current, notes: value } : current)} multiline />
+            <AppButton label={t('itinerary.saveItem')} onPress={handleSave} />
           </>
         ) : null}
       </AppModal>

@@ -7,15 +7,17 @@ import { LegalSectionCards } from '@/components/legal/LegalSectionCards';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { termsSections } from '@/content/legal';
 import { colors, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function TermsScreen() {
+  const { t } = useTranslation();
   return (
     <AppScreen scroll contentStyle={styles.screen}>
-      <AppHeader badgeLabel="T" title="Terms of Use" subtitle="Important Pineapple app terms" />
+      <AppHeader badgeLabel="T" title={t('legal.termsTitle')} subtitle={t('legal.termsSubtitle')} />
 
       <AppCard
-        title="Important reminder"
-        subtitle="Pineapple helps you stay organised, but it does not replace checking official travel requirements yourself."
+        title={t('legal.importantReminder')}
+        subtitle={t('legal.importantReminderBody')}
         right={<MaterialIcons name="gavel" size={22} color={colors.primaryBlue} />}
       />
 

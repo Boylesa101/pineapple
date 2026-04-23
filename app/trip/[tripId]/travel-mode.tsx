@@ -225,6 +225,7 @@ export default function TravelModeScreen() {
           </AppCard>
           <ValueCard label="Insurance policy" value={insuranceDocument?.documentNumber || ''} sensitive revealed={revealed} />
           <ValueCard label="Insurer emergency" value={bundle.emergencyInfo?.insurerEmergencyNumber || ''} revealed />
+          <ValueCard label="Police" value={bundle.emergencyInfo?.policePhone || ''} revealed />
           <ValueCard label="Emergency contacts" value={bundle.emergencyInfo?.emergencyContacts || ''} revealed />
           <AppCard title="Shared travel refs">
             <Text style={styles.subline}>{nextFlight ? `${nextFlight.airline} ${nextFlight.flightNumber}` : 'No upcoming flight saved'}</Text>
@@ -250,6 +251,8 @@ export default function TravelModeScreen() {
           <AppCard title="Emergency notes">
             <Text style={styles.smallText}>{bundle.emergencyInfo?.localEmergencyNote || 'No local emergency note saved.'}</Text>
             <Text style={styles.smallText}>{bundle.emergencyInfo?.embassyConsulateNote || 'No embassy / consulate note saved.'}</Text>
+            <Text style={styles.smallText}>{bundle.emergencyInfo?.hospitalContact || 'No hospital / clinic contact saved.'}</Text>
+            <Text style={styles.smallText}>{bundle.emergencyInfo?.pharmacyContact || 'No pharmacy contact saved.'}</Text>
           </AppCard>
         </View>
 

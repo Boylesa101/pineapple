@@ -1,4 +1,3 @@
-// Replace these placeholder emails and URLs before production release.
 // This file is the single source of truth for Pineapple's in-app legal wording.
 // Keep this aligned with the actual shipped app behavior. Do not overstate security,
 // location usage, analytics, or cloud capabilities if the code does not support them.
@@ -16,11 +15,12 @@ export type FAQItem = {
 
 export const legalConfig = {
   appName: 'Pineapple',
-  tagline: 'Your travel essentials in one secure place — even offline.',
+  tagline: 'Your travel essentials in one calm place — even offline.',
   supportEmail: 'studiopixel101@gmail.com',
   privacyEmail: 'studiopixel101@gmail.com',
-  versionPlaceholder: 'Use the current app version here before release.',
-  releaseLabel: 'First public release candidate',
+  currentVersion: '2.5.1',
+  releaseLabel: 'OpenSky transport provider update',
+  futurePlayStoreUrl: '#',
   developerName: 'Pineapple App',
   copyrightName: 'Pineapple App',
   smallPrint:
@@ -32,6 +32,7 @@ export const privacySummaryBullets = [
   'Pineapple does not require an account for basic use in the current release.',
   'Pineapple uses local notifications for reminders when you turn them on.',
   'The current audited release does not continuously track your location.',
+  'Pineapple web is a companion surface and does not support sensitive vault usage.',
 ] as const;
 
 export const homeHighlights = [
@@ -126,7 +127,7 @@ export const privacySections: ContentSection[] = [
     heading: 'Who we are',
     paragraphs: [
       `${legalConfig.appName} is a travel companion app published by ${legalConfig.developerName}. This Privacy Policy explains how the current release handles information.`,
-      `If you have privacy questions, contact ${legalConfig.privacyEmail}. Replace this placeholder email before release.`,
+      `If you have privacy questions, contact ${legalConfig.privacyEmail}.`,
     ],
   },
   {
@@ -134,6 +135,7 @@ export const privacySections: ContentSection[] = [
     paragraphs: [
       'Pineapple helps you store travel documents, organise trips, view reminders, and keep emergency travel information easy to reach.',
       'The current release is designed around local-first use. Core travel data stays on the device, although some optional lookups need an internet connection when you choose to use them.',
+      'Pineapple web is a companion surface for product and support pages. The installed Android app remains the intended place for sensitive vault data, backups, and manual-share sync.',
     ],
   },
   {
@@ -169,6 +171,7 @@ export const privacySections: ContentSection[] = [
     paragraphs: [
       'Pineapple is local-first, but some optional features can contact third-party services when you choose to use them.',
       'Examples found in the current audited release include destination image lookup, hotel and address search, and Vibes or place suggestions. These features may send the search text or destination details needed to fetch results. This is not the same as account-based cloud sync.',
+      'Manual-share trip packets stay local to the devices and apps you choose to use. In the current release they are encrypted with a transfer code, integrity-checked before import, and still require you to share that transfer code separately.',
     ],
     bullets: [
       'Destination and hotel image lookup may use services such as Pexels or Wikimedia Commons',
@@ -188,6 +191,7 @@ export const privacySections: ContentSection[] = [
     paragraphs: [
       'Pineapple includes app-locking, PIN support, optional biometrics where available, and additional protections for sensitive files and fields in parts of the app.',
       'No mobile app can promise perfect security. Pineapple is designed to reduce risk, but you should still keep your device protected and review what you store on it.',
+      'The installed Android app is the primary hardened surface. Pineapple web should not be treated as equally secure for sensitive travel records.',
     ],
   },
   {
@@ -263,7 +267,7 @@ export const termsSections: ContentSection[] = [
   {
     heading: 'Contact',
     paragraphs: [
-      `For support questions, contact ${legalConfig.supportEmail}. Replace this placeholder email before release.`,
+      `For support questions, contact ${legalConfig.supportEmail}.`,
     ],
   },
 ];
@@ -273,7 +277,7 @@ export const supportIntroSections: ContentSection[] = [
     heading: 'Need help with Pineapple?',
     paragraphs: [
       'Use this page for app support, store-reviewer references, and launch-readiness contact details.',
-      `Support contact: ${legalConfig.supportEmail}. Replace this placeholder email before release.`,
+      `Support contact: ${legalConfig.supportEmail}.`,
     ],
   },
 ];
@@ -317,7 +321,7 @@ export const supportFaqs: FAQItem[] = [
 ];
 
 export const releaseChecklist = [
-  'Replace placeholder support and privacy email addresses.',
+  'Confirm the support and privacy email addresses remain monitored before release.',
   'Confirm any linked support or policy URLs before release.',
   'Update the Google Play listing link when the store page is live.',
   'Verify whether analytics, crash reporting, or any new SDKs have been added since this draft.',

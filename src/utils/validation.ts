@@ -117,7 +117,14 @@ export function validateItineraryEvent(input: ItineraryEventDraft) {
 
 export function validateEmergencyInfo(input: EmergencyInfoDraft) {
   const errors: string[] = [];
-  if (!input.insurerEmergencyNumber.trim() && !input.localEmergencyNote.trim() && !input.embassyConsulateNote.trim()) {
+  if (
+    !input.insurerEmergencyNumber.trim() &&
+    !input.policePhone.trim() &&
+    !input.hospitalContact.trim() &&
+    !input.pharmacyContact.trim() &&
+    !input.localEmergencyNote.trim() &&
+    !input.embassyConsulateNote.trim()
+  ) {
     errors.push('Add at least one emergency reference.');
   }
   return errors;

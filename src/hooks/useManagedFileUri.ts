@@ -2,13 +2,18 @@ import { useEffect, useState } from 'react';
 
 import { materializeReadableFile } from '@/utils/fileStorage';
 
-export function useManagedFileUri(uri: string | null | undefined, mimeType?: string | null) {
-  const [resolvedUri, setResolvedUri] = useState<string | null>(uri ?? null);
+type UseManagedFileUriOptions = {
+  enabled?: boolean;
+};
+
+export function useManagedFileUri(uri: string | null | undefined, mimeType?: string | null, options: UseManagedFileUriOptions = {}) {
+  const { enabled = true } = options;
+  const [resolvedUri, setResolvedUri] = useState<string | null>(enabled ? (uri ?? null) : null);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!uri) {
+    if (!uri || !enabled) {
       setResolvedUri(null);
       return () => {
         cancelled = true;
@@ -30,7 +35,7 @@ export function useManagedFileUri(uri: string | null | undefined, mimeType?: str
     return () => {
       cancelled = true;
     };
-  }, [mimeType, uri]);
+  }, [enabled, mimeType, uri]);
 
   return resolvedUri;
 }

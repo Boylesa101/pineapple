@@ -58,6 +58,8 @@ export async function recognizeDocumentText(localFileUri: string, mimeType: stri
   let generatedImageUris: string[] = [];
   let readableSourceUri = localFileUri;
   try {
+    // Vault callers must only reach this path after a successful vault unlock when the
+    // source file belongs to a sensitive stored document.
     const materialized = await materializeReadableFile(localFileUri, mimeType);
     readableSourceUri = materialized.uri || localFileUri;
     const source = await resolveOcrSource(readableSourceUri, mimeType);

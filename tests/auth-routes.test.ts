@@ -25,6 +25,20 @@ test('route guard keeps first-time users on onboarding until setup is complete',
   );
 });
 
+test('route guard keeps users on onboarding while the required name step is still incomplete', () => {
+  assert.equal(
+    resolveAuthRoute({
+      currentPath: '/home',
+      hasCompletedOnboarding: false,
+      onboardingStep: 'name',
+      pinConfigured: false,
+      isUnlocked: false,
+      tripCount: 0,
+    }),
+    '/onboarding',
+  );
+});
+
 test('route guard keeps unlocked no-trip users on create-first-trip without bouncing to home', () => {
   assert.equal(
     resolveAuthRoute({

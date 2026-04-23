@@ -19,17 +19,17 @@ export default function FlightTicketsScreen() {
         <View style={styles.heroRow}>
           <MaterialIcons name="flight-takeoff" size={28} color={colors.primaryBlue} />
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>Google Wallet linking is not live yet</Text>
+            <Text style={styles.title}>Airline cards now open inside Pineapple</Text>
             <Text style={styles.meta}>
-              Pineapple does not currently deep-link into Google Wallet. For now, this screen routes you into the trip’s flight and travel information instead.
+              Pineapple now opens a branded flight-card stack and full-screen boarding pass for the active trip. Wallet deep-linking still is not part of this release.
             </Text>
           </View>
         </View>
         {selectedTrip ? (
           <AppButton
-            label={`Open ${selectedTrip.destination} travel info`}
+            label={`Open ${selectedTrip.destination} flight cards`}
             onPress={() =>
-              router.push({ pathname: '/trip/[tripId]', params: { tripId: selectedTrip.id, focus: 'travel' } })
+              router.push({ pathname: '/trip/[tripId]/flights', params: { tripId: selectedTrip.id } })
             }
           />
         ) : (
@@ -40,11 +40,11 @@ export default function FlightTicketsScreen() {
       <AppCard title="What belongs here">
         <Pressable style={styles.row}>
           <MaterialIcons name="confirmation-number" size={20} color={colors.primaryBlue} />
-          <Text style={styles.rowText}>Boarding passes and flight-ticket documents stored in the Vault</Text>
+          <Text style={styles.rowText}>Airline-branded flight cards and the saved boarding-pass view for the active trip</Text>
         </Pressable>
         <Pressable style={styles.row}>
           <MaterialIcons name="luggage" size={20} color={colors.primaryBlue} />
-          <Text style={styles.rowText}>Travel segments, transfer notes, and airport guidance for the active trip</Text>
+          <Text style={styles.rowText}>Live-status flight context where available, with passenger and barcode details still coming from local import data</Text>
         </Pressable>
       </AppCard>
     </AppScreen>

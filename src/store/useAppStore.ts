@@ -38,7 +38,14 @@ import { getTransportNotificationSummary } from '@/services/notificationPlanner'
 import { queueNotificationRefresh } from '@/services/notifications';
 import { exportTripPdf } from '@/services/pdfExport';
 import { protectStructuredDataAtRest } from '@/services/structuredDataProtection';
-import { exportSharedTripPacket, importSharedTripPacket, parseSharedTripPacket, resolveConflict } from '@/services/sync';
+import {
+  createSharedTripPacket,
+  createEncryptedSharedTripTransfer,
+  exportSharedTripPacket,
+  importSharedTripPacket,
+  parseSharedTripPacket,
+  resolveConflict,
+} from '@/services/sync';
 import {
   authenticateBiometrics,
   canUseBiometrics,
@@ -71,6 +78,8 @@ import type {
   PackingItemDraft,
   PdfExportOptions,
   ReminderSettingDraft,
+  ReminderKind,
+  ReminderLeadTime,
   SavedVibeDraft,
   StoredSecurityConfig,
   TravelSegmentDraft,
@@ -80,6 +89,47 @@ import type {
   TripParticipantDraft,
   VibeCacheEntryDraft,
 } from '@/types/models';
+import { sendImmediateTravelNotification } from '@/services/notifications';
+
+const defaultReminderSettings: Array<{ kind: ReminderKind; enabled: boolean; leadTimeDays: ReminderLeadTime }> = [
+  { kind: 'trip_countdown_30_days', enabled: true, leadTimeDays: 30 },
+  { kind: 'trip_countdown_7_days', enabled: true, leadTimeDays: 7 },
+  { kind: 'trip_countdown_3_days', enabled: true, leadTimeDays: 3 },
+  { kind: 'trip_countdown_1_day', enabled: true, leadTimeDays: 1 },
+  { kind: 'trip_today', enabled: true, leadTimeDays: 0 },
+  { kind: 'packing_incomplete', enabled: true, leadTimeDays: 3 },
+  { kind: 'flight_check_in', enabled: true, leadTimeDays: 1 },
+  { kind: 'transport_departure', enabled: true, leadTimeDays: 1 },
+  { kind: 'hotel_check_in', enabled: true, leadTimeDays: 0 },
+  { kind: 'transfer_reminder', enabled: true, leadTimeDays: 0 },
+  { kind: 'insurance_missing', enabled: true, leadTimeDays: 7 },
+  { kind: 'shared_trip_update', enabled: true, leadTimeDays: 0 },
+  { kind: 'live_travel_update', enabled: true, leadTimeDays: 0 },
+  { kind: 'travel_mode_reminder', enabled: false, leadTimeDays: 0 },
+  { kind: 'sos_ready', enabled: false, leadTimeDays: 0 },
+  { kind: 'excursion_reminder', enabled: false, leadTimeDays: 1 },
+];
+
+async function ensureDefaultReminderSettings(snapshot: AppDataSnapshot) {
+  const missing = defaultReminderSettings.filter(
+    (setting) => !snapshot.reminderSettings.some((current) => current.tripId === null && current.kind === setting.kind)
+  );
+
+  if (!missing.length) {
+    return snapshot;
+  }
+
+  for (const setting of missing) {
+    await upsertReminderSetting({
+      tripId: null,
+      kind: setting.kind,
+      enabled: setting.enabled,
+      leadTimeDays: setting.leadTimeDays,
+    });
+  }
+
+  return loadSnapshot();
+}
 
 const emptySnapshot: AppDataSnapshot = {
   trips: [],
@@ -173,8 +223,9 @@ type StoreState = {
   exportTripPdfFile: (tripId: string, options: PdfExportOptions) => Promise<string>;
   exportBackupFile: (password: string) => Promise<{ uri: string; exportedAt: string; attachmentCount: number; skippedAttachmentCount: number }>;
   importBackupFile: (encryptedContents: string, password: string) => Promise<void>;
-  exportSharedTripFile: (tripId: string) => Promise<string>;
-  importSharedTripFile: (contents: string) => Promise<{ mode: 'created' | 'updated' | 'conflict'; tripId?: string }>;
+  exportSharedTripFile: (tripId: string, transferCode?: string) => Promise<{ uri: string; transferCode: string }>;
+  prepareSharedTripTransfer: (tripId: string, transferCode?: string) => Promise<{ encryptedContents: string; transferCode: string }>;
+  importSharedTripFile: (contents: string, transferCode: string) => Promise<{ mode: 'created' | 'updated' | 'conflict'; tripId?: string }>;
   resolveSyncConflictChoice: (conflictId: string, resolution: ConflictStatus) => Promise<void>;
   deleteRecord: (table: string, id: string) => Promise<void>;
   resetWithDemoData: () => Promise<void>;
@@ -334,6 +385,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
         data = proofBuildResult.snapshot;
         await persistSnapshot(data);
       }
+      data = await ensureDefaultReminderSettings(data);
 
       const visibleTrips = filterVisibleTrips(data.trips);
       const onboardingStep = deriveOnboardingStep(storedOnboardingStep, legacyOnboardingComplete, {
@@ -381,7 +433,7 @@ export const useAppStore = create<StoreState>((set, get) => ({
     }
   },
   refreshData: async () => {
-    const snapshot = await loadSnapshot();
+    const snapshot = await ensureDefaultReminderSettings(await loadSnapshot());
     set((state) => ({
       data: snapshot,
       activeTripId: nextActiveTripId(state, snapshot),
@@ -879,12 +931,13 @@ export const useAppStore = create<StoreState>((set, get) => ({
       lastInteractionAt: Date.now(),
     });
   },
-  exportSharedTripFile: async (tripId) => {
-    const { uri, packet } = await exportSharedTripPacket(get().data, tripId);
+  exportSharedTripFile: async (tripId, transferCode) => {
+    const { uri, transferCode: generatedTransferCode } = await exportSharedTripPacket(get().data, tripId, transferCode);
     const currentState = get().data.sharedTripStates.find((item) => item.tripId === tripId);
+    const shareCode = currentState?.shareCode ?? createSharedTripPacket(get().data, tripId).shareCode;
     await upsertSharedTripState({
       tripId,
-      shareCode: currentState?.shareCode ?? packet.shareCode,
+      shareCode,
       syncEnabled: get().data.appPreferences.syncEnabled,
       syncStatus: get().data.appPreferences.syncEnabled ? 'pending_import' : 'local_only',
       lastSyncAt: get().data.appPreferences.syncEnabled ? new Date().toISOString() : currentState?.lastSyncAt ?? null,
@@ -893,13 +946,35 @@ export const useAppStore = create<StoreState>((set, get) => ({
       lastKnownRemoteUpdatedAt: currentState?.lastKnownRemoteUpdatedAt ?? null,
     });
     await get().refreshData();
-    return uri;
+    return { uri, transferCode: generatedTransferCode };
   },
-  importSharedTripFile: async (contents) => {
-    const packet = parseSharedTripPacket(contents);
+  prepareSharedTripTransfer: async (tripId, transferCode) => {
+    const { envelopeContents, transferCode: generatedTransferCode } = createEncryptedSharedTripTransfer(get().data, tripId, transferCode);
+    return {
+      encryptedContents: envelopeContents,
+      transferCode: generatedTransferCode,
+    };
+  },
+  importSharedTripFile: async (contents, transferCode) => {
+    const packet = parseSharedTripPacket(contents, transferCode);
     const result = importSharedTripPacket(get().data, packet);
     await replaceAllData(result.snapshot);
     await get().refreshData();
+    const notificationsEnabled = get().data.appPreferences.notificationsEnabled;
+    const sharedUpdateEnabled =
+      get().data.reminderSettings.find((item) => item.tripId === null && item.kind === 'shared_trip_update')?.enabled ?? true;
+    if (notificationsEnabled && sharedUpdateEnabled) {
+      await sendImmediateTravelNotification({
+        title: result.mode === 'conflict' ? 'Shared trip needs review' : 'Shared trip updated',
+        body:
+          result.mode === 'conflict'
+            ? 'Pineapple stored the incoming shared trip as a conflict for manual review.'
+            : 'An encrypted shared trip updated your local Pineapple data.',
+        href: result.tripId ? `/trip/${result.tripId}` : '/settings',
+        activeTripId: 'tripId' in result ? result.tripId : null,
+        channelId: 'pineapple-reminders',
+      }).catch(() => undefined);
+    }
     return {
       mode: result.mode,
       tripId: 'tripId' in result ? result.tripId : undefined,

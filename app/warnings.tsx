@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { InfoChip } from '@/components/InfoChip';
 import { ListRow } from '@/components/ListRow';
 import { colors, spacing } from '@/constants/theme';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useAppStore } from '@/store/useAppStore';
 import { formatShortDate } from '@/utils/date';
 import { documentTypeSupportsExpiryWarnings, getDocumentExpiryInfo } from '@/utils/documentExpiry';
@@ -37,6 +38,7 @@ type FilterMode = 'all' | 'expiring' | 'expired' | 'notifications_off';
 
 export default function WarningsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data, setActiveTrip } = useAppStore();
   const [filter, setFilter] = useState<FilterMode>('all');
   const dashboardTrip = useMemo(() => getDashboardTrip(data), [data]);
@@ -70,8 +72,8 @@ export default function WarningsScreen() {
   }, [data.documents, data.travellers, data.trips, filter]);
 
   return (
-    <AppScreen title="Alerts" subtitle="Important document, trip, and reminder issues that need attention on this device.">
-      <AppCard title="Current alerts">
+    <AppScreen title={t('warnings.title')} subtitle={t('warnings.subtitle')}>
+      <AppCard title={t('warnings.currentAlerts')}>
         {alerts.length ? (
           alerts.map((alert, index) => (
             <View key={`${alert.title}-${index}`} style={[styles.alertRow, index === alerts.length - 1 ? styles.alertRowLast : null]}>
@@ -79,31 +81,34 @@ export default function WarningsScreen() {
                 <Text style={styles.alertTitle}>{alert.title}</Text>
                 <Text style={styles.alertText}>{alert.subtitle}</Text>
               </View>
-              <InfoChip label={alert.tone === 'danger' ? 'Urgent' : alert.tone === 'coral' ? 'Soon' : 'Review'} tone={alert.tone === 'danger' ? 'danger' : alert.tone === 'coral' ? 'coral' : 'gold'} />
+              <InfoChip
+                label={alert.tone === 'danger' ? t('warnings.urgent') : alert.tone === 'coral' ? t('warnings.soon') : t('warnings.review')}
+                tone={alert.tone === 'danger' ? 'danger' : alert.tone === 'coral' ? 'coral' : 'gold'}
+              />
             </View>
           ))
         ) : (
-          <Text style={styles.note}>No current trip or document alerts. Pineapple will show them here when something needs attention.</Text>
+          <Text style={styles.note}>{t('warnings.noCurrentAlerts')}</Text>
         )}
       </AppCard>
 
-      <AppCard title="Filters">
+      <AppCard title={t('warnings.filters')}>
         <ChoiceChips<FilterMode>
           value={filter}
           onChange={setFilter}
           options={[
-            { label: 'All', value: 'all' },
-            { label: 'Expiring soon', value: 'expiring' },
-            { label: 'Expired', value: 'expired' },
-            { label: 'Notifications off', value: 'notifications_off' },
+            { label: t('warnings.filterAll'), value: 'all' },
+            { label: t('warnings.filterExpiring'), value: 'expiring' },
+            { label: t('warnings.filterExpired'), value: 'expired' },
+            { label: t('warnings.filterNotificationsOff'), value: 'notifications_off' },
           ]}
         />
         {!data.appPreferences.expiryRemindersEnabled ? (
-          <Text style={styles.note}>Expiry reminders are currently disabled in Settings. Status warnings still show inside the app.</Text>
+          <Text style={styles.note}>{t('warnings.expiryOffNote')}</Text>
         ) : null}
       </AppCard>
 
-      <AppCard title="Overview">
+      <AppCard title={t('warnings.overview')}>
         <View style={styles.chipRow}>
           <InfoChip label={`${data.documents.filter((item) => item.expiredStatus).length} expired`} tone="danger" />
           <InfoChip label={`${data.documents.filter((item) => item.expiringSoonStatus).length} expiring soon`} tone="gold" />
@@ -111,7 +116,7 @@ export default function WarningsScreen() {
       </AppCard>
 
       {documents.length ? (
-        <AppCard title="Documents">
+        <AppCard title={t('warnings.documents')}>
           {documents.map(({ document, trip, traveller, info }) => (
             <ListRow
               key={document.id}
@@ -126,7 +131,7 @@ export default function WarningsScreen() {
                 <View style={styles.rowRight}>
                   <InfoChip label={info.badgeLabel} tone={info.tone} />
                   <AppButton
-                    label="Edit"
+                    label={t('warnings.editAction')}
                     tone="secondary"
                     onPress={() => {
                       setActiveTrip(document.tripId);
@@ -141,8 +146,8 @@ export default function WarningsScreen() {
       ) : (
         <AppCard>
           <EmptyState
-            title="No documents in this filter"
-            description="Documents with expiry dates and reminder states will appear here automatically."
+            title={t('warnings.noDocumentsTitle')}
+            description={t('warnings.noDocumentsBody')}
           />
         </AppCard>
       )}
