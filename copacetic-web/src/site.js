@@ -5,7 +5,12 @@
   document.getElementById('burger').onclick = function () { nav.classList.toggle('open'); };
 
   // Home: device showcase (source/device.js)
-  if (window.mountSites) window.mountSites();
+  if (window.mountSites) {
+    window.mountSites();
+    // The mock client sites are pictures of other sites: hide them from screen readers and search snippets.
+    var track = document.getElementById('dev-track');
+    if (track) { track.setAttribute('aria-hidden', 'true'); track.setAttribute('data-nosnippet', ''); }
+  }
 
   // Contact: toggleable interest chips + form
   var main = document.getElementById('main');
@@ -14,6 +19,13 @@
   var f = document.getElementById('form');
   if (f) {
     var TO = 'Andrew@copacetic.web';
+    var started = Date.now();
+    // Honeypot: invisible to people and screen readers; bots that fill every field give themselves away.
+    var trap = document.createElement('input');
+    trap.name = 'website'; trap.tabIndex = -1; trap.autocomplete = 'off';
+    trap.setAttribute('aria-hidden', 'true');
+    trap.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;opacity:0';
+    document.getElementById('ff').appendChild(trap);
     var done = function () {
       document.getElementById('ff').style.display = 'none';
       document.getElementById('sent').style.display = 'block';
@@ -27,6 +39,8 @@
         email: val('fe'),
         interests: Array.prototype.map.call(f.querySelectorAll('.chip.on'), function (c) { return c.textContent; }),
         message: val('fm'),
+        website: trap.value,
+        elapsed: Date.now() - started,
       };
       var btn = f.querySelector('button[type=submit]');
       btn.disabled = true;
