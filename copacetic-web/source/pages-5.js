@@ -68,3 +68,8 @@ ${gsec('07', 'Launch a compliant website', `<p>Your website is often the first t
 ])}<p>We build all of this in from the start. See <a href="#legal">what we build for law firms</a>.</p>`)}
 <div class="guide-cta"><div><div class="price-name">Setting up a firm?</div><div class="price-tagline">Tell us where you are with your plans. We'll help with the name, brand and website.</div></div><a class="mk-btn mk-btn-dark mk-btn-lg" href="#contact">Start a project <i class="ti ti-arrow-right"></i></a></div>
 </div>`;
+
+// Home: the philosophy statement, between "Companies we work with" and "What we do".
+const TRUST_ROW = '<div class="mk-trust"><span>Companies we work with</span><div class="mk-trust-row" id="trust"></div></div>';
+PAGES.home = PAGES.home.replace(TRUST_ROW, TRUST_ROW + `
+<section class="mk-philo"><div class="mk-eyebrow">Our philosophy</div><p>Your website isn't just a shop window for your business or brand. It's there to tell the world about <em>you and your philosophy.</em></p></section>`);

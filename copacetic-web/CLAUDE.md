@@ -21,6 +21,7 @@ The owner asked for these after the port, so they are part of the source now:
 - `source/pages-5.js` + `source/site-3.css`: FAQ sections on For law firms, AI chatbots and Branding, and the
   `/starting-a-law-firm` guide (linked from the footer and the FAQs). Regulatory statements follow SRA guidance;
   keep them general, link to sra.org.uk, and keep the "not legal or regulatory advice" note.
+- The home-page "Our philosophy" statement (end of `source/pages-5.js`).
 - Search titles/descriptions, social links and the site URL in `site.config.mjs`; mobile fixes in `src/responsive.css`.
 
 ## Pinned values (most likely to drift)

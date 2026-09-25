@@ -31,3 +31,9 @@
 .guide-n{padding-top:0}
 .guide-sec h2{font-size:24px}
 }
+/* home: philosophy statement */
+.mk-philo{max-width:860px;margin:0 auto;padding:8px 28px 64px;text-align:center}
+.mk-philo .mk-eyebrow{margin-bottom:16px}
+.mk-philo p{font-family:var(--serif);font-size:34px;line-height:1.25;font-weight:500;letter-spacing:-.01em;color:var(--ink);text-wrap:balance}
+.mk-philo em{color:var(--accent)}
+@media (max-width:620px){.mk-philo{padding:0 16px 48px}.mk-philo p{font-size:clamp(24px,7vw,28px)}}
