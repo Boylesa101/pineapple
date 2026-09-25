@@ -157,7 +157,7 @@ async function walk(dir) {
   }
   return out;
 }
-const files = (await walk(OUT)).filter(f => !/(^|\/)(_headers|_redirects|sw\.js)$/.test(f));
+const files = (await walk(OUT)).filter(f => !/(^|\/)(sw\.js)$/.test(f));
 const hash = createHash('sha256');
 for (const f of files.sort()) hash.update(relative(OUT, f)).update(await readFile(f));
 const version = hash.digest('hex').slice(0, 12);

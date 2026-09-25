@@ -1,6 +1,6 @@
 # copacetic.web
 
-The copacetic.web marketing site, ported exactly from the finished design. It is a static site with one page per route, runs as a PWA, and deploys to Cloudflare Pages.
+The copacetic.web marketing site, ported exactly from the finished design. It is a static site with one page per route, runs as a PWA, and deploys to Vercel.
 
 Read `CLAUDE.md` (the fidelity rules) before changing anything.
 
@@ -13,8 +13,9 @@ Read `CLAUDE.md` (the fidelity rules) before changing anything.
 | `build.mjs` | Runs the `source/` page scripts in a sandbox and writes `dist/<route>.html` for every route. It retypes no copy. |
 | `src/site.js` | Browser runtime: burger menu, device showcase mount, contact chips and form, service worker registration. |
 | `src/sw.js` | Service worker template. The build fills in the page and asset lists and a content hash. |
-| `public/` | Self-hosted fonts (Cormorant Garamond, DM Sans, DM Mono, Tabler Icons 2.47.0 webfont), PWA icons made from `lutey/mood2.png`, the manifest, `_headers`, and `clients/` (the mock-up photos). |
-| `functions/api/contact.js` | Cloudflare Pages Function that emails form submissions to Andrew@copacetic.web through Resend. |
+| `public/` | Self-hosted fonts (Cormorant Garamond, DM Sans, DM Mono, Tabler Icons 2.47.0 webfont), PWA icons made from `lutey/mood2.png`, the manifest, and `clients/` (the mock-up photos). |
+| `api/contact.js` | Vercel Function that emails form submissions to Andrew@copacetic.web through Resend. |
+| `vercel.json` | Vercel settings: build command, `dist` output, clean URLs (`/pricing` serves `pricing.html`) and security/cache headers. |
 
 Routes: `/`, `/services`, `/web-design`, `/apps`, `/ai`, `/branding`, `/solicitors`, `/seo`, `/social`, `/analytics`, `/hosting`, `/legal`, `/pricing`, `/clients`, `/about`, `/contact`. Any other path gets `404.html`, which uses the page-hero style.
 
@@ -25,7 +26,7 @@ cd copacetic-web
 npm run fetch:images   # once: downloads the Honest Coffee / Taylor Rose photos into public/clients/
 npm run build          # writes dist/
 npm run preview        # http://localhost:4321 with clean URLs; /api/contact is stubbed and logs to the console
-npm run deploy         # build + wrangler pages deploy dist --project-name copacetic-web
+npm run deploy         # vercel deploy --prod (Vercel runs `node build.mjs` itself, per vercel.json)
 ```
 
 The build needs no dependencies, only Node 20 or later.
@@ -38,7 +39,7 @@ The build needs no dependencies, only Node 20 or later.
 
 The form posts JSON to `/api/contact`. On success it shows "Thanks, we've got it." If the endpoint can't be reached (for example, offline, or email isn't configured), it opens the visitor's mail app with the message already filled in, addressed to Andrew@copacetic.web, and then shows the same thanks state.
 
-In the Cloudflare Pages project, set:
+In the Vercel project (Settings → Environment Variables), set:
 
 - `RESEND_API_KEY` (secret)
 - `CONTACT_FROM`: a sender on a domain you've verified in Resend, e.g. `copacetic.web <website@copacetic.web>`
