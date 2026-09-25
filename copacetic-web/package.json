@@ -1,0 +1,16 @@
+{
+  "name": "copacetic-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "copacetic.web marketing site: static build from source/, PWA, Cloudflare Pages.",
+  "scripts": {
+    "build": "node build.mjs",
+    "preview": "node scripts/serve.mjs",
+    "fetch:images": "node scripts/fetch-client-images.mjs",
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name copacetic-web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
