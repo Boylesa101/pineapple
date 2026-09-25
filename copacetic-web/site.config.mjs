@@ -80,6 +80,10 @@ export const SEO = {
     title: 'About Us: A Web Design Bureau for the Legal Sector | copacetic.web',
     description: 'We specialise in websites for law firms and legal tech start-ups, designed from scratch and hosted on our own secure UK servers.',
   },
+  'starting-a-law-firm': {
+    title: 'How to Start a Law Firm in England & Wales: Checklist | copacetic.web',
+    description: 'Setting up your own law firm? A practical checklist: structure, SRA authorisation, COLP and COFA, indemnity insurance, AML, and what your website needs on day one.',
+  },
   contact: {
     title: 'Contact Us: Start Your Law Firm Website | copacetic.web',
     description: 'Tell us about your project: web design, apps, AI chatbots, branding, solicitor profile sites, SEO, social media or hosting.',
@@ -87,8 +91,11 @@ export const SEO = {
 };
 
 // Topics for the Organization schema (helps search engines understand what we do).
+// Publication date of the Starting a law firm guide (update when the guide changes).
+export const GUIDE_DATE = '2026-09-25';
+
 export const KNOWS_ABOUT = [
   'Law firm web design', 'Solicitor website design', 'Legal tech website design', 'AI chatbots for law firms',
-  'Law firm branding', 'SRA Transparency Rules', 'SRA digital badge', 'Law firm SEO', 'Progressive Web Apps',
+  'Law firm branding', 'Starting a law firm', 'SRA Transparency Rules', 'SRA digital badge', 'Law firm SEO', 'Progressive Web Apps',
   'iOS app development', 'Android app development', 'UK website hosting',
 ];

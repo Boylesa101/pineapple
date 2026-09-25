@@ -20,7 +20,7 @@ Read `CLAUDE.md` (the fidelity rules) before changing anything.
 | `api/contact.js` | Vercel Function that emails form submissions to Andrew@copacetic.web through Resend. |
 | `vercel.json` | Vercel settings: build command, `dist` output, clean URLs (`/pricing` serves `pricing.html`) and security/cache headers. |
 
-Routes: `/`, `/services`, `/web-design`, `/apps`, `/ai`, `/branding`, `/solicitors`, `/seo`, `/social`, `/analytics`, `/hosting`, `/legal`, `/pricing`, `/clients`, `/about`, `/contact`. Any other path gets `404.html`, which uses the page-hero style.
+Routes: `/`, `/services`, `/web-design`, `/apps`, `/ai`, `/branding`, `/solicitors`, `/seo`, `/social`, `/analytics`, `/hosting`, `/legal`, `/pricing`, `/clients`, `/about`, `/contact`, and `/starting-a-law-firm` (the guide). Any other path gets `404.html`, which uses the page-hero style.
 
 ## Commands
 
@@ -34,6 +34,12 @@ python3 scripts/subset-icons.py   # only when a page starts using a new Tabler i
 ```
 
 The build needs no dependencies, only Node 20 or later.
+
+## FAQs and the Starting a law firm guide
+
+`source/pages-5.js` (styles in `source/site-3.css`) adds FAQ sections to `/legal`, `/ai` and `/branding`, and the `/starting-a-law-firm` guide. The footer's Company column links to the guide, and so do the FAQs. The build turns the FAQs into `FAQPage` structured data and the guide into an `Article`. Change `GUIDE_DATE` in `site.config.mjs` when you update the guide.
+
+The regulatory points follow the SRA's published guidance (Transparency Rules, the clickable logo, authorisation, COLP/COFA) and link to sra.org.uk. They're written as general information, with a note saying so. Have them read over by someone in practice before launch.
 
 ## Social links
 

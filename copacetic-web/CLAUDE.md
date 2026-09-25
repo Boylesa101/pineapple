@@ -16,6 +16,13 @@ When the two seem to differ, `source/` wins.
   `[ team photo ]`, the About "[Our story…]" box) and "£—" / "Price to be confirmed" **stay exactly as they are**.
   Do not fill them in.
 
+## Owner-approved additions (keep them)
+The owner asked for these after the port, so they are part of the source now:
+- `source/pages-5.js` + `source/site-3.css`: FAQ sections on For law firms, AI chatbots and Branding, and the
+  `/starting-a-law-firm` guide (linked from the footer and the FAQs). Regulatory statements follow SRA guidance;
+  keep them general, link to sra.org.uk, and keep the "not legal or regulatory advice" note.
+- Search titles/descriptions, social links and the site URL in `site.config.mjs`; mobile fixes in `src/responsive.css`.
+
 ## Pinned values (most likely to drift)
 - Brand shown in the header: **copacetic** + **.web** in green `#166534`. Footer uses `.web` in `#7fe3ad`.
   Lutey face (`lutey/mood2.png`) sits left of the wordmark. There is **no** "Web Design" pill.

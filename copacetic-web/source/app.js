@@ -6,8 +6,8 @@ const SERVER = `<div class="sm"><div class="sm-head"><span class="sm-ic"><i clas
 <div class="sm-row"><span>Security</span><span>Built to ISO 27001 standards</span></div>
 <div class="sm-row"><span>SSL</span><span class="sm-mono">TLS · active</span></div>
 <div class="sm-row"><span>PWA</span><span class="sm-mono">installable</span></div></div>`;
-const ORDER = ['home','services','web-design','apps','ai','branding','solicitors','seo','social','analytics','hosting','legal','pricing','clients','about','contact'];
-const NAVMAP = { 'web-design':'services', apps:'services', ai:'services', branding:'services', solicitors:'services', seo:'services', social:'services', analytics:'services', hosting:'services' };
+const ORDER = ['home','services','web-design','apps','ai','branding','solicitors','seo','social','analytics','hosting','legal','pricing','clients','about','contact','starting-a-law-firm'];
+const NAVMAP = { 'web-design':'services', apps:'services', ai:'services', branding:'services', solicitors:'services', seo:'services', social:'services', analytics:'services', hosting:'services', 'starting-a-law-firm':'legal' };
 function clientCard(c) {
   const s = (window.SITES || []).find(x => x.n === c[0]);
   const shot = s ? `<div class="cl-shot live"><div class="thumb">${s.html}</div></div>` : `<div class="cl-shot">[ ${esc(c[0])} — site screenshot ]</div>`;

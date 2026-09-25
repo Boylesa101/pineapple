@@ -10,7 +10,7 @@ import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promi
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CLIENT_IMAGES } from './scripts/client-images.mjs';
-import { EMAIL, KNOWS_ABOUT, SEO, SITE_URL, SOCIAL } from './site.config.mjs';
+import { EMAIL, GUIDE_DATE, KNOWS_ABOUT, SEO, SITE_URL, SOCIAL } from './site.config.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const SRC = join(ROOT, 'source');
@@ -30,6 +30,7 @@ const SCRIPTS = [
   ['pages-2.js', await read('pages-2.js')],
   ['pages-3.js', await read('pages-3.js')],
   ['pages-4.js', await read('pages-4.js')],
+  ['pages-5.js', await read('pages-5.js')],
   ['sites.js', sitesJs],
   ['device.js', await read('device.js')],
   ['app.js', await read('app.js')],
@@ -134,6 +135,9 @@ function schema(route, title) {
         { '@type': 'ListItem', position: NAVMAP[route] === 'services' ? 3 : 2, name: title, item: url(route) },
       ],
     });
+    const faqs = [...PAGES[route].matchAll(/<summary>([\s\S]*?)<\/summary><div class="faq-a">([\s\S]*?)<\/div><\/details>/g)];
+    if (faqs.length) graph.push({ '@type': 'FAQPage', mainEntity: faqs.map(([, q, a]) => ({ '@type': 'Question', name: text(q), acceptedAnswer: { '@type': 'Answer', text: text(a) } })) });
+    if (route === 'starting-a-law-firm') graph.push({ '@type': 'Article', headline: text(PAGES[route].match(/<h1>([\s\S]*?)<\/h1>/)[1]), description: SEO[route].description, author: { '@id': ORG_ID }, publisher: { '@id': ORG_ID }, datePublished: GUIDE_DATE, dateModified: GUIDE_DATE, mainEntityOfPage: url(route), image: SITE_URL + '/og.png', inLanguage: 'en-GB' });
     const svc = SERVICES.find(s => s[0] === route);
     if (svc) graph.push({ '@type': 'Service', name: text(svc[2]), description: SEO[route].description, serviceType: text(svc[2]), provider: { '@id': ORG_ID }, areaServed: { '@type': 'Country', name: 'United Kingdom' }, url: url(route) });
   }
@@ -194,7 +198,7 @@ await cp(join(ROOT, 'public'), OUT, { recursive: true });
 const cssParts = [
   ['fonts/fonts.css', await readFile(join(ROOT, 'public/fonts/fonts.css'), 'utf8')],
   ['fonts/tabler-icons.min.css', await readFile(join(ROOT, 'public/fonts/tabler-icons.min.css'), 'utf8')],
-  ...(await Promise.all(['site.css', 'site-2.css', 'sites.css', 'device.css'].map(async f => [`source/${f}`, await read(f)]))),
+  ...(await Promise.all(['site.css', 'site-2.css', 'site-3.css', 'sites.css', 'device.css'].map(async f => [`source/${f}`, await read(f)]))),
   ['source/index.html <style>', inlineCss],
   ['src/responsive.css', await readFile(join(ROOT, 'src/responsive.css'), 'utf8')],
 ];
@@ -223,7 +227,7 @@ await writeFile(join(OUT, '404.html'), page('404', notFound, {}));
 
 // Sitemap and robots.txt, so search engines find every page.
 const today = new Date().toISOString().slice(0, 10);
-const priority = r => (r === 'home' ? '1.0' : ['legal', 'web-design', 'ai', 'branding', 'solicitors', 'services'].includes(r) ? '0.9' : '0.7');
+const priority = r => (r === 'home' ? '1.0' : ['legal', 'starting-a-law-firm', 'web-design', 'ai', 'branding', 'solicitors', 'services'].includes(r) ? '0.9' : '0.7');
 await writeFile(join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${ORDER.map(r => `  <url><loc>${url(r)}</loc><lastmod>${today}</lastmod><priority>${priority(r)}</priority></url>`).join('\n')}
