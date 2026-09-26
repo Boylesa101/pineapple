@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export type MediaRow = {
   id: string;
-  section_id: string;
+  section_id: string | null;
   kind: 'logo' | 'image' | 'font' | 'document';
   storage_path: string;
   original_name: string;

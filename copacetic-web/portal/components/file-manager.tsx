@@ -24,7 +24,7 @@ const size = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} 
 // link), then ask the server to check the contents and mark it clean.
 export function FileManager({
   orgId, sectionId, kinds, files, editable, label, hint,
-}: { orgId: string; sectionId: string; kinds: MediaKind[]; files: FileItem[]; editable: boolean; label: string; hint?: string }) {
+}: { orgId: string; sectionId: string | null; kinds: MediaKind[]; files: FileItem[]; editable: boolean; label: string; hint?: string }) {
   return (
     <div className="stack">
       <h2>{label}</h2>
@@ -45,7 +45,7 @@ export function FileManager({
 }
 
 function KindGroup({ orgId, sectionId, kind, files, editable, showHeading }: {
-  orgId: string; sectionId: string; kind: MediaKind; files: FileItem[]; editable: boolean; showHeading: boolean;
+  orgId: string; sectionId: string | null; kind: MediaKind; files: FileItem[]; editable: boolean; showHeading: boolean;
 }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
@@ -99,7 +99,7 @@ function KindGroup({ orgId, sectionId, kind, files, editable, showHeading }: {
     router.refresh();
   }
 
-  const inputId = `upload-${sectionId}-${kind}`;
+  const inputId = `upload-${sectionId ?? 'library'}-${kind}`;
   return (
     <section aria-label={KIND_LABELS[kind]}>
       {showHeading && <h3>{KIND_LABELS[kind]}</h3>}

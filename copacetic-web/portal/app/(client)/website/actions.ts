@@ -62,18 +62,22 @@ export async function savePost(input: z.input<typeof savePostSchema>): Promise<S
   return { ok: true, version: row.version };
 }
 
-export async function setPostSlug(orgId: string, id: string, raw: string): Promise<{ ok: boolean; slug?: string; message?: string }> {
-  if (!uuid.safeParse(orgId).success || !uuid.safeParse(id).success) return { ok: false, message: 'Invalid post.' };
+export async function setPostSlug(
+  orgId: string, id: string, raw: string, version: number,
+): Promise<{ ok: true; slug: string; version: number } | { ok: false; message: string; conflict?: boolean }> {
+  if (!uuid.safeParse(orgId).success || !uuid.safeParse(id).success || !Number.isInteger(version)) return { ok: false, message: 'Invalid post.' };
   await requireWebsite(orgId);
   const parsed = slugSchema.safeParse(slugify(raw));
   if (!parsed.success) return { ok: false, message: 'Use letters, numbers and hyphens.' };
   const supabase = await createClient();
-  const { data, error } = await supabase.from('posts').update({ slug: parsed.data }).eq('id', id).eq('org_id', orgId).select('slug').maybeSingle();
+  const { data, error } = await supabase.from('posts').update({ slug: parsed.data })
+    .eq('id', id).eq('org_id', orgId).eq('version', version).select('slug, version').maybeSingle();
   if (error?.code === '23505') return { ok: false, message: 'Another post already uses that address.' };
-  if (error || !data) return { ok: false, message: 'The address couldn’t be changed.' };
+  if (error) return { ok: false, message: 'The address couldn’t be changed.' };
+  if (!data) return { ok: false, message: 'Someone else changed this post. Reload the page to see their version.', conflict: true };
   syncSoon();
   revalidatePath(`${base(orgId)}/blog`);
-  return { ok: true, slug: data.slug };
+  return { ok: true, slug: data.slug, version: data.version };
 }
 
 const publishSchema = z.object({

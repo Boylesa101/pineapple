@@ -55,7 +55,12 @@ export function useAutosave<T>(value: T, initialVersion: number, save: (value: T
     return () => window.removeEventListener('beforeunload', onLeave);
   }, []);
 
-  return { state, flush, version };
+  // For a change saved outside the autosave (e.g. a post's address) that moved the version on.
+  const setVersion = useCallback((v: number) => {
+    version.current = v;
+  }, []);
+
+  return { state, flush, version, setVersion };
 }
 
 export function SaveIndicator({ state }: { state: SaveState }) {

@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/auth';
 import { ROLE_LABELS, STAGES, stageIndex, stageInfo } from '@/lib/stages';
 import { createClient } from '@/lib/supabase/server';
 import { checklist, loadOnboarding } from '@/lib/onboarding';
+import { websiteEnabled } from '@/lib/website/load';
 
 export const metadata: Metadata = { title: 'Overview' };
 
@@ -81,6 +82,18 @@ export default async function Overview(props: PageProps<'/'>) {
                     </ol>
                     <p>{stageInfo(site.stage).client}</p>
                   </div>
+
+                  {websiteEnabled(site.stage) && (
+                    <div className="card">
+                      <div className="spread">
+                        <div>
+                          <h2 style={{ marginBottom: 4 }}>Your website</h2>
+                          <p className="small">Blog posts, opening times and documents such as your price list.</p>
+                        </div>
+                        <Link className="btn" href={`/website/${org.id}`}>Manage your website</Link>
+                      </div>
+                    </div>
+                  )}
 
                   {idx >= stageIndex('onboarding') && (await onboardingCard(org.id))}
 
