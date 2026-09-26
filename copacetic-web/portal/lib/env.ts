@@ -1,6 +1,8 @@
 import 'server-only';
 import { z } from 'zod';
 
+const gid = z.string().regex(/^[0-9]{1,30}$/);
+
 // Server-side configuration, validated once at start-up. Secrets never get a NEXT_PUBLIC_ prefix.
 const schema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
@@ -15,6 +17,16 @@ const schema = z.object({
   // Signs upload verdicts; must match the `media_signing_secret` in Supabase Vault. Without it,
   // uploads stay "checking" and are never marked clean.
   MEDIA_SIGNING_SECRET: z.string().min(32).optional(),
+
+  // Phase 3 (Asana). All optional: without them, jobs queue up in the database and wait.
+  // Supabase secret key (sb_secret_…): only the job worker and the Asana webhook use it.
+  SUPABASE_SECRET_KEY: z.string().min(20).optional(),
+  // Shared with Supabase Vault (`jobs_secret`) so the scheduled call can run jobs.
+  JOBS_SECRET: z.string().min(32).optional(),
+  ASANA_TOKEN: z.string().min(10).optional(),
+  ASANA_WORKSPACE_GID: gid.optional(),
+  ASANA_TEAM_GID: gid.optional(),
+  ASANA_ASSIGNEE_GID: gid.optional(),
 });
 
 export const env = schema.parse({
@@ -25,6 +37,12 @@ export const env = schema.parse({
   EMAIL_FROM: process.env.EMAIL_FROM || undefined,
   AGENCY_NOTIFY_EMAIL: process.env.AGENCY_NOTIFY_EMAIL || undefined,
   MEDIA_SIGNING_SECRET: process.env.MEDIA_SIGNING_SECRET || undefined,
+  SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY || undefined,
+  JOBS_SECRET: process.env.JOBS_SECRET || undefined,
+  ASANA_TOKEN: process.env.ASANA_TOKEN || undefined,
+  ASANA_WORKSPACE_GID: process.env.ASANA_WORKSPACE_GID || undefined,
+  ASANA_TEAM_GID: process.env.ASANA_TEAM_GID || undefined,
+  ASANA_ASSIGNEE_GID: process.env.ASANA_ASSIGNEE_GID || undefined,
 });
 
 export const portalUrl = (path: string) => new URL(path, env.PORTAL_URL).toString();

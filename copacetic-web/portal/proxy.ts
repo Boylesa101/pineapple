@@ -5,7 +5,8 @@ import { createServerClient } from '@supabase/ssr';
 // and does optimistic routing (signed out -> /login, admin without 2FA -> /admin/mfa).
 // Pages and server actions still check permissions themselves; this is not the security boundary.
 
-const PUBLIC_PATHS = ['/login', '/auth/', '/invite/'];
+// API routes authenticate themselves (shared secret or Asana signature), so they're never redirected.
+const PUBLIC_PATHS = ['/login', '/auth/', '/invite/', '/api/'];
 
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');

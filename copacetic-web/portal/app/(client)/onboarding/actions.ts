@@ -8,6 +8,7 @@ import { briefingProgress, cleanBriefing } from '@/lib/content/briefing';
 import { richTextSchema } from '@/lib/content/richtext';
 import { cleanFields, sectionConfig, type SectionType } from '@/lib/content/sections';
 import { sendEmail } from '@/lib/email';
+import { syncSoon } from '@/lib/jobs';
 import { checklist, loadOnboarding, requireMember, sectionMissing } from '@/lib/onboarding';
 import { checkSignature, extOf, FILE_TYPES, KIND_EXTS, MAX_UPLOAD_BYTES, safeFileName } from '@/lib/uploads';
 import { sha256Hex, signVerdict } from '@/lib/uploads-server';
@@ -54,6 +55,7 @@ export async function submitBriefing(orgId: string): Promise<{ ok: boolean; miss
   const supabase = await createClient();
   const { error } = await supabase.rpc('submit_briefing', { p_org: orgId });
   if (error) return { ok: false };
+  syncSoon();
   await notifyAgency(o.org.name, orgId, 'submitted their briefing');
   revalidatePath(base(orgId), 'layout');
   return { ok: true };
@@ -132,6 +134,7 @@ export async function submitSection(orgId: string, id: string): Promise<{ ok: bo
   const supabase = await createClient();
   const { error } = await supabase.rpc('submit_section', { p_section: id });
   if (error) return { ok: false };
+  syncSoon();
   revalidatePath(base(orgId), 'layout');
   return { ok: true };
 }
@@ -162,6 +165,7 @@ export async function submitAll(orgId: string): Promise<{ ok: boolean; blocking?
   const supabase = await createClient();
   const { error } = await supabase.rpc('submit_all', { p_org: orgId });
   if (error) return { ok: false, blocking: ['Submission failed. Try again.'] };
+  syncSoon();
   await notifyAgency(o.org.name, orgId, 'submitted all their content');
   revalidatePath('/', 'layout');
   return { ok: true };

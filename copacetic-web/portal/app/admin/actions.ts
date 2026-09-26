@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth';
 import { createAndSendInvite } from '@/lib/invitations';
+import { syncSoon } from '@/lib/jobs';
 import type { MessageCode } from '@/lib/messages';
 import { createClient } from '@/lib/supabase/server';
 import { buildSchema, formString, inviteSchema, newClientSchema, role, stageSchema, uuid } from '@/lib/validation';
@@ -39,6 +40,7 @@ export async function createClientOrg(formData: FormData) {
     .from('sites')
     .insert({ org_id: org.id, name: d.siteName, invoice_on: d.invoiceOn });
   if (siteError) toClient(org.id, 'create_failed');
+  syncSoon(); // creates the client's Asana project
 
   try {
     await createAndSendInvite(org.id, d.contactEmail, d.contactRole);
@@ -184,6 +186,7 @@ export async function reopenSection(formData: FormData) {
   if (!parsed.success) redirect('/admin');
   const supabase = await createClient();
   await supabase.rpc('reopen_section', { p_section: parsed.data.sectionId });
+  syncSoon();
   revalidatePath(`/admin/clients/${parsed.data.orgId}/content`);
   redirect(`/admin/clients/${parsed.data.orgId}/content`);
 }
@@ -194,6 +197,7 @@ export async function reopenBriefing(formData: FormData) {
   if (!parsed.success) redirect('/admin');
   const supabase = await createClient();
   await supabase.rpc('reopen_briefing', { p_org: parsed.data });
+  syncSoon();
   revalidatePath(`/admin/clients/${parsed.data}/content`);
   redirect(`/admin/clients/${parsed.data}/content`);
 }
