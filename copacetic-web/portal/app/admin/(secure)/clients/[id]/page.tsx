@@ -62,6 +62,9 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
       <Link className="small" href="/admin">← All clients</Link>
       <div className="eyebrow" style={{ marginTop: 14 }}>Client</div>
       <h1>{org.name}</h1>
+      <p className="row no-print" style={{ marginBottom: 10 }}>
+        <Link className="btn ghost" href={`/admin/clients/${org.id}/content`}>Briefing and content</Link>
+      </p>
       <p className="lede">
         <code>{org.slug}</code>
         {org.sra_number && <> · SRA {org.sra_number}</>}

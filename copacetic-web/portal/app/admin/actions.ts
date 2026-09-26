@@ -172,3 +172,28 @@ export async function deleteBuild(formData: FormData) {
   await supabase.from('builds').delete().eq('id', parsed.data.buildId);
   toClient(parsed.data.orgId);
 }
+
+// ------------------------------------------------------------------ Phase 2 ---
+
+export async function reopenSection(formData: FormData) {
+  await requireAdmin();
+  const parsed = z.object({ orgId: uuid, sectionId: uuid }).safeParse({
+    orgId: formString(formData, 'orgId'),
+    sectionId: formString(formData, 'sectionId'),
+  });
+  if (!parsed.success) redirect('/admin');
+  const supabase = await createClient();
+  await supabase.rpc('reopen_section', { p_section: parsed.data.sectionId });
+  revalidatePath(`/admin/clients/${parsed.data.orgId}/content`);
+  redirect(`/admin/clients/${parsed.data.orgId}/content`);
+}
+
+export async function reopenBriefing(formData: FormData) {
+  await requireAdmin();
+  const parsed = uuid.safeParse(formString(formData, 'orgId'));
+  if (!parsed.success) redirect('/admin');
+  const supabase = await createClient();
+  await supabase.rpc('reopen_briefing', { p_org: parsed.data });
+  revalidatePath(`/admin/clients/${parsed.data}/content`);
+  redirect(`/admin/clients/${parsed.data}/content`);
+}
