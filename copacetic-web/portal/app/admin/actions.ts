@@ -251,3 +251,27 @@ export async function retrySync(formData: FormData) {
   revalidatePath(back);
   redirect(back);
 }
+
+// ------------------------------------------------------------------ Phase 4 ---
+
+export async function setSiteWebsite(formData: FormData) {
+  await requireAdmin();
+  const parsed = z.object({
+    orgId: uuid,
+    siteId: uuid,
+    url: z.union([z.literal(''), z.url({ protocol: /^https$/ }).max(300)]),
+    secret: z.union([z.literal(''), z.string().min(32).max(200).regex(/^[\x21-\x7e]+$/)]),
+  }).safeParse({
+    orgId: formString(formData, 'orgId'),
+    siteId: formString(formData, 'siteId'),
+    url: formString(formData, 'url').trim().replace(/\/+$/, '').toLowerCase(),
+    secret: formString(formData, 'secret').trim(),
+  });
+  if (!parsed.success) return toClient(formString(formData, 'orgId'), 'website_failed');
+  const { orgId, siteId, url, secret } = parsed.data;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_site_website', { p_site: siteId, p_url: url, p_secret: secret || null });
+  if (error) toClient(orgId, 'website_failed');
+  revalidatePath(`/admin/clients/${orgId}`);
+  toClient(orgId);
+}

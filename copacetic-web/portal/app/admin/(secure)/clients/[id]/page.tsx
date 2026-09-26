@@ -8,6 +8,7 @@ import { messageFor } from '@/lib/messages';
 import { ROLE_LABELS, STAGES, stageInfo } from '@/lib/stages';
 import { createClient } from '@/lib/supabase/server';
 import { ACTION_LABELS, asanaProjectUrl, loadClientSync } from '@/lib/sync';
+import { portalUrl } from '@/lib/env';
 import { uuid } from '@/lib/validation';
 import {
   addBuild,
@@ -18,6 +19,7 @@ import {
   removeClientMember,
   requestAsanaProject,
   retrySync,
+  setSiteWebsite,
   revokeInvitation,
   setBuildShared,
   setMemberRole,
@@ -37,7 +39,7 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
   const [{ data: org }, { data: sites }, { data: members }, { data: invites }, { data: builds }, { data: audit }] =
     await Promise.all([
       supabase.from('organisations').select('id, name, slug, sra_number, created_at').eq('id', id).maybeSingle(),
-      supabase.from('sites').select('id, name, stage, stage_changed_at, invoice_on, asana_project_gid').eq('org_id', id).order('created_at'),
+      supabase.from('sites').select('id, name, stage, stage_changed_at, invoice_on, asana_project_gid, website_url').eq('org_id', id).order('created_at'),
       supabase.from('memberships').select('user_id, role, profiles (email, full_name)').eq('org_id', id).order('created_at'),
       supabase
         .from('invitations')
@@ -60,6 +62,11 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
   if (!org) notFound();
   const [flash, sync] = await Promise.all([takeInviteFlash(), loadClientSync(id)]);
   const problems = sync.jobs.filter((j) => j.status === 'failed');
+  const hookSet = Object.fromEntries(await Promise.all((sites ?? []).map(async (s) => {
+    const { data } = await supabase.rpc('site_website_configured', { p_site: s.id });
+    return [s.id, data === true] as const;
+  })));
+  const feedBase = portalUrl('/api/public/v1/sites/');
   const now = new Date();
 
   return (
@@ -69,6 +76,7 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
       <h1>{org.name}</h1>
       <p className="row no-print" style={{ marginBottom: 10 }}>
         <Link className="btn ghost" href={`/admin/clients/${org.id}/content`}>Briefing and content</Link>
+        <Link className="btn ghost" href={`/website/${org.id}`}>Website content</Link>
       </p>
       <p className="lede">
         <code>{org.slug}</code>
@@ -104,6 +112,39 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
                   ))}
                 </select>
                 <Submit className="btn ghost" pending="Moving…">Move to stage</Submit>
+              </form>
+            </div>
+
+            <div className="card">
+              <div className="spread">
+                <h2 style={{ marginBottom: 0 }}>Client website</h2>
+                {site.website_url && hookSet[site.id] ? <span className="pill green">Refresh set up</span> : <span className="pill amber">Not connected</span>}
+              </div>
+              <p className="small" style={{ margin: '6px 0 14px' }}>
+                The client’s site reads its blog, opening times and documents from these feeds, and the portal calls its{' '}
+                <code>/api/revalidate</code> endpoint (with the secret) whenever something changes.
+              </p>
+              <ul className="small mono" style={{ listStyle: 'none', marginBottom: 14, wordBreak: 'break-all' }}>
+                <li>{feedBase}{site.id}/posts</li>
+                <li>{feedBase}{site.id}/opening-times</li>
+                <li>{feedBase}{site.id}/documents</li>
+              </ul>
+              <form action={setSiteWebsite}>
+                <input type="hidden" name="orgId" value={org.id} />
+                <input type="hidden" name="siteId" value={site.id} />
+                <div className="grid2">
+                  <div className="field">
+                    <label htmlFor={`web-${site.id}`}>Website address</label>
+                    <input id={`web-${site.id}`} name="url" type="url" maxLength={300} defaultValue={site.website_url ?? ''} placeholder="https://www.firm.co.uk" />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`secret-${site.id}`}>Refresh secret</label>
+                    <input id={`secret-${site.id}`} name="secret" type="password" autoComplete="off" minLength={32} maxLength={200}
+                      placeholder={hookSet[site.id] ? 'Leave blank to keep the current one' : 'At least 32 characters'} />
+                    <p className="hint">Generate with <code>openssl rand -hex 32</code>; set the same value as <code>PORTAL_REVALIDATE_SECRET</code> on the client’s site.</p>
+                  </div>
+                </div>
+                <Submit className="btn ghost" pending="Saving…">Save website settings</Submit>
               </form>
             </div>
 

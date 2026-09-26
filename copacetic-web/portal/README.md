@@ -40,3 +40,15 @@ Until these steps are done, submissions queue up in `integration_events` and not
 - **Failures** retry after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours. After 8 attempts they show on **Admin → Asana sync**, where you can retry them.
 
 Existing clients get their project on the first run. To use a project you already have, open the client's page and choose **Link existing project**.
+
+## Client websites (Phase 4)
+
+Once a client's site is in build, the firm manages some of its website content from the portal, under **Manage your website** on their overview:
+
+- **Blog.** Any member writes drafts. Owners and approvers publish, schedule or unpublish them.
+- **Opening times.** Each office has weekly hours, plus bank holidays, closures and special hours. Any member can change these, and changes go live straight away.
+- **Documents.** For example price lists or the complaints procedure: upload, publish, hide, or replace the file while keeping the same link.
+
+The client's Next.js site reads published content from read-only feeds at `/api/public/v1/sites/<siteId>/…`. The portal then tells the site to refresh through its `/api/revalidate` endpoint. Setup and example code are in [`docs/CLIENT_SITE_STARTER.md`](docs/CLIENT_SITE_STARTER.md).
+
+For each client, go to Admin → client → **Client website** and enter the site's address and a refresh secret. The refresh runs in the same background job queue as Asana, so it needs `SUPABASE_SECRET_KEY` (see above), but not the Asana settings.
