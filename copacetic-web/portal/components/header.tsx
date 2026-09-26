@@ -9,7 +9,9 @@ export function Header({ items = [], email, area }: { items?: Item[]; email?: st
         <Link className="logo" href={area === 'Agency' ? '/admin' : '/'}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/mark.png" alt="" width={26} height={26} />
-          copacetic<span>.web</span>
+          <span className="word">
+            copacetic<span>.web</span>
+          </span>
           {area && <small>{area}</small>}
         </Link>
         <nav className="nav" aria-label="Main">
