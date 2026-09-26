@@ -16,7 +16,7 @@ Database changes live in `supabase/migrations`, and the pgTAP tests are in `supa
 
 Until these steps are done, submissions queue up in `integration_events` and nothing is lost.
 
-1. **Team.** In Asana, create the **copacetic.web** team. Its ID is the number in the team page URL; put it in `ASANA_TEAM_GID`.
+1. **Team.** Done: the "copacetic web team" (`ASANA_TEAM_GID=1169581892702821`, already in `.env.example`).
 2. **Token.** Create a personal access token under Asana → My settings → Apps → Developer apps.
    - Ideally use a dedicated "copacetic.web portal" account that is a member of the team.
    - Set it as `ASANA_TOKEN`. It is server-only, so never give it a `NEXT_PUBLIC_` prefix.
