@@ -30,9 +30,11 @@ export async function loadClientSync(orgId: string) {
     supabase.from('integration_events').select(JOB_COLUMNS).eq('org_id', orgId)
       .order('id', { ascending: false }).limit(50),
   ]);
-  const open = ((jobs ?? []) as SyncJob[]).filter((j) => j.status !== 'done');
+  const all = (jobs ?? []) as SyncJob[];
   const stateFor = (entityId: string, taskGid: string | null | undefined): SyncBadge => {
-    const mine = open.filter((j) => j.entity_id === entityId);
+    // A failure only counts until a later job for the same thing has gone through.
+    const lastDone = Math.max(0, ...all.filter((j) => j.entity_id === entityId && j.status === 'done').map((j) => j.id));
+    const mine = all.filter((j) => j.entity_id === entityId && j.status !== 'done' && !(j.status === 'failed' && j.id < lastDone));
     if (mine.some((j) => j.status === 'failed')) return { kind: 'failed', taskGid };
     if (mine.length) return { kind: 'waiting', taskGid };
     return taskGid ? { kind: 'synced', taskGid } : { kind: 'none' };

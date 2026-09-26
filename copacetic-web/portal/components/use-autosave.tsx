@@ -5,42 +5,51 @@ export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'confl
 type Result = { ok: true; version: number } | { ok: false; reason: 'conflict' | 'locked' | 'invalid' };
 
 // Debounced autosave with optimistic concurrency: each save sends the version it started from,
-// and the server refuses it if someone else saved in between.
+// and the server refuses it if someone else saved in between. Saves run one at a time, and keep
+// going until the server has the latest value.
 export function useAutosave<T>(value: T, initialVersion: number, save: (value: T, version: number) => Promise<Result>, delay = 1200) {
   const [state, setState] = useState<SaveState>('idle');
   const version = useRef(initialVersion);
   const latest = useRef(value);
-  const first = useRef(true);
-  const inFlight = useRef<Promise<void> | null>(null);
+  const stored = useRef(value); // the value the server last accepted
+  const queue = useRef<Promise<boolean>>(Promise.resolve(true));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const flush = useCallback(async () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    if (inFlight.current) await inFlight.current;
-    const run = (async () => {
-      setState('saving');
-      try {
-        const res = await save(latest.current, version.current);
-        if (res.ok) {
-          version.current = res.version;
-          setState('saved');
-        } else setState(res.reason === 'invalid' ? 'error' : res.reason);
-      } catch {
-        setState('error');
-      }
-    })();
-    inFlight.current = run;
-    await run;
-    inFlight.current = null;
+  const saveRef = useRef(save);
+  useEffect(() => {
+    saveRef.current = save;
   }, [save]);
 
+  // Resolves true once the server has everything typed so far, false if a save failed.
+  const flush = useCallback((): Promise<boolean> => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const run = queue.current.then(async () => {
+      while (latest.current !== stored.current) {
+        const snapshot = latest.current;
+        setState('saving');
+        try {
+          const res = await saveRef.current(snapshot, version.current);
+          if (!res.ok) {
+            setState(res.reason === 'invalid' ? 'error' : res.reason);
+            return false;
+          }
+          version.current = res.version;
+          stored.current = snapshot;
+        } catch {
+          setState('error');
+          return false;
+        }
+      }
+      setState((s) => (s === 'saving' || s === 'dirty' ? 'saved' : s));
+      return true;
+    });
+    queue.current = run.catch(() => false);
+    return run;
+  }, []);
+
   useEffect(() => {
+    if (value === latest.current) return; // first render, or nothing changed
     latest.current = value;
-    if (first.current) {
-      first.current = false;
-      return;
-    }
     setState('dirty');
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, delay);
@@ -49,7 +58,7 @@ export function useAutosave<T>(value: T, initialVersion: number, save: (value: T
   // Warn before leaving with unsaved changes.
   useEffect(() => {
     const onLeave = (e: BeforeUnloadEvent) => {
-      if (timer.current || inFlight.current) e.preventDefault();
+      if (latest.current !== stored.current) e.preventDefault();
     };
     window.addEventListener('beforeunload', onLeave);
     return () => window.removeEventListener('beforeunload', onLeave);

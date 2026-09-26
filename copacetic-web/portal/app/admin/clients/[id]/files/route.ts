@@ -14,7 +14,7 @@ export async function GET(_req: Request, ctx: RouteContext<'/admin/clients/[id]/
   const supabase = await createClient();
   const [{ data: org }, { data: media }] = await Promise.all([
     supabase.from('organisations').select('slug').eq('id', id).maybeSingle(),
-    supabase.from('media').select('kind, storage_path, original_name').eq('org_id', id).eq('status', 'clean'),
+    supabase.from('media').select('kind, storage_path, original_name').eq('org_id', id).eq('status', 'clean').not('section_id', 'is', null),
   ]);
   if (!org) return new NextResponse('Not found', { status: 404 });
 

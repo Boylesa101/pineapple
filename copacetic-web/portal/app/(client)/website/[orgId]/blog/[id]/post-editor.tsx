@@ -106,7 +106,11 @@ function SlugEditor({ orgId, id, slug, editable, siteUrl, autosave }: {
         {editable && value !== saved && (
           <button type="button" className="btn ghost" disabled={busy} onClick={async () => {
             setBusy(true);
-            await autosave.flush();
+            if (!(await autosave.flush())) {
+              setBusy(false);
+              setMessage('Your latest changes haven’t saved yet, so the address wasn’t changed. Try again.');
+              return;
+            }
             const res = await setPostSlug(orgId, id, value, autosave.version.current);
             setBusy(false);
             if (res.ok) {

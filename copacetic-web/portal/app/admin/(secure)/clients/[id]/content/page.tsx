@@ -27,6 +27,8 @@ export default async function ClientContentPage(props: PageProps<'/admin/clients
   const c = checklist(o);
   const bp = briefingProgress(o.briefing.data as Record<string, Record<string, unknown>>);
   const [files, sync] = await Promise.all([withFileUrls(o.media), loadClientSync(id)]);
+  // Clients can only edit while onboarding or just after submitting; reopening later would strand the item.
+  const canReopen = o.stage === 'onboarding' || o.stage === 'content_submitted';
   const pct = Math.round((c.progress.complete / c.progress.total) * 100);
 
   return (
@@ -58,7 +60,7 @@ export default async function ClientContentPage(props: PageProps<'/admin/clients
               {o.briefing.status === 'submitted' ? 'Submitted' : `Draft · ${bp.done}/${bp.total} required`}
             </span>
             <SyncBadge state={sync.briefing} label="briefing" />
-            {o.briefing.status === 'submitted' && (
+            {o.briefing.status === 'submitted' && canReopen && (
               <form action={reopenBriefing}>
                 <input type="hidden" name="orgId" value={id} />
                 <Submit className="btn link">Reopen for changes</Submit>
@@ -88,7 +90,7 @@ export default async function ClientContentPage(props: PageProps<'/admin/clients
                     <div className="row">
                       <span className={`pill ${tone}`}>{label}</span>
                       <SyncBadge state={sync.section(r.id)} label={r.title || cfg.itemLabel} />
-                      {r.status !== 'draft' && (
+                      {r.status !== 'draft' && canReopen && (
                         <form action={reopenSection}>
                           <input type="hidden" name="orgId" value={id} />
                           <input type="hidden" name="sectionId" value={r.id} />

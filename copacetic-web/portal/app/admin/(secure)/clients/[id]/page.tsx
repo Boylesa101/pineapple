@@ -28,7 +28,7 @@ import {
 export const metadata: Metadata = { title: 'Client' };
 
 const ROLES = ['owner', 'approver', 'editor'] as const;
-const when = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const when = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
 
 export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>) {
   const { id } = await props.params;

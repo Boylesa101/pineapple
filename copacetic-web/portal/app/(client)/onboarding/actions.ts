@@ -26,6 +26,13 @@ async function whyNotSaved(table: 'briefings' | 'content_sections', match: Recor
   for (const [k, v] of Object.entries(match)) q = q.eq(k, v);
   const { data } = await q.maybeSingle();
   if (!data || data.status !== 'draft') return { ok: false, reason: 'locked' };
+  // Still a draft: either someone else saved first, or editing has closed for this stage.
+  const orgId = match.org_id ?? (await supabase.from('content_sections').select('org_id').eq('id', match.id ?? '').maybeSingle()).data?.org_id;
+  if (orgId) {
+    const { data: site } = await supabase.from('sites').select('stage').eq('org_id', orgId)
+      .in('stage', ['onboarding', 'content_submitted']).limit(1).maybeSingle();
+    if (!site) return { ok: false, reason: 'locked' };
+  }
   return { ok: false, reason: 'conflict' };
 }
 
@@ -270,7 +277,12 @@ export async function finalizeUpload(orgId: string, mediaId: string): Promise<{ 
     // No signing secret configured: leave it pending for the agency to see.
     return { status: 'pending', message: ok ? undefined : `This file was not accepted: ${reason}.` };
   }
-  await supabase.rpc('finalize_media', { p_media: mediaId, p_ok: ok, p_sha256: sha, p_size: size, p_signature: signature });
+  const { error: finalizeError } = await supabase.rpc('finalize_media', { p_media: mediaId, p_ok: ok, p_sha256: sha, p_size: size, p_signature: signature });
+  if (finalizeError) {
+    // e.g. MEDIA_SIGNING_SECRET doesn't match the Vault secret: the file stays unchecked.
+    console.error('[uploads] finalize_media failed', finalizeError.code, finalizeError.message);
+    return { status: 'pending', message: 'The file uploaded but couldn’t be marked as checked. We’ve been notified; you can carry on.' };
+  }
   if (!ok) {
     await supabase.storage.from('client-files').remove([m.storage_path]);
     await supabase.from('media').delete().eq('id', mediaId);

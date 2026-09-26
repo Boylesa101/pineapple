@@ -1,10 +1,12 @@
 import { AsanaError } from '@/lib/asana/client';
-import { handle, type Deps } from './handlers';
+import { handle, NotReady, type Deps } from './handlers';
 
 // Retry schedule after each failed attempt; after MAX_ATTEMPTS a job is marked failed and shows on
 // the admin "Sync problems" page for a manual retry.
 export const BACKOFF_MINUTES = [1, 5, 30, 120, 720];
 export const MAX_ATTEMPTS = 8;
+// Waiting on another job (e.g. the project) isn't a failure of this one, so it gets longer.
+export const MAX_WAITING_ATTEMPTS = 30;
 
 export function nextAttemptAt(attempts: number, now: Date, retryAfterSeconds?: number) {
   const minutes = BACKOFF_MINUTES[Math.min(Math.max(attempts, 1), BACKOFF_MINUTES.length) - 1];
@@ -32,7 +34,8 @@ export async function runJobs(
         result.done++;
       } catch (e) {
         const permanent = e instanceof AsanaError && e.permanent;
-        if (permanent || job.attempts >= MAX_ATTEMPTS) {
+        const limit = e instanceof NotReady ? MAX_WAITING_ATTEMPTS : MAX_ATTEMPTS;
+        if (permanent || job.attempts >= limit) {
           await deps.store.fail(job.id, describe(e));
           result.failed++;
         } else {

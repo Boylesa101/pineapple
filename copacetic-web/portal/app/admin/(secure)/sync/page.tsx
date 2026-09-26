@@ -7,7 +7,7 @@ import { retrySync } from '@/app/admin/actions';
 
 export const metadata: Metadata = { title: 'Asana sync' };
 
-const when = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const when = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
 
 export default async function SyncPage() {
   const jobs = await loadSyncProblems();

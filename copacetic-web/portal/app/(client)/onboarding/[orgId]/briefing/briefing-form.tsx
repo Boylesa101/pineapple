@@ -49,7 +49,11 @@ export function BriefingForm({ orgId, initial, version, readOnly }: { orgId: str
               disabled={pending}
               onClick={() =>
                 start(async () => {
-                  await flush();
+                  // Don't submit (and lock) an older copy if the latest edits didn't save.
+                  if (!(await flush())) {
+                    setMissing(['Your latest changes haven’t saved yet. Check your connection, then try again.']);
+                    return;
+                  }
                   const res = await submitBriefing(orgId);
                   if (res.ok) router.refresh();
                   else setMissing(res.missing ?? ['Something went wrong. Try again.']);

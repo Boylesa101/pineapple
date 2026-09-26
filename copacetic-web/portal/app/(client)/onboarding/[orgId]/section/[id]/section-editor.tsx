@@ -72,7 +72,11 @@ export function SectionEditor({ orgId, row, readOnly }: { orgId: string; row: Ro
               disabled={pending}
               onClick={() =>
                 start(async () => {
-                  await flush();
+                  // Don't submit (and lock) an older copy if the latest edits didn't save.
+                  if (!(await flush())) {
+                    setMissing(['Your latest changes haven’t saved yet. Check your connection, then try again.']);
+                    return;
+                  }
                   const res = await submitSection(orgId, row.id);
                   if (res.ok) router.refresh();
                   else setMissing(res.missing ?? ['Something went wrong. Try again.']);
