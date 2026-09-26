@@ -2,7 +2,7 @@ import { AsanaError, isGid, type Asana } from '@/lib/asana/client';
 import { ASANA_SECTIONS, briefingTask, hasMarker, marker, projectFields, sectionTask } from '@/lib/asana/content';
 import type { Job, JobConfig, JobStore } from './types';
 
-export type Deps = { store: JobStore; asana: Asana; config: JobConfig };
+export type Deps = { store: JobStore; asana: Asana; config: JobConfig; fetchImpl?: typeof fetch };
 
 // Thrown when a job has to wait for another (e.g. a task before its project exists). Always retried.
 export class NotReady extends Error {}
@@ -153,6 +153,30 @@ async function reopened(taskGid: string | null, what: string, asana: Asana) {
   }
 }
 
+// ----------------------------------------------------------- client websites --
+// Tell a client's site (Next.js) to refetch its portal content. The site's /api/revalidate checks
+// the shared secret and calls revalidateTag for each tag.
+export const SITE_TAGS = ['portal:posts', 'portal:opening-times', 'portal:documents'];
+
+async function revalidateSite(job: Job, { store, fetchImpl = fetch }: Deps) {
+  const target = await store.siteTarget(job.entity_id);
+  if (!target) return; // no website set up (or removed since)
+  const url = new URL('/api/revalidate', target.url);
+  let res: Response;
+  try {
+    res = await fetchImpl(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${target.secret}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags: SITE_TAGS }),
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (e) {
+    throw new Error(`Website unreachable: ${e instanceof Error ? e.message : 'network error'}`);
+  }
+  if (!res.ok) throw new Error(`Website refresh failed (${res.status}) at ${url.origin}`);
+}
+
 // ---------------------------------------------------------------- dispatch --
 export async function handle(job: Job, deps: Deps) {
   switch (job.action) {
@@ -166,6 +190,8 @@ export async function handle(job: Job, deps: Deps) {
       const s = await deps.store.section(job.entity_id);
       return reopened(s?.taskGid ?? null, 'section', deps.asana);
     }
+    case 'revalidate_site':
+      return revalidateSite(job, deps);
     case 'briefing_reopened': {
       const b = await deps.store.briefing(job.entity_id);
       return reopened(b?.taskGid ?? null, 'briefing', deps.asana);

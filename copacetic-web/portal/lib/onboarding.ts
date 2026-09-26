@@ -52,6 +52,7 @@ export const loadOnboarding = cache(async (orgId: string) => {
       .from('media')
       .select('id, section_id, kind, storage_path, original_name, mime_type, size_bytes, alt_text, label, status, created_at')
       .eq('org_id', orgId)
+      .not('section_id', 'is', null) // website files (blog images, documents) live in the Website area
       .order('created_at'),
   ]);
   if (!org) notFound();

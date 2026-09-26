@@ -2,7 +2,8 @@
 // an in-memory fake in tests.
 
 export type JobAction =
-  | 'ensure_project' | 'upsert_briefing_task' | 'upsert_section_task' | 'section_reopened' | 'briefing_reopened';
+  | 'ensure_project' | 'upsert_briefing_task' | 'upsert_section_task' | 'section_reopened' | 'briefing_reopened'
+  | 'revalidate_site';
 
 export type Job = { id: number; action: JobAction; org_id: string | null; entity_id: string; attempts: number };
 
@@ -32,6 +33,9 @@ export interface JobStore {
   setSectionTask(id: string, gid: string): Promise<void>;
   briefing(orgId: string): Promise<BriefingInfo | null>;
   setBriefingTask(orgId: string, gid: string): Promise<void>;
+
+  // A client website's address and the secret its /api/revalidate endpoint expects.
+  siteTarget(siteId: string): Promise<{ url: string; secret: string } | null>;
 
   webhook(projectGid: string): Promise<{ webhookGid: string | null; hasSecret: boolean } | null>;
   openHandshake(projectGid: string): Promise<void>;

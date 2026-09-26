@@ -111,6 +111,7 @@ function fakeStore() {
     sections: new Map<string, SectionInfo>(),
     briefings: new Map<string, BriefingInfo>(),
     hooks: new Map<string, { webhookGid: string | null; secret: string | null; open: boolean }>(),
+    targets: new Map<string, { url: string; secret: string }>(),
   };
   const store: JobStore = {
     async claim(limit) {
@@ -131,6 +132,7 @@ function fakeStore() {
     async setSectionTask(id, gid) { s.sections.get(id)!.taskGid = gid; },
     async briefing(orgId) { const x = s.briefings.get(orgId); return x ? { ...x } : null; },
     async setBriefingTask(orgId, gid) { s.briefings.get(orgId)!.taskGid = gid; },
+    async siteTarget(id) { return s.targets.get(id) ?? null; },
     async webhook(p) { const h = s.hooks.get(p); return h ? { webhookGid: h.webhookGid, hasSecret: !!h.secret } : null; },
     async openHandshake(p) { s.hooks.set(p, { ...(s.hooks.get(p) ?? { webhookGid: null, secret: null }), open: true }); },
     async setWebhookGid(p, g) { s.hooks.get(p)!.webhookGid = g; },
@@ -406,5 +408,36 @@ describe('task content', () => {
     const t = setup();
     await expect(handle({ id: 1, action: 'nope' as Job['action'], org_id: null, entity_id: 'x', attempts: 1 }, t.deps))
       .rejects.toThrow(/Unknown job/);
+  });
+});
+
+describe('client website refresh', () => {
+  it('posts the tags to the site with its secret', async () => {
+    const t = setup();
+    t.s.targets.set(SITE, { url: 'https://firm-a.co.uk/some/page', secret: 's'.repeat(40) });
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init! });
+      return new Response('{"revalidated":true}', { status: 200 });
+    }) as typeof fetch;
+    t.s.jobs.push({ id: 99, action: 'revalidate_site', org_id: ORG, entity_id: SITE, attempts: 0, status: 'pending' });
+    expect(await runJobs({ ...t.deps, fetchImpl })).toMatchObject({ done: 1 });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe('https://firm-a.co.uk/api/revalidate');
+    expect((calls[0].init.headers as Record<string, string>).Authorization).toBe(`Bearer ${'s'.repeat(40)}`);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ tags: ['portal:posts', 'portal:opening-times', 'portal:documents'] });
+  });
+
+  it('retries when the site says no, and skips sites without a website set up', async () => {
+    const t = setup();
+    t.s.targets.set(SITE, { url: 'https://firm-a.co.uk', secret: 's'.repeat(40) });
+    const fetchImpl = (async () => new Response('nope', { status: 401 })) as unknown as typeof fetch;
+    t.s.jobs.push({ id: 1, action: 'revalidate_site', org_id: ORG, entity_id: SITE, attempts: 0, status: 'pending' });
+    expect(await runJobs({ ...t.deps, fetchImpl })).toMatchObject({ retrying: 1 });
+    expect(t.s.jobs[0].error).toMatch(/401/);
+
+    const u = setup();
+    u.s.jobs.push({ id: 1, action: 'revalidate_site', org_id: ORG, entity_id: 'other-site', attempts: 0, status: 'pending' });
+    expect(await runJobs({ ...u.deps, fetchImpl })).toMatchObject({ done: 1 });
   });
 });

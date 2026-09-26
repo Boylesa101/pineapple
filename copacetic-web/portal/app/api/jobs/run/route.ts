@@ -15,5 +15,5 @@ export async function POST(request: Request) {
     return new Response(null, { status: 401 });
   }
   const result = await runDueJobs({ budgetMs: 45_000 });
-  return Response.json(result ?? { skipped: 'Asana sync is not configured' });
+  return Response.json(result ?? { skipped: 'Background jobs are not configured (SUPABASE_SECRET_KEY)' });
 }

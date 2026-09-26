@@ -222,7 +222,7 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
 
       {problems.length > 0 && (
         <section className="card" aria-labelledby="sync-problems">
-          <h2 id="sync-problems">Asana sync problems</h2>
+          <h2 id="sync-problems">Sync problems</h2>
           <ul style={{ listStyle: 'none' }} className="stack">
             {problems.map((j) => (
               <li key={j.id} className="spread">

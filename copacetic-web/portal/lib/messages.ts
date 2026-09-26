@@ -9,6 +9,9 @@ export const MESSAGES = {
   slug_taken: 'That short name is already used by another client. Choose a different one.',
   create_failed: 'The client couldn’t be created. Try again.',
   build_failed: 'The preview couldn’t be saved. Check the link and try again.',
+  needs_title: 'Give the post a title before publishing it.',
+  not_allowed: 'Only the firm’s owners and approvers can do that.',
+  website_failed: 'The website settings didn’t save. Check the address starts with https:// and the secret is at least 32 characters.',
   asana_failed: 'That Asana change didn’t go through. Check the project number and try again.',
 } as const;
 export type MessageCode = keyof typeof MESSAGES;

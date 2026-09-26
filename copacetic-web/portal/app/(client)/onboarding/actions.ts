@@ -184,7 +184,8 @@ async function notifyAgency(firm: string, orgId: string, what: string) {
 
 const uploadSchema = z.object({
   orgId: uuid,
-  sectionId: uuid,
+  // null = a website file (blog image or document) rather than part of an onboarding section.
+  sectionId: uuid.nullable(),
   kind: z.enum(['logo', 'image', 'font', 'document']),
   name: z.string().min(1).max(255),
   size: z.number().int().positive().max(MAX_UPLOAD_BYTES),
@@ -208,6 +209,9 @@ export async function requestUpload(input: z.input<typeof uploadSchema>): Promis
     return { ok: false, message: `That file type isn’t accepted here. Use ${KIND_EXTS[d.kind].join(', ')}.` };
   }
   if (d.kind === 'font' && !d.fontLicence) return { ok: false, message: 'Confirm you have a licence to share this font file.' };
+  if (d.sectionId === null && d.kind !== 'image' && d.kind !== 'document') {
+    return { ok: false, message: 'Only images and documents can be added here.' };
+  }
 
   const supabase = await createClient();
   const mediaId = crypto.randomUUID();
@@ -226,7 +230,7 @@ export async function requestUpload(input: z.input<typeof uploadSchema>): Promis
     font_licence_confirmed: d.kind === 'font' ? true : false,
     uploaded_by: viewer.userId,
   });
-  if (error) return { ok: false, message: 'Files can’t be added to this section right now.' };
+  if (error) return { ok: false, message: 'Files can’t be added here right now.' };
   const { data: signed, error: signError } = await supabase.storage.from('client-files').createSignedUploadUrl(path);
   if (signError || !signed) {
     await supabase.from('media').delete().eq('id', mediaId);

@@ -17,6 +17,7 @@ export const ACTION_LABELS: Record<string, string> = {
   upsert_section_task: 'Content task',
   section_reopened: 'Reopened note',
   briefing_reopened: 'Briefing reopened note',
+  revalidate_site: 'Website refresh',
 };
 
 const JOB_COLUMNS = 'id, action, entity_id, status, attempts, last_error, next_attempt_at, updated_at, org_id';

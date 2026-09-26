@@ -15,19 +15,21 @@ const webhookUrl = () => {
   return u.protocol === 'https:' && !['localhost', '127.0.0.1'].includes(u.hostname) ? u.toString() : undefined;
 };
 
-// Runs due Asana jobs. Safe to call from anywhere and any number of times at once: each job is
-// claimed by exactly one caller. Never throws.
+// Runs due jobs: Asana ones when Asana is connected, client-website refreshes whenever the secret key
+// is set. Safe to call from anywhere and any number of times at once: each job is claimed by exactly
+// one caller. Never throws.
 export async function runDueJobs(opts?: { budgetMs?: number }): Promise<RunResult | null> {
   const db = serviceClient();
-  if (!db || !asanaConfigured()) return null;
+  if (!db) return null;
+  const asana = asanaConfigured();
   try {
     return await runJobs(
       {
-        store: supabaseJobStore(db),
-        asana: asanaClient(env.ASANA_TOKEN!),
+        store: supabaseJobStore(db, asana ? ['asana', 'website'] : ['website']),
+        asana: asanaClient(env.ASANA_TOKEN ?? ''),
         config: {
-          teamGid: env.ASANA_TEAM_GID!,
-          workspaceGid: env.ASANA_WORKSPACE_GID!,
+          teamGid: env.ASANA_TEAM_GID ?? '',
+          workspaceGid: env.ASANA_WORKSPACE_GID ?? '',
           assigneeGid: env.ASANA_ASSIGNEE_GID,
           portalUrl: env.PORTAL_URL.replace(/\/$/, ''),
           webhookUrl: webhookUrl(),
@@ -41,8 +43,9 @@ export async function runDueJobs(opts?: { budgetMs?: number }): Promise<RunResul
   }
 }
 
-// Call after a change that queued jobs (a submission, a new client): runs them once the response
-// has been sent, so Asana usually updates within seconds. The every-minute schedule catches the rest.
+// Call after a change that queued jobs (a submission, a new client, a published post): runs them
+// once the response has been sent, so Asana and client sites usually update within seconds. The
+// every-minute schedule catches the rest.
 export function syncSoon() {
-  if (asanaConfigured()) after(() => runDueJobs({ budgetMs: 15_000 }));
+  if (env.SUPABASE_SECRET_KEY) after(() => runDueJobs({ budgetMs: 15_000 }));
 }

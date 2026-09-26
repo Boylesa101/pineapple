@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Job, JobStore } from './types';
 
 // The worker's database access, as the service role (secret key).
-export function supabaseJobStore(db: SupabaseClient): JobStore {
+export function supabaseJobStore(db: SupabaseClient, providers: string[] = ['asana', 'website']): JobStore {
   const must = <T>({ data, error }: { data: T; error: { message: string } | null }) => {
     if (error) throw new Error(`Database: ${error.message}`);
     return data;
@@ -13,7 +13,7 @@ export function supabaseJobStore(db: SupabaseClient): JobStore {
 
   return {
     async claim(limit) {
-      return (must(await db.rpc('claim_integration_events', { p_limit: limit })) ?? []) as Job[];
+      return (must(await db.rpc('claim_integration_events', { p_limit: limit, p_providers: providers })) ?? []) as Job[];
     },
     async complete(id) {
       must(await db.from('integration_events')
@@ -77,6 +77,11 @@ export function supabaseJobStore(db: SupabaseClient): JobStore {
     },
     async setBriefingTask(orgId, gid) {
       must(await db.from('briefings').update({ asana_task_gid: gid }).eq('org_id', orgId));
+    },
+
+    async siteTarget(siteId) {
+      const rows = must(await db.rpc('site_revalidate_target', { p_site: siteId })) as { url: string; secret: string }[] | null;
+      return rows?.[0] ?? null;
     },
 
     async webhook(projectGid) {
