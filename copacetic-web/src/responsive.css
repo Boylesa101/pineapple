@@ -1,0 +1,73 @@
+/* Responsive fixes layered over the source CSS. Loaded last.
+   Desktop (>980px) is untouched; these only change narrower screens. */
+
+/* Grid tracks default to min-content width, so the hero's nowrap buttons and the
+   520px device frame forced the single column to ~690px on phones. */
+@media (max-width:980px){
+  .mk-spot-in,.contact-wrap,.mk-foot-top{grid-template-columns:minmax(0,1fr)}
+  .mk-hero>*,.mk-spot-in>*{min-width:0}
+}
+/* 861-980px keeps the two-column hero from source/index.html. */
+@media (max-width:860px){
+  .mk-hero{grid-template-columns:minmax(0,1fr)}
+}
+
+/* Phones: tighter gutters and headings that scale with the screen. */
+@media (max-width:620px){
+  .mk-nav-in{padding:0 16px;gap:12px}
+  .mk-nav-cta{gap:4px}
+  .mk-hero{padding:40px 16px 36px;gap:32px}
+  .mk-hero h1{font-size:clamp(32px,9.6vw,42px)}
+  .mk-hero p{font-size:15.5px}
+  .mk-hero-cta .mk-btn{flex:1 1 auto;justify-content:center}
+  .mk-phero{padding:48px 16px 32px}
+  .mk-phero h1{font-size:clamp(30px,8.8vw,36px)}
+  .mk-phero p{font-size:15px}
+  .mk-trust,.mk-features{padding-left:16px;padding-right:16px}
+  .mk-features{padding-top:52px;padding-bottom:52px}
+  .mk-trust-row{gap:10px 22px}
+  .mk-trust-row span{font-size:19px}
+  .mk-sec-head{margin-bottom:28px}
+  .mk-sec-head h2{font-size:clamp(28px,8vw,34px)}
+  .mk-spot-in{padding:52px 16px;gap:36px}
+  .mk-spot-copy h2{font-size:clamp(27px,7.6vw,32px)}
+  .mk-feat{padding:22px}
+  .price-grid,.cl-grid,.about-story,.about-values,.contact-wrap,.price-allinc{padding-left:16px;padding-right:16px}
+  .price-grid{row-gap:22px}
+  .price-proj{margin:14px 16px 0}
+  .contact-form{padding:20px}
+  .mk-cta{padding:60px 16px}
+  .mk-foot-top,.mk-foot-cta,.mk-foot-bar{padding-left:16px;padding-right:16px}
+  .mk-nav.open .mk-links{padding:6px 16px 14px}
+  /* 16px stops iOS zooming into form fields */
+  .cf-field input,.cf-field textarea{font-size:16px}
+  .dev-ctrl{flex-wrap:wrap;justify-content:center}
+  .dev-ctrl .pvs-cap{flex-basis:100%;text-align:center}
+}
+
+/* Very small phones (iPhone SE 1st gen, older Androids). */
+@media (max-width:360px){
+  .mk-logo-word{font-size:19px}
+  .mk-link-btn{padding:9px 4px}
+}
+
+/* Bigger touch targets without changing how the controls look. */
+.pvs-dots button,.pvs-arr,.burger,.chip{position:relative}
+.pvs-dots button::after{content:"";position:absolute;inset:-10px -4px}
+@media (pointer:coarse){
+  .pvs-arr::after{content:"";position:absolute;inset:-9px}
+  .mk-foot-col a{padding:3px 0;margin-bottom:7px}
+}
+
+/* Respect reduced-motion settings. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;scroll-behavior:auto!important}
+}
+
+/* Footer social links (LinkedIn, Google Business Profile). */
+.mk-foot-social{display:flex!important;align-items:center;gap:7px}
+.mk-foot-social i{font-size:16px}
+
+/* Reserve the device showcase's space before device.js fills it (no layout shift). */
+#pvs{min-height:457px}
+@media (max-width:620px){#pvs{min-height:483px}}

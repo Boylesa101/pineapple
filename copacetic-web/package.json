@@ -1,0 +1,16 @@
+{
+  "name": "copacetic-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "copacetic.web marketing site: static build from source/, PWA, Vercel.",
+  "scripts": {
+    "build": "node build.mjs",
+    "preview": "node scripts/serve.mjs",
+    "fetch:images": "node scripts/fetch-client-images.mjs",
+    "deploy": "npx vercel deploy --prod"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
