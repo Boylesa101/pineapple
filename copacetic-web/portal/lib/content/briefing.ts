@@ -114,6 +114,10 @@ export const BRIEFING: BriefingPart[] = [
     title: 'Technical',
     fields: [
       { key: 'currentSite', label: 'Current website address', type: 'url' },
+      { key: 'currentSiteLikes', label: 'What do you like about your current site?', type: 'textarea',
+        hint: 'Pages, features, wording or anything about the look you’d like to keep. Leave blank if you don’t have a site yet.' },
+      { key: 'currentSiteChanges', label: 'What don’t you like, or want to see changed?', type: 'textarea',
+        hint: 'Anything that frustrates you or your clients, is out of date, or is missing.' },
       { key: 'domains', label: 'Domain name(s) you want to use', type: 'text', required: true },
       { key: 'domainControl', label: 'Who manages your domain and DNS?', type: 'text', hint: 'For example your IT company, or the registrar’s name.' },
       { key: 'emailProvider', label: 'Email provider', type: 'select',
