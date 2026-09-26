@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { ROLE_LABELS, STAGES, stageIndex, stageInfo } from '@/lib/stages';
 import { createClient } from '@/lib/supabase/server';
+import { checklist, loadOnboarding } from '@/lib/onboarding';
 
 export const metadata: Metadata = { title: 'Overview' };
 
@@ -10,7 +11,7 @@ const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short
 
 export default async function Overview(props: PageProps<'/'>) {
   const viewer = await requireUser();
-  const { welcome } = await props.searchParams;
+  const { welcome, submitted } = await props.searchParams;
   const supabase = await createClient();
 
   // RLS limits every query below to the firms this person belongs to, and to shared previews.
@@ -43,12 +44,17 @@ export default async function Overview(props: PageProps<'/'>) {
 
   return (
     <>
+      {submitted && (
+        <div className="notice ok" role="status">
+          Thank you. Everything’s with us now, and we’ll be in touch as we start building.
+        </div>
+      )}
       {welcome && (
         <div className="notice ok" role="status">
           You’ve joined. Welcome to your portal.
         </div>
       )}
-      {memberships.map((m) => {
+      {await Promise.all(memberships.map(async (m) => {
         const org = m.organisations as unknown as { id: string; name: string };
         const orgSites = (sites ?? []).filter((s) => s.org_id === org.id);
         return (
@@ -58,7 +64,7 @@ export default async function Overview(props: PageProps<'/'>) {
               <h1 id={`org-${org.id}`}>{org.name}</h1>
               <span className="pill">You’re {ROLE_LABELS[m.role as keyof typeof ROLE_LABELS].toLowerCase()}</span>
             </div>
-            {orgSites.map((site) => {
+            {await Promise.all(orgSites.map(async (site) => {
               const idx = stageIndex(site.stage);
               const siteBuilds = (builds ?? []).filter((b) => b.site_id === site.id);
               return (
@@ -75,6 +81,8 @@ export default async function Overview(props: PageProps<'/'>) {
                     </ol>
                     <p>{stageInfo(site.stage).client}</p>
                   </div>
+
+                  {idx >= stageIndex('onboarding') && (await onboardingCard(org.id))}
 
                   <div className="card">
                     <h2>Previews</h2>
@@ -103,10 +111,37 @@ export default async function Overview(props: PageProps<'/'>) {
                   </div>
                 </div>
               );
-            })}
+            }))}
           </section>
         );
-      })}
+      }))}
     </>
+  );
+}
+
+async function onboardingCard(orgId: string) {
+  const o = await loadOnboarding(orgId);
+  const c = checklist(o);
+  const pct = Math.round((c.progress.complete / c.progress.total) * 100);
+  const open = o.stage === 'onboarding';
+  return (
+    <div className="card">
+      <div className="spread">
+        <h2 style={{ marginBottom: 0 }}>Your content</h2>
+        <Link className={open ? 'btn' : 'btn ghost'} href={`/onboarding/${orgId}`}>
+          {open ? (pct ? 'Continue' : 'Start') : 'View what you sent'}
+        </Link>
+      </div>
+      {open ? (
+        <>
+          <p className="small" style={{ margin: '10px 0 6px' }}>
+            {c.progress.complete} of {c.progress.total} required parts done: briefing, brand, content and files.
+          </p>
+          <div className="bar" aria-label={`${pct}% complete`}><span style={{ width: `${pct}%` }} /></div>
+        </>
+      ) : (
+        <p className="small" style={{ marginTop: 10 }}>Submitted. It’s read-only unless we reopen a section for changes.</p>
+      )}
+    </div>
   );
 }
