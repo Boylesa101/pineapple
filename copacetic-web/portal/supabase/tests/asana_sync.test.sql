@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(17);
+select plan(18);
 
 create temp table _tap (n serial, line text);
 grant all on _tap, _tap_n_seq to authenticated, anon, service_role;
@@ -73,6 +73,17 @@ grant select on _due to service_role;
 set local role service_role;
 insert into _tap (line) select is((select count(*)::int from public.claim_integration_events(50)), (select n from _due), 'the worker claims every due job');
 insert into _tap (line) select is((select count(*)::int from public.claim_integration_events(50)), 0, 'a claimed job is not handed out twice');
+reset role;
+
+-- A resubmission while its first job is still being worked on waits for that job to finish.
+select pg_temp.login('00000000-0000-0000-0000-00000000000a', 'aal2');
+select public.reopen_section('30000000-0000-0000-0000-0000000000a1');
+reset role;
+select pg_temp.login('00000000-0000-0000-0000-0000000000a1');
+select public.submit_section('30000000-0000-0000-0000-0000000000a1');
+reset role;
+set local role service_role;
+insert into _tap (line) select is((select count(*)::int from public.claim_integration_events(50) where entity_id = '30000000-0000-0000-0000-0000000000a1'), 0, 'jobs for something already being worked on wait their turn');
 reset role;
 
 insert into _tap (line) select * from finish();
