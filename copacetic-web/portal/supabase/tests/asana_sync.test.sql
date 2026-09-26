@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(18);
+select plan(22);
 
 create temp table _tap (n serial, line text);
 grant all on _tap, _tap_n_seq to authenticated, anon, service_role;
@@ -84,6 +84,26 @@ select public.submit_section('30000000-0000-0000-0000-0000000000a1');
 reset role;
 set local role service_role;
 insert into _tap (line) select is((select count(*)::int from public.claim_integration_events(50) where entity_id = '30000000-0000-0000-0000-0000000000a1'), 0, 'jobs for something already being worked on wait their turn');
+reset role;
+
+-- Recording the Asana task id is bookkeeping: an open editor must not see it as someone else's edit.
+create temp table _v as select version from public.content_sections where id = '30000000-0000-0000-0000-0000000000a2';
+update public.content_sections set asana_task_gid = '1234567890' where id = '30000000-0000-0000-0000-0000000000a2';
+insert into _tap (line) select is((select version from public.content_sections where id = '30000000-0000-0000-0000-0000000000a2'), (select version from _v), 'saving the Asana task id does not bump the version');
+
+-- Retrying failed jobs.
+insert into public.integration_events (id, provider, action, entity_id, status) overriding system value values
+  (900001, 'asana', 'ensure_project', 'retry-alone', 'failed'),
+  (900002, 'asana', 'ensure_project', 'retry-dup', 'failed'),
+  (900003, 'asana', 'ensure_project', 'retry-dup', 'pending');
+select pg_temp.login('00000000-0000-0000-0000-00000000000a', 'aal2');
+select public.retry_integration_event(900001);
+select public.retry_integration_event(900002);
+reset role;
+insert into _tap (line) select is((select status::text from public.integration_events where id = 900001), 'pending', 'the agency can retry a failed job');
+insert into _tap (line) select is((select status::text from public.integration_events where id = 900002), 'done', 'retrying a job that a newer one already covers just closes it');
+select pg_temp.login('00000000-0000-0000-0000-0000000000a1');
+insert into _tap (line) select throws_ok($$select public.asana_webhook_gid('123')$$, '42501', null, 'clients cannot look up webhooks');
 reset role;
 
 insert into _tap (line) select * from finish();
