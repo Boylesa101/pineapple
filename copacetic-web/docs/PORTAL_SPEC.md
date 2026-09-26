@@ -87,6 +87,13 @@ Enforce with Supabase RLS on every table, using `org_id` and membership role. Se
 Structured sections the client completes during onboarding and edits after payment:
 
 - **Briefing**: port the existing briefing form's eight sections (firm and regulatory, business, price and service info, branding, content and features, blog, technical, timing and budget). Keep PDF, email and Asana outputs working.
+- **Brand assets** (the client sends everything the design needs):
+  - **Colours:** any number of named brand colours, entered as hex (`#1c1917`) or RGB (`rgb(28, 25, 23)`), with a live swatch. Stored as normalised hex, whatever format was entered, and labelled by use (primary, secondary, accent, text, background).
+  - **Fonts:** font names (e.g. from Google Fonts) and/or uploaded font files (`.woff2`, `.woff`, `.otf`, `.ttf`), marked as headings or body. Clients must confirm they hold a licence for any uploaded font file.
+  - **Logos:** uploaded in every version they have (primary, secondary or stacked, white/reversed, icon or favicon). SVG preferred; PNG and PDF are also accepted.
+  - **Images:** photography (office, team, headshots), each with alt text and a note on where it could be used.
+  - **Documents:** existing brand guidelines, copy decks, fee schedules and other reference files (PDF, DOCX, XLSX, PPTX).
+  - Everything is stored in private Supabase Storage under the firm's folder, previewed in the portal, and downloadable by the agency as one bundle.
 - **About us**: firm story, values, history
 - **Services / practice areas** (repeatable): name, summary, full description, who it's for, key people
 - **Team** (repeatable): name, role, photo, bio, qualifications, practising status, languages
@@ -141,7 +148,7 @@ Each section shows completion progress. Autosave drafts. Submit per section or a
 - RLS on every table, with tests for cross-organisation access.
 - Two-factor authentication required for `agency_admin`; optional for clients.
 - Private storage buckets; files served through signed URLs scoped to the organisation.
-- File uploads: allowlisted types (images, PDF, sanitised SVG), a size limit, and a virus scan if feasible.
+- File uploads: allowlisted types (JPEG, PNG, WebP, sanitised SVG, PDF, DOCX, XLSX, PPTX, and font files WOFF2/WOFF/OTF/TTF), checked by file signature as well as extension, with a size limit (e.g. 25 MB per file) and a virus scan if feasible.
 - Rate limiting on auth, invites, the public API and uploads.
 - Security headers (CSP, HSTS). No secrets in client bundles or Git history.
 - UK GDPR: a privacy notice for the portal, data processing terms with clients, and the ability to export and delete an organisation's data.
