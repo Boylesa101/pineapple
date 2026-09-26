@@ -4,6 +4,7 @@ import { FileManager } from '@/components/file-manager';
 import { Submit } from '@/components/submit';
 import { messageFor } from '@/lib/messages';
 import { loadDocuments, loadLibrary } from '@/lib/website/data';
+import { loadWebsite } from '@/lib/website/load';
 import { deleteDocument, updateDocument } from '@/app/(client)/website/actions';
 import { AddDocument, ReplaceFile } from './documents-manager';
 
@@ -12,7 +13,7 @@ export const metadata: Metadata = { title: 'Documents' };
 export default async function DocumentsPage(props: PageProps<'/website/[orgId]/documents'>) {
   const { orgId } = await props.params;
   const { error } = await props.searchParams;
-  const [docs, library] = await Promise.all([loadDocuments(orgId), loadLibrary(orgId, 'document')]);
+  const [w, docs, library] = await Promise.all([loadWebsite(orgId), loadDocuments(orgId), loadLibrary(orgId, 'document')]);
   const used = new Set(docs.map((d) => d.media_id));
   const unused = library.filter((f) => !used.has(f.id));
   const available = unused.filter((f) => f.status === 'clean');
@@ -22,14 +23,27 @@ export default async function DocumentsPage(props: PageProps<'/website/[orgId]/d
       <h1>Documents</h1>
       <p className="lede">
         Price lists, your complaints procedure, forms and other files for your website. Replacing a file keeps its link the same.
+        {!w.canPublish && ' You can add documents; an owner or approver at your firm puts them on the site.'}
       </p>
       {messageFor(error) && <div className="notice err" role="alert">{messageFor(error)}</div>}
 
       {docs.length > 0 && (
         <section aria-labelledby="on-site">
-          <h2 id="on-site">On your website</h2>
-          {docs.map((d) => (
+          <h2 id="on-site">Your documents</h2>
+          {docs.map((d) => {
+            // Editors can work on hidden documents; changing one that's on the site is for owners and approvers.
+            const editable = w.canPublish || !d.visible;
+            return (
             <article key={d.id} className="card">
+              {!editable ? (
+                <div className="spread">
+                  <div>
+                    <h3 style={{ marginBottom: 2 }}>{d.title}</h3>
+                    {d.description && <p className="small">{d.description}</p>}
+                  </div>
+                  <span className="pill green">On the website</span>
+                </div>
+              ) : (<>
               <form action={updateDocument}>
                 <input type="hidden" name="orgId" value={orgId} />
                 <input type="hidden" name="id" value={d.id} />
@@ -44,9 +58,13 @@ export default async function DocumentsPage(props: PageProps<'/website/[orgId]/d
                   </div>
                 </div>
                 <div className="spread">
-                  <label className="check">
-                    <input type="checkbox" name="visible" defaultChecked={d.visible} /> Show on the website
-                  </label>
+                  {w.canPublish ? (
+                    <label className="check">
+                      <input type="checkbox" name="visible" defaultChecked={d.visible} /> Show on the website
+                    </label>
+                  ) : (
+                    <span className="pill amber">Hidden until an owner or approver shows it</span>
+                  )}
                   <Submit className="btn ghost" pending="Saving…">Save</Submit>
                 </div>
               </form>
@@ -63,8 +81,10 @@ export default async function DocumentsPage(props: PageProps<'/website/[orgId]/d
                   Remove<span className="sr-only"> {d.title}</span>
                 </ConfirmSubmit>
               </form>
+              </>)}
             </article>
-          ))}
+            );
+          })}
         </section>
       )}
 

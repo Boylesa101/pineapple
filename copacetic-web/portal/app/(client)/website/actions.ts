@@ -217,11 +217,12 @@ export async function addDocument(input: z.input<typeof docSchema>): Promise<{ o
   const parsed = docSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? 'Check the details.' };
   const { orgId, mediaId, title, description } = parsed.data;
-  await requireWebsite(orgId);
+  const { canPublish } = await requireWebsite(orgId);
   const supabase = await createClient();
   const { count } = await supabase.from('site_documents').select('id', { count: 'exact', head: true }).eq('org_id', orgId);
+  // Editors prepare documents; an owner or approver shows them on the site.
   const { error } = await supabase.from('site_documents').insert({
-    org_id: orgId, media_id: mediaId, title, description: description || null, sort_order: count ?? 0,
+    org_id: orgId, media_id: mediaId, title, description: description || null, sort_order: count ?? 0, visible: canPublish,
   });
   if (error) return { ok: false, message: 'The document couldn’t be added. Wait for the file check to finish, then try again.' };
   syncSoon();
@@ -244,9 +245,10 @@ export async function updateDocument(formData: FormData) {
   const d = parsed.data;
   await requireWebsite(d.orgId);
   const supabase = await createClient();
-  await supabase.from('site_documents')
+  const { data: updated } = await supabase.from('site_documents')
     .update({ title: d.title, description: d.description || null, visible: d.visible === 'on' })
-    .eq('id', d.id).eq('org_id', d.orgId);
+    .eq('id', d.id).eq('org_id', d.orgId).select('id');
+  if (!updated?.length) redirect(`${base(d.orgId)}/documents?error=not_allowed`);
   syncSoon();
   revalidatePath(`${base(d.orgId)}/documents`);
   redirect(`${base(d.orgId)}/documents`);
@@ -259,7 +261,8 @@ export async function replaceDocumentFile(orgId: string, id: string, mediaId: st
   const supabase = await createClient();
   const { data: doc } = await supabase.from('site_documents').select('media_id').eq('id', id).eq('org_id', orgId).maybeSingle();
   if (!doc) return { ok: false, message: 'Document not found.' };
-  const { error } = await supabase.from('site_documents').update({ media_id: mediaId }).eq('id', id);
+  const { data: swapped, error } = await supabase.from('site_documents').update({ media_id: mediaId }).eq('id', id).select('id');
+  if (!error && !swapped?.length) return { ok: false, message: 'Only owners and approvers can change a document that’s on the website.' };
   if (error) return { ok: false, message: 'The new file couldn’t be used. Wait for the file check to finish, then try again.' };
   await removeFile(orgId, doc.media_id);
   syncSoon();
@@ -274,7 +277,8 @@ export async function deleteDocument(formData: FormData) {
   await requireWebsite(orgId);
   const supabase = await createClient();
   const { data: doc } = await supabase.from('site_documents').delete().eq('id', id).eq('org_id', orgId).select('media_id').maybeSingle();
-  if (doc) await removeFile(orgId, doc.media_id);
+  if (!doc) redirect(`${base(orgId)}/documents?error=not_allowed`);
+  await removeFile(orgId, doc.media_id);
   syncSoon();
   revalidatePath(`${base(orgId)}/documents`);
   redirect(`${base(orgId)}/documents`);
@@ -290,6 +294,7 @@ async function removeFile(orgId: string, mediaId: string) {
   if (docs || covers) return;
   const { data: m } = await supabase.from('media').select('storage_path').eq('id', mediaId).eq('org_id', orgId).is('section_id', null).maybeSingle();
   if (!m) return;
-  await supabase.from('media').delete().eq('id', mediaId);
+  // Object first: the storage policy needs the media row to still exist.
   await supabase.storage.from('client-files').remove([m.storage_path]);
+  await supabase.from('media').delete().eq('id', mediaId);
 }

@@ -51,14 +51,14 @@ async function ensureProject(job: Job, { store, asana, config }: Deps) {
 async function ensureWebhook(project: string, { store, asana, config }: Deps) {
   const hook = await store.webhook(project);
   if (hook?.webhookGid && hook.hasSecret) return;
-  const target = `${config.webhookUrl}?project=${project}`;
+  const base = `${config.webhookUrl}?project=${project}`;
   const create = async () => {
-    // Asana calls our endpoint with the secret while this request is in flight; the window lets
-    // the endpoint accept it once.
-    await store.openHandshake(project);
+    // Asana calls our endpoint with the secret while this request is in flight; the window and the
+    // one-time nonce in the URL let the endpoint accept that call and nothing else.
+    const nonce = await store.openHandshake(project);
     return asana.post<Gid>('/webhooks', {
       resource: project,
-      target,
+      target: `${base}&nonce=${nonce}`,
       filters: [{ resource_type: 'task', action: 'changed', fields: ['completed'] }],
     });
   };
@@ -66,9 +66,10 @@ async function ensureWebhook(project: string, { store, asana, config }: Deps) {
   try {
     created = await create();
   } catch (e) {
-    // One already exists for this target (e.g. we lost its secret): replace it.
+    // One already exists for this project (e.g. we lost its secret): replace it.
     const old = await asana.find<Gid & { target?: string }>(
-      `/webhooks?workspace=${config.workspaceGid}&resource=${project}&opt_fields=target`, (w) => w.target === target);
+      `/webhooks?workspace=${config.workspaceGid}&resource=${project}&opt_fields=target`,
+      (w) => w.target === base || !!w.target?.startsWith(`${base}&`));
     if (!old) throw e;
     await asana.del(`/webhooks/${old.gid}`);
     created = await create();

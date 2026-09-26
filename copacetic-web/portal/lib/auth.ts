@@ -62,5 +62,8 @@ export async function requireOrgRole(orgId: string, roles: Role[]) {
 
 // Only ever redirect to a path on this site.
 export function safeNext(next: string | null | undefined, fallback = '/') {
-  return next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : fallback;
+  // Control characters are rejected too: browsers strip them, so "/\t/evil.com" would become "//evil.com".
+  return next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') && !/[\u0000-\u001f\u007f]/.test(next)
+    ? next
+    : fallback;
 }

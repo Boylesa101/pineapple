@@ -52,6 +52,15 @@ describe('uploads', () => {
     expect(checkSvg('<html><body>hi</body></html>')).toMatch(/not an SVG/);
   });
 
+  it('rejects SVG tricks that get past simple checks', () => {
+    expect(checkSvg('<svg><a><animate attributeName="href" values="jav&#x61;script:alert(1)"/></a></svg>')).not.toBeNull();
+    expect(checkSvg('<svg><a><set attributeName="xlink:href" to="https://x.test"/></a></svg>')).toMatch(/animates a link|outside/);
+    expect(checkSvg('<svg><a href="&#106;avascript:alert(1)">x</a></svg>')).toMatch(/encoded/);
+    expect(checkSvg('<svg><use href="data:image/svg+xml;base64,PHN2Zz4="/></svg>')).toMatch(/embedded/);
+    expect(checkSvg('<svg><image href="https://tracker.test/x.png"/></svg>')).toMatch(/outside/);
+    expect(checkSvg('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/><image href="data:image/png;base64,iVBOR"/></svg>')).toBeNull();
+  });
+
   it('makes storage-safe names and reads extensions', () => {
     expect(safeFileName('Our Logo (final) v2.SVG')).toBe('Our-Logo-final-v2.svg');
     expect(safeFileName('../../etc/passwd.png')).toBe('etc-passwd.png');

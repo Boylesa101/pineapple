@@ -99,5 +99,12 @@ export function checkSvg(text: string): string | null {
   if (/\son[a-z]+\s*=/i.test(t)) return 'SVG contains event handlers';
   if (/(?:href|src)\s*=\s*["']?\s*(?:javascript|data:text\/html)/i.test(t)) return 'SVG contains an unsafe link';
   if (/<!ENTITY/i.test(t)) return 'SVG contains XML entities';
+  // Also refuse tricks that get past simple checks: encoded characters, links set by animation,
+  // javascript: anywhere, embedded data other than plain images, and external references.
+  if (/&#/.test(t)) return 'SVG contains encoded characters';
+  if (/javascript\s*:/i.test(t)) return 'SVG contains an unsafe link';
+  if (/<(?:animate|animateMotion|animateTransform|set)\b[^>]*attributeName\s*=\s*["']?(?:xlink:)?href/i.test(t)) return 'SVG animates a link';
+  if (/(?:href|src)\s*=\s*["']?\s*data:(?!image\/(?:png|jpeg|webp|gif);)/i.test(t)) return 'SVG contains embedded content';
+  if (/(?:href|src)\s*=\s*["']?\s*(?:https?:)?\/\//i.test(t)) return 'SVG links to outside content';
   return null;
 }

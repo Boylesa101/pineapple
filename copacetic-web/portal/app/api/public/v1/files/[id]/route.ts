@@ -15,13 +15,14 @@ export async function GET(request: Request, ctx: RouteContext<'/api/public/v1/fi
   const isImage = file.mime_type.startsWith('image/') && file.mime_type !== 'image/svg+xml';
   const { data: signed } = await db.storage
     .from('client-files')
-    .createSignedUrl(file.storage_path, 600, isImage ? undefined : { download: file.file_name });
+    .createSignedUrl(file.storage_path, 120, isImage ? undefined : { download: file.file_name });
   if (!signed?.signedUrl) return notFound();
   return new Response(null, {
     status: 302,
     headers: {
       Location: signed.signedUrl,
-      'Cache-Control': 'public, max-age=300',
+      // Short: an unpublished or hidden file should stop being reachable quickly.
+      'Cache-Control': 'private, max-age=60',
       'Access-Control-Allow-Origin': '*',
       'X-Robots-Tag': 'noindex',
     },

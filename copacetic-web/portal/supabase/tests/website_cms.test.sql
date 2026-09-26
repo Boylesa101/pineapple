@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(35);
+select plan(38);
 
 create temp table _tap (n serial, line text);
 grant all on _tap, _tap_n_seq to authenticated, anon, service_role;
@@ -144,14 +144,24 @@ reset role;
 
 -- --------------------------------------------------------------- documents --
 select pg_temp.login('00000000-0000-0000-0000-0000000000a2');
-insert into _tap (line) select lives_ok($$insert into public.site_documents (id, org_id, media_id, title) values
-  ('60000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-00000000000a', '40000000-0000-0000-0000-0000000000a2', 'Price list')$$,
-  'members can publish a document');
+insert into _tap (line) select throws_ok($$insert into public.site_documents (org_id, media_id, title) values
+  ('10000000-0000-0000-0000-00000000000a', '40000000-0000-0000-0000-0000000000a2', 'Price list')$$,
+  '42501', null, 'editors cannot put a document on the website');
+insert into _tap (line) select lives_ok($$insert into public.site_documents (id, org_id, media_id, title, visible) values
+  ('60000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-00000000000a', '40000000-0000-0000-0000-0000000000a2', 'Price list', false)$$,
+  'but can prepare a hidden one');
 insert into _tap (line) select throws_ok($$insert into public.site_documents (org_id, media_id, title) values
   ('10000000-0000-0000-0000-00000000000a', '40000000-0000-0000-0000-0000000000a3', 'Not a PDF')$$, '22023', null, 'documents must be document files');
+insert into _tap (line) select throws_ok($$update public.site_documents set visible = true where id = '60000000-0000-0000-0000-0000000000a1'$$,
+  '42501', null, 'and cannot show it');
 insert into _tap (line) select lives_ok($$insert into public.media (org_id, section_id, kind, storage_path, original_name, mime_type, size_bytes, uploaded_by) values
   ('10000000-0000-0000-0000-00000000000a', null, 'image', '10000000-0000-0000-0000-00000000000a/new/new.png', 'new.png', 'image/png', 10,
    '00000000-0000-0000-0000-0000000000a2')$$, 'members can upload website images');
+reset role;
+
+select pg_temp.login('00000000-0000-0000-0000-0000000000a1');
+insert into _tap (line) select is(pg_temp.affected($$update public.site_documents set visible = true where id = '60000000-0000-0000-0000-0000000000a1'$$), 1,
+  'owners put documents on the website');
 reset role;
 
 select pg_temp.anon();

@@ -38,7 +38,8 @@ export interface JobStore {
   siteTarget(siteId: string): Promise<{ url: string; secret: string } | null>;
 
   webhook(projectGid: string): Promise<{ webhookGid: string | null; hasSecret: boolean } | null>;
-  openHandshake(projectGid: string): Promise<void>;
+  // Opens a short handshake window; returns the one-time nonce to put in the webhook URL.
+  openHandshake(projectGid: string): Promise<string>;
   setWebhookGid(projectGid: string, webhookGid: string): Promise<void>;
 }
 

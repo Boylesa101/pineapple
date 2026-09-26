@@ -85,7 +85,9 @@ function fakeAsana() {
     }
     if (method === 'POST' && path === '/webhooks') {
       state.onHandshake?.(String(data.target));
-      if (state.webhooks.some((w) => w.target === data.target)) return json(403, { errors: [{ message: 'Duplicate webhook' }] });
+      if (state.webhooks.some((w) => w.resource === data.resource && w.target.split('&')[0] === String(data.target).split('&')[0])) {
+        return json(403, { errors: [{ message: 'Duplicate webhook' }] });
+      }
       const w = { gid: id(), resource: String(data.resource), target: String(data.target) };
       state.webhooks.push(w);
       return json(201, { data: { gid: w.gid } });
@@ -110,7 +112,7 @@ function fakeStore() {
     sites: new Map<string, SiteInfo>(),
     sections: new Map<string, SectionInfo>(),
     briefings: new Map<string, BriefingInfo>(),
-    hooks: new Map<string, { webhookGid: string | null; secret: string | null; open: boolean }>(),
+    hooks: new Map<string, { webhookGid: string | null; secret: string | null; open: boolean; nonce?: string }>(),
     targets: new Map<string, { url: string; secret: string }>(),
   };
   const store: JobStore = {
@@ -134,7 +136,11 @@ function fakeStore() {
     async setBriefingTask(orgId, gid) { s.briefings.get(orgId)!.taskGid = gid; },
     async siteTarget(id) { return s.targets.get(id) ?? null; },
     async webhook(p) { const h = s.hooks.get(p); return h ? { webhookGid: h.webhookGid, hasSecret: !!h.secret } : null; },
-    async openHandshake(p) { s.hooks.set(p, { ...(s.hooks.get(p) ?? { webhookGid: null, secret: null }), open: true }); },
+    async openHandshake(p) {
+      const nonce = `n${p}`;
+      s.hooks.set(p, { ...(s.hooks.get(p) ?? { webhookGid: null, secret: null }), open: true, nonce });
+      return nonce;
+    },
     async setWebhookGid(p, g) { s.hooks.get(p)!.webhookGid = g; },
   };
   return { s, store };
@@ -159,9 +165,10 @@ function setup() {
   s.briefings.set(ORG, { orgId: ORG, orgName: 'Firm A LLP', status: 'submitted', taskGid: null, submittedAt: '2026-09-26T10:00:00Z' });
   // Asana's handshake reaches our endpoint during webhook creation; accept it only while the window is open.
   state.onHandshake = (target) => {
-    const project = new URL(target).searchParams.get('project')!;
+    const url = new URL(target);
+    const project = url.searchParams.get('project')!;
     const h = s.hooks.get(project);
-    if (h?.open) Object.assign(h, { secret: 'shh', open: false });
+    if (h?.open && h.nonce === url.searchParams.get('nonce')) Object.assign(h, { secret: 'shh', open: false });
   };
   let n = 1;
   const queue = (action: Job['action'], entity: string) =>
@@ -183,7 +190,7 @@ describe('Asana project set-up', () => {
     expect(t.state.sections.map((x) => x.name)).toEqual(['Briefing', 'Content', 'Build', 'Review', 'Launch']);
     expect(Object.keys(t.s.sites.get(SITE)!.sections)).toHaveLength(5);
     expect(t.state.webhooks).toEqual([
-      expect.objectContaining({ resource: p.gid, target: `https://portal.test/api/webhooks/asana?project=${p.gid}` }),
+      expect.objectContaining({ resource: p.gid, target: `https://portal.test/api/webhooks/asana?project=${p.gid}&nonce=n${p.gid}` }),
     ]);
     expect(t.s.hooks.get(p.gid)).toMatchObject({ secret: 'shh', open: false });
   });
@@ -207,6 +214,25 @@ describe('Asana project set-up', () => {
     expect(t.state.projects).toHaveLength(1);
     expect(t.state.sections).toHaveLength(5);
     expect(t.state.webhooks).toHaveLength(1);
+  });
+
+  it('replaces a webhook whose secret was lost, and ignores handshakes without the nonce', async () => {
+    const t = setup();
+    t.queue('ensure_project', SITE);
+    await runJobs(t.deps);
+    const p = t.s.sites.get(SITE)!.projectGid!;
+    const first = t.state.webhooks[0].gid;
+    t.s.hooks.set(p, { webhookGid: null, secret: null, open: false }); // secret lost
+    t.queue('ensure_project', SITE);
+    await runJobs(t.deps);
+    expect(t.state.webhooks).toHaveLength(1);
+    expect(t.state.webhooks[0].gid).not.toBe(first);
+    expect(t.s.hooks.get(p)).toMatchObject({ secret: 'shh' });
+
+    // A handshake that doesn't carry the nonce Asana was given is refused.
+    t.s.hooks.set(p, { webhookGid: null, secret: null, open: true, nonce: 'real' });
+    t.state.onHandshake!(`https://portal.test/api/webhooks/asana?project=${p}&nonce=guess`);
+    expect(t.s.hooks.get(p)!.secret).toBeNull();
   });
 
   it('skips the webhook when the portal has no public address', async () => {

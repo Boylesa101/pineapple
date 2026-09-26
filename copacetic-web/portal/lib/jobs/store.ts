@@ -91,7 +91,7 @@ export function supabaseJobStore(db: SupabaseClient, providers: string[] = ['asa
       return { webhookGid: gid, hasSecret: !!secret };
     },
     async openHandshake(projectGid) {
-      must(await db.rpc('open_asana_handshake', { p_project: projectGid }));
+      return must(await db.rpc('open_asana_handshake', { p_project: projectGid })) as string;
     },
     async setWebhookGid(projectGid, webhookGid) {
       must(await db.rpc('set_asana_webhook_gid', { p_project: projectGid, p_webhook: webhookGid }));

@@ -298,9 +298,10 @@ export async function deleteMedia(orgId: string, mediaId: string): Promise<{ ok:
   const supabase = await createClient();
   const { data: m } = await supabase.from('media').select('storage_path').eq('id', mediaId).eq('org_id', orgId).maybeSingle();
   if (!m) return { ok: false };
+  // Object first: the storage policy needs the media row to still exist.
+  await supabase.storage.from('client-files').remove([m.storage_path]);
   const { error } = await supabase.from('media').delete().eq('id', mediaId);
   if (error) return { ok: false };
-  await supabase.storage.from('client-files').remove([m.storage_path]);
   revalidatePath(base(orgId), 'layout');
   return { ok: true };
 }

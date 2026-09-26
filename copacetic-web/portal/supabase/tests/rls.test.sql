@@ -4,7 +4,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(51);
+select plan(53);
 
 -- Results are collected here so each assertion can run as whichever role it needs.
 create temp table _tap (n serial, line text);
@@ -90,6 +90,8 @@ insert into _tap (line) select throws_ok('select token_hash from public.invitati
 insert into _tap (line) select throws_ok($$insert into public.memberships (org_id, user_id, role) values ('10000000-0000-0000-0000-00000000000b', auth.uid(), 'owner')$$, '42501', null, 'nobody can add themselves to another firm');
 insert into _tap (line) select throws_ok($$delete from public.memberships where user_id = auth.uid()$$, 'P0001', 'An organisation must keep at least one owner', 'the last owner cannot leave');
 insert into _tap (line) select is(pg_temp.affected($q$update public.memberships set role = 'approver' where user_id = '00000000-0000-0000-0000-0000000000a2'$q$), 1, 'owners can change roles in their firm');
+insert into _tap (line) select is(pg_temp.affected($q$update public.invitations set revoked_at = now() where email = 'new.person@firm-a.test'$q$), 1, 'owners can withdraw an invitation');
+insert into _tap (line) select throws_ok($q$update public.invitations set revoked_at = null where email = 'new.person@firm-a.test'$q$, '42501', null, 'but cannot bring a withdrawn one back');
 reset role;
 
 -- ------------------------------------------- editor of firm A (org A) ---

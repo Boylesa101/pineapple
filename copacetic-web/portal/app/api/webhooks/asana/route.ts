@@ -5,7 +5,7 @@ import { env } from '@/lib/env';
 import { serviceClient } from '@/lib/supabase/service';
 
 // Asana calls this (1) once with X-Hook-Secret while we create the webhook, and (2) with signed task
-// events after that. The project id is in the URL we registered (?project=<gid>).
+// events after that. The project id and a one-time handshake nonce are in the URL we registered.
 
 const MAX_BODY = 1_000_000;
 const empty = (status: number, headers?: HeadersInit) => new Response(null, { status, headers });
@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
   const hookSecret = request.headers.get('x-hook-secret');
   if (hookSecret) {
     if (!/^[\x21-\x7e]{16,200}$/.test(hookSecret)) return empty(400);
-    const { data: accepted } = await db.rpc('accept_asana_handshake', { p_project: project, p_secret: hookSecret });
+    const nonce = request.nextUrl.searchParams.get('nonce') ?? '';
+    if (!/^[0-9a-f]{36}$/.test(nonce)) return empty(403);
+    const { data: accepted } = await db.rpc('accept_asana_handshake', { p_project: project, p_secret: hookSecret, p_nonce: nonce });
     return accepted ? empty(200, { 'X-Hook-Secret': hookSecret }) : empty(403);
   }
 
