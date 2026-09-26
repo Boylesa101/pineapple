@@ -73,3 +73,32 @@ ${gsec('07', 'Launch a compliant website', `<p>Your website is often the first t
 const TRUST_ROW = '<div class="mk-trust"><span>Companies we work with</span><div class="mk-trust-row" id="trust"></div></div>';
 PAGES.home = PAGES.home.replace(TRUST_ROW, TRUST_ROW + `
 <section class="mk-philo"><div class="mk-eyebrow">Our philosophy</div><p>Your website isn't just a shop window for your business or brand. It's there to tell the world about <em>you and your philosophy.</em></p></section>`);
+
+// Home: the client portal, after "What we do". Owner-approved addition.
+const PORTAL_ITEMS = (items) => items.map(([ic, h, p]) => `<div class="mk-feat"><div class="mk-feat-ic"><i class="ti ti-${ic}"></i></div><h3>${h}</h3><p>${p}</p></div>`).join('');
+const PORTAL_SECTION = `
+<section class="mk-features portal-sec">
+<div class="mk-sec-head"><div class="mk-eyebrow">Your client portal</div><h2>Stay in control of your website, without learning new software.</h2><p>Every client gets a secure, private portal. It's where we build your website together, and where you look after it once it's live.</p></div>
+<h3 class="portal-h">While we build your site</h3>
+<div class="mk-feat-grid g3">${PORTAL_ITEMS([
+['eye', 'See each draft as it takes shape', 'Preview every new version of your site in your browser, whenever we share one.'],
+['cloud-upload', 'Send us everything in one place', 'Your firm details, practice areas, team profiles, logos, photos and documents. No long email chains.'],
+['circle-check', 'Approve each stage', 'Give feedback and sign off when you are happy. Nothing goes live until you approve it.'],
+])}</div>
+<h3 class="portal-h">Once you're live</h3>
+<div class="mk-feat-grid">${PORTAL_ITEMS([
+['users', 'Keep your team up to date', 'Add new starters, change job titles and remove people who have left.'],
+['clock', 'Change your opening hours', 'Update your hours, bank holidays and office closures. Your website updates within a minute.'],
+['news', 'Publish news and articles', 'Write blog posts and publish them straight to your website, or schedule them for later.'],
+['file-text', 'Keep documents current', 'Upload a new price list or complaints procedure. The link on your website stays the same.'],
+])}</div>
+<p class="portal-note"><i class="ti ti-lock"></i>No separate software, plugins or extra logins. Your partners or practice manager approve anything before it goes public.</p>
+</section>`;
+PAGES.home = PAGES.home.replace(`${svcGrid()}\n</section>`, `${svcGrid()}\n</section>` + PORTAL_SECTION);
+
+// Pricing: page allowance per package (to be decided) and the revisions policy. Owner-approved addition.
+PAGES.pricing = PAGES.pricing
+  .replaceAll('<li><i class="ti ti-check"></i>[Inclusions to confirm]</li>',
+    '<li><i class="ti ti-check"></i>[Number of pages to confirm]</li><li><i class="ti ti-check"></i>Client portal and website editor</li><li><i class="ti ti-check"></i>[Inclusions to confirm]</li>')
+  .replace('<div class="price-allinc">', `<div class="price-revisions"><div class="price-name">Changes after sign-off</div><p>Before launch, you review and approve every stage of your site. Once you have signed it off, further design or content changes are quoted separately, depending on what needs to change. Blog posts, opening hours, team updates and documents you can change at any time yourself, through your client portal.</p></div>
+<div class="price-allinc">`);

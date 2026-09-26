@@ -37,3 +37,11 @@
 .mk-philo p{font-family:var(--serif);font-size:34px;line-height:1.25;font-weight:500;letter-spacing:-.01em;color:var(--ink);text-wrap:balance}
 .mk-philo em{color:var(--accent)}
 @media (max-width:620px){.mk-philo{padding:0 16px 48px}.mk-philo p{font-size:clamp(24px,7vw,28px)}}
+/* Client portal (home) and changes after sign-off (pricing): owner-approved additions */
+.portal-h{max-width:1140px;margin:28px auto 14px;font-family:var(--serif);font-size:24px;font-weight:600;color:var(--ink)}
+.portal-note{max-width:1140px;margin:22px auto 0;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.portal-note i{color:var(--accent);font-size:16px}
+.price-revisions{max-width:904px;margin:14px auto 0;padding:22px 26px;border:1px dashed var(--border-2);border-radius:16px;background:var(--surface)}
+.price-revisions p{margin-top:6px;font-size:13.5px;line-height:1.6;color:var(--ink-2)}
+@media (max-width:980px){.price-revisions{margin:14px 28px 0}}
+@media (max-width:620px){.price-revisions{margin:14px 16px 0;padding:18px}}

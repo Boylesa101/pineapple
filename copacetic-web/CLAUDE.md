@@ -22,6 +22,9 @@ The owner asked for these after the port, so they are part of the source now:
   `/starting-a-law-firm` guide (linked from the footer and the FAQs). Regulatory statements follow SRA guidance;
   keep them general, link to sra.org.uk, and keep the "not legal or regulatory advice" note.
 - The home-page "Our philosophy" statement (end of `source/pages-5.js`).
+- The home-page "Your client portal" section (after "What we do"), and on Pricing: a "[Number of pages to confirm]"
+  placeholder and "Client portal and website editor" in each tier, plus the "Changes after sign-off" box
+  (end of `source/pages-5.js`, styles at the end of `source/site-3.css`).
 - Search titles/descriptions, social links and the site URL in `site.config.mjs`; mobile fixes in `src/responsive.css`.
 
 ## Pinned values (most likely to drift)
