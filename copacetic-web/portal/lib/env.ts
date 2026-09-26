@@ -10,6 +10,11 @@ const schema = z.object({
   // Optional: without it, invite emails aren't sent and the admin copies the link instead.
   RESEND_API_KEY: z.string().min(10).optional(),
   EMAIL_FROM: z.string().min(3).default('copacetic.web <portal@localhost>'),
+  // Where submission notifications go (the agency inbox). Optional.
+  AGENCY_NOTIFY_EMAIL: z.email().optional(),
+  // Signs upload verdicts; must match the `media_signing_secret` in Supabase Vault. Without it,
+  // uploads stay "checking" and are never marked clean.
+  MEDIA_SIGNING_SECRET: z.string().min(32).optional(),
 });
 
 export const env = schema.parse({
@@ -18,6 +23,8 @@ export const env = schema.parse({
   PORTAL_URL: process.env.PORTAL_URL || undefined,
   RESEND_API_KEY: process.env.RESEND_API_KEY || undefined,
   EMAIL_FROM: process.env.EMAIL_FROM || undefined,
+  AGENCY_NOTIFY_EMAIL: process.env.AGENCY_NOTIFY_EMAIL || undefined,
+  MEDIA_SIGNING_SECRET: process.env.MEDIA_SIGNING_SECRET || undefined,
 });
 
 export const portalUrl = (path: string) => new URL(path, env.PORTAL_URL).toString();
