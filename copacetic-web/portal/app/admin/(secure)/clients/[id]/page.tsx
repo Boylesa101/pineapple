@@ -7,13 +7,17 @@ import { takeInviteFlash } from '@/lib/invitations';
 import { messageFor } from '@/lib/messages';
 import { ROLE_LABELS, STAGES, stageInfo } from '@/lib/stages';
 import { createClient } from '@/lib/supabase/server';
+import { ACTION_LABELS, asanaProjectUrl, loadClientSync } from '@/lib/sync';
 import { uuid } from '@/lib/validation';
 import {
   addBuild,
   deleteBuild,
   inviteToClient,
+  linkAsanaProject,
   moveStage,
   removeClientMember,
+  requestAsanaProject,
+  retrySync,
   revokeInvitation,
   setBuildShared,
   setMemberRole,
@@ -33,7 +37,7 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
   const [{ data: org }, { data: sites }, { data: members }, { data: invites }, { data: builds }, { data: audit }] =
     await Promise.all([
       supabase.from('organisations').select('id, name, slug, sra_number, created_at').eq('id', id).maybeSingle(),
-      supabase.from('sites').select('id, name, stage, stage_changed_at, invoice_on').eq('org_id', id).order('created_at'),
+      supabase.from('sites').select('id, name, stage, stage_changed_at, invoice_on, asana_project_gid').eq('org_id', id).order('created_at'),
       supabase.from('memberships').select('user_id, role, profiles (email, full_name)').eq('org_id', id).order('created_at'),
       supabase
         .from('invitations')
@@ -54,7 +58,8 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
         .limit(25),
     ]);
   if (!org) notFound();
-  const flash = await takeInviteFlash();
+  const [flash, sync] = await Promise.all([takeInviteFlash(), loadClientSync(id)]);
+  const problems = sync.jobs.filter((j) => j.status === 'failed');
   const now = new Date();
 
   return (
@@ -100,6 +105,38 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
                 </select>
                 <Submit className="btn ghost" pending="Moving…">Move to stage</Submit>
               </form>
+            </div>
+
+            <div className="card">
+              <div className="spread">
+                <h2 style={{ marginBottom: 0 }}>Asana</h2>
+                {site.asana_project_gid ? (
+                  <a href={asanaProjectUrl(site.asana_project_gid)} target="_blank" rel="noopener noreferrer">
+                    Open project<span className="sr-only"> for {site.name}</span>
+                  </a>
+                ) : (
+                  <span className="pill amber">Not set up yet</span>
+                )}
+              </div>
+              <p className="small" style={{ margin: '6px 0 14px' }}>
+                {site.asana_project_gid
+                  ? 'Submissions become tasks in this project. Completing a content task in Asana approves it here.'
+                  : 'The project is created automatically once Asana is connected. You can also link one you already have.'}
+              </p>
+              <div className="row">
+                <form action={linkAsanaProject} className="row">
+                  <input type="hidden" name="orgId" value={org.id} />
+                  <input type="hidden" name="siteId" value={site.id} />
+                  <label className="sr-only" htmlFor={`asana-${site.id}`}>Asana project link or number</label>
+                  <input id={`asana-${site.id}`} name="project" required maxLength={300} placeholder="Asana project link or number" style={{ width: 280 }} />
+                  <Submit className="btn ghost" pending="Linking…">{site.asana_project_gid ? 'Link a different project' : 'Link existing project'}</Submit>
+                </form>
+                <form action={requestAsanaProject}>
+                  <input type="hidden" name="orgId" value={org.id} />
+                  <input type="hidden" name="siteId" value={site.id} />
+                  <Submit className="btn link" pending="Queued…">{site.asana_project_gid ? 'Check sections and webhook' : 'Create project now'}</Submit>
+                </form>
+              </div>
             </div>
 
             <div className="card">
@@ -182,6 +219,28 @@ export default async function ClientPage(props: PageProps<'/admin/clients/[id]'>
           </section>
         );
       })}
+
+      {problems.length > 0 && (
+        <section className="card" aria-labelledby="sync-problems">
+          <h2 id="sync-problems">Asana sync problems</h2>
+          <ul style={{ listStyle: 'none' }} className="stack">
+            {problems.map((j) => (
+              <li key={j.id} className="spread">
+                <div>
+                  <strong>{ACTION_LABELS[j.action] ?? j.action}</strong>{' '}
+                  <span className="small">after {j.attempts} attempts · {when.format(new Date(j.updated_at))}</span>
+                  {j.last_error && <div className="small mono">{j.last_error}</div>}
+                </div>
+                <form action={retrySync}>
+                  <input type="hidden" name="jobId" value={j.id} />
+                  <input type="hidden" name="orgId" value={org.id} />
+                  <Submit className="btn ghost" pending="Retrying…">Retry</Submit>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="card" aria-labelledby="people">
         <h2 id="people">People</h2>

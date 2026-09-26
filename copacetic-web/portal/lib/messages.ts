@@ -9,6 +9,7 @@ export const MESSAGES = {
   slug_taken: 'That short name is already used by another client. Choose a different one.',
   create_failed: 'The client couldn’t be created. Try again.',
   build_failed: 'The preview couldn’t be saved. Check the link and try again.',
+  asana_failed: 'That Asana change didn’t go through. Check the project number and try again.',
 } as const;
 export type MessageCode = keyof typeof MESSAGES;
 export const messageFor = (code: unknown) =>

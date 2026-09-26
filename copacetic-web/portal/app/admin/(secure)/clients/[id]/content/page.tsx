@@ -4,12 +4,14 @@ import { notFound } from 'next/navigation';
 import { BriefingView } from '@/components/briefing-view';
 import { RichTextView } from '@/components/rich-text-view';
 import { Submit } from '@/components/submit';
+import { SyncBadge } from '@/components/sync-badge';
 import { toRgb } from '@/lib/colour';
 import { briefingProgress } from '@/lib/content/briefing';
 import { COLOUR_USES, FONT_ROLES, SECTIONS, type Colour, type Font } from '@/lib/content/sections';
 import { withFileUrls } from '@/lib/files';
 import { checklist, loadOnboarding } from '@/lib/onboarding';
 import { stageInfo } from '@/lib/stages';
+import { loadClientSync } from '@/lib/sync';
 import { uuid } from '@/lib/validation';
 import { reopenBriefing, reopenSection } from '@/app/admin/actions';
 
@@ -24,7 +26,7 @@ export default async function ClientContentPage(props: PageProps<'/admin/clients
   const o = await loadOnboarding(id);
   const c = checklist(o);
   const bp = briefingProgress(o.briefing.data as Record<string, Record<string, unknown>>);
-  const files = await withFileUrls(o.media);
+  const [files, sync] = await Promise.all([withFileUrls(o.media), loadClientSync(id)]);
   const pct = Math.round((c.progress.complete / c.progress.total) * 100);
 
   return (
@@ -55,6 +57,7 @@ export default async function ClientContentPage(props: PageProps<'/admin/clients
             <span className={`pill ${o.briefing.status === 'submitted' ? 'green' : ''}`}>
               {o.briefing.status === 'submitted' ? 'Submitted' : `Draft · ${bp.done}/${bp.total} required`}
             </span>
+            <SyncBadge state={sync.briefing} label="briefing" />
             {o.briefing.status === 'submitted' && (
               <form action={reopenBriefing}>
                 <input type="hidden" name="orgId" value={id} />
@@ -84,6 +87,7 @@ export default async function ClientContentPage(props: PageProps<'/admin/clients
                     <h3 style={{ marginBottom: 0 }}>{r.title || cfg.itemLabel}</h3>
                     <div className="row">
                       <span className={`pill ${tone}`}>{label}</span>
+                      <SyncBadge state={sync.section(r.id)} label={r.title || cfg.itemLabel} />
                       {r.status !== 'draft' && (
                         <form action={reopenSection}>
                           <input type="hidden" name="orgId" value={id} />

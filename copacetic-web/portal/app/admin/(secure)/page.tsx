@@ -10,11 +10,12 @@ const days = (iso: string) => Math.max(0, Math.floor((Date.now() - new Date(iso)
 export default async function AdminHome(props: PageProps<'/admin'>) {
   const { stage } = await props.searchParams;
   const supabase = await createClient();
-  const [{ data: orgs }, { data: sites }, { data: builds }, { data: members }] = await Promise.all([
+  const [{ data: orgs }, { data: sites }, { data: builds }, { data: members }, { count: failedSyncs }] = await Promise.all([
     supabase.from('organisations').select('id, name, slug, created_at').order('name'),
     supabase.from('sites').select('id, org_id, name, stage, stage_changed_at'),
     supabase.from('builds').select('site_id, version_label, created_at, shared_with_client').order('created_at', { ascending: false }),
     supabase.from('memberships').select('org_id'),
+    supabase.from('integration_events').select('id', { count: 'exact', head: true }).eq('status', 'failed'),
   ]);
   const filter = typeof stage === 'string' && STAGES.some((s) => s.id === stage) ? stage : null;
   const rows = (sites ?? [])
@@ -37,6 +38,12 @@ export default async function AdminHome(props: PageProps<'/admin'>) {
           New client
         </Link>
       </div>
+      {!!failedSyncs && (
+        <div className="notice err" role="status" style={{ marginTop: 14 }}>
+          {failedSyncs === 1 ? '1 change' : `${failedSyncs} changes`} didn’t reach Asana.{' '}
+          <Link href="/admin/sync">Review and retry</Link>
+        </div>
+      )}
       <nav className="row" aria-label="Filter by stage" style={{ margin: '14px 0 18px' }}>
         <Link className={`pill ${!filter ? 'green' : ''}`} href="/admin">All</Link>
         {STAGES.map((s) => (

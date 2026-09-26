@@ -201,3 +201,53 @@ export async function reopenBriefing(formData: FormData) {
   revalidatePath(`/admin/clients/${parsed.data}/content`);
   redirect(`/admin/clients/${parsed.data}/content`);
 }
+
+// ------------------------------------------------------------------ Phase 3 ---
+
+const asanaGid = z.string().trim().regex(/^[0-9]{1,30}$/);
+
+// Accepts a bare project number or a pasted Asana project link.
+const projectFromInput = (v: string) => v.match(/app\.asana\.com\/(?:0|1\/\d+\/project)\/(\d{1,30})/)?.[1] ?? v.trim();
+
+export async function linkAsanaProject(formData: FormData) {
+  await requireAdmin();
+  const parsed = z.object({ orgId: uuid, siteId: uuid, project: asanaGid }).safeParse({
+    orgId: formString(formData, 'orgId'),
+    siteId: formString(formData, 'siteId'),
+    project: projectFromInput(formString(formData, 'project')),
+  });
+  if (!parsed.success) return toClient(formString(formData, 'orgId'), 'asana_failed');
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('link_asana_project', { p_site: parsed.data.siteId, p_project: parsed.data.project });
+  if (error) toClient(parsed.data.orgId, 'asana_failed');
+  syncSoon();
+  toClient(parsed.data.orgId);
+}
+
+export async function requestAsanaProject(formData: FormData) {
+  await requireAdmin();
+  const parsed = z.object({ orgId: uuid, siteId: uuid }).safeParse({
+    orgId: formString(formData, 'orgId'),
+    siteId: formString(formData, 'siteId'),
+  });
+  if (!parsed.success) redirect('/admin');
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('request_asana_project', { p_site: parsed.data.siteId });
+  if (error) toClient(parsed.data.orgId, 'asana_failed');
+  syncSoon();
+  toClient(parsed.data.orgId);
+}
+
+export async function retrySync(formData: FormData) {
+  await requireAdmin();
+  const id = z.coerce.number().int().positive().safeParse(formString(formData, 'jobId'));
+  const orgId = uuid.safeParse(formString(formData, 'orgId'));
+  const back = orgId.success ? `/admin/clients/${orgId.data}` : '/admin/sync';
+  if (id.success) {
+    const supabase = await createClient();
+    await supabase.rpc('retry_integration_event', { p_id: id.data });
+    syncSoon();
+  }
+  revalidatePath(back);
+  redirect(back);
+}

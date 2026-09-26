@@ -11,6 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         items={[
           { href: '/admin', label: 'Clients' },
           { href: '/admin/clients/new', label: 'New client' },
+          { href: '/admin/sync', label: 'Asana sync' },
         ]}
       />
       <main className="page">{children}</main>
